@@ -1,13 +1,20 @@
-import { Activity, Network, Shield } from 'lucide-react';
+import { Activity, Network, Shield, Zap } from 'lucide-react';
+import { useState } from 'react';
 import KPICard from './components/KPICard';
 import AlertPanel from './components/AlertPanel';
 import DeviceStatus from './components/DeviceStatus';
 import NetworkTopology from './components/NetworkTopology';
 import AIInsights from './components/AIInsights';
 import LayerOverview from './components/LayerOverview';
+import Advanced3DTopology from './components/Advanced3DTopology';
+import AdvancedAnalytics from './components/AdvancedAnalytics';
+import NetworkHeatmap from './components/NetworkHeatmap';
+import PredictiveAnalytics from './components/PredictiveAnalytics';
+import DataFlowVisualization from './components/DataFlowVisualization';
 import { devices, layerKPIs, alerts, connections } from './data/mockData';
 
 function App() {
+  const [activeView, setActiveView] = useState<'overview' | '3d' | 'analytics' | 'predictions'>('overview');
   const healthyDevices = devices.filter(d => d.status === 'healthy').length;
   const totalDevices = devices.length;
   const healthPercentage = Math.round((healthyDevices / totalDevices) * 100);
@@ -51,38 +58,110 @@ function App() {
       </header>
 
       <main className="max-w-[1800px] mx-auto px-6 py-6">
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12">
-            <LayerOverview kpis={layerKPIs} />
-          </div>
+        <div className="flex gap-2 mb-6 bg-white rounded-lg shadow-lg p-2">
+          <button
+            onClick={() => setActiveView('overview')}
+            className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+              activeView === 'overview'
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveView('3d')}
+            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+              activeView === '3d'
+                ? 'bg-purple-600 text-white shadow-lg'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <Zap className="w-4 h-4" />
+            3D Topology
+          </button>
+          <button
+            onClick={() => setActiveView('analytics')}
+            className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+              activeView === 'analytics'
+                ? 'bg-green-600 text-white shadow-lg'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            Analytics
+          </button>
+          <button
+            onClick={() => setActiveView('predictions')}
+            className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+              activeView === 'predictions'
+                ? 'bg-orange-600 text-white shadow-lg'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            Predictions
+          </button>
+        </div>
 
-          <div className="col-span-12 lg:col-span-8">
-            <NetworkTopology devices={devices} connections={connections} />
-          </div>
+        {activeView === 'overview' && (
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-12">
+              <LayerOverview kpis={layerKPIs} />
+            </div>
 
-          <div className="col-span-12 lg:col-span-4">
-            <DeviceStatus devices={devices} />
-          </div>
+            <div className="col-span-12 lg:col-span-8">
+              <NetworkTopology devices={devices} connections={connections} />
+            </div>
 
-          <div className="col-span-12">
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-6">Layer KPI Metrics</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                {layerKPIs.map((kpi, idx) => (
-                  <KPICard key={idx} kpi={kpi} />
-                ))}
+            <div className="col-span-12 lg:col-span-4">
+              <DeviceStatus devices={devices} />
+            </div>
+
+            <div className="col-span-12">
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <h2 className="text-xl font-bold text-gray-800 mb-6">Layer KPI Metrics</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                  {layerKPIs.map((kpi, idx) => (
+                    <KPICard key={idx} kpi={kpi} />
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="col-span-12 lg:col-span-6">
-            <AlertPanel alerts={alerts} />
-          </div>
+            <div className="col-span-12 lg:col-span-6">
+              <AlertPanel alerts={alerts} />
+            </div>
 
-          <div className="col-span-12 lg:col-span-6">
-            <AIInsights />
+            <div className="col-span-12 lg:col-span-6">
+              <AIInsights />
+            </div>
           </div>
-        </div>
+        )}
+
+        {activeView === '3d' && (
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-12">
+              <Advanced3DTopology devices={devices} connections={connections} />
+            </div>
+            <div className="col-span-12">
+              <DataFlowVisualization />
+            </div>
+            <div className="col-span-12">
+              <NetworkHeatmap />
+            </div>
+          </div>
+        )}
+
+        {activeView === 'analytics' && (
+          <div>
+            <AdvancedAnalytics />
+          </div>
+        )}
+
+        {activeView === 'predictions' && (
+          <div>
+            <PredictiveAnalytics />
+          </div>
+        )}
 
         <footer className="mt-6 text-center text-sm text-slate-600 bg-white rounded-lg shadow-lg p-4">
           <div className="flex items-center justify-center gap-8">
