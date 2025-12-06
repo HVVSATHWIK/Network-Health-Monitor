@@ -139,7 +139,7 @@ export default function Advanced3DTopology({ devices, connections }: Advanced3DT
 
     let mouseX = 0;
     let mouseY = 0;
-    renderer.domElement.addEventListener('mousemove', (e) => {
+    renderer.domElement.addEventListener('mousemove', (e: MouseEvent) => {
       mouseX = (e.clientX / width) * 2 - 1;
       mouseY = -(e.clientY / height) * 2 + 1;
     });
@@ -151,19 +151,19 @@ export default function Advanced3DTopology({ devices, connections }: Advanced3DT
       camera.position.y += (30 + mouseY * 20 - camera.position.y) * 0.05;
       camera.lookAt(0, 0, 0);
 
-      deviceGroup.children.forEach((child) => {
+      deviceGroup.children.forEach((child: THREE.Object3D) => {
         if ((child as any).baseScale !== undefined) {
           (child as any).baseScale += (child as any).speed;
           if ((child as any).baseScale > 1.5) (child as any).baseScale = 1;
           child.scale.setScalar((child as any).baseScale);
-          child.material.opacity = 0.2 + (1 - (child as any).baseScale) * 0.3;
+          ((child as THREE.Mesh).material as THREE.MeshPhongMaterial).opacity = 0.2 + (1 - (child as any).baseScale) * 0.3;
         } else {
           child.rotation.x += 0.005;
           child.rotation.y += 0.008;
         }
       });
 
-      lineGroup.children.forEach((child) => {
+      lineGroup.children.forEach((child: THREE.Object3D) => {
         if ((child as any).progress !== undefined) {
           (child as any).progress += (child as any).speed;
           if ((child as any).progress > 1) (child as any).progress = 0;
