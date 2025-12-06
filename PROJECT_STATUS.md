@@ -175,7 +175,6 @@ Network-Health-Monitor/
 1. **TypeScript Type Errors**
    - Missing `@types/three` package for Three.js type definitions
    - Four type errors in Advanced3DTopology.tsx related to implicit 'any' types
-   - Need to run `npm i --save-dev @types/three` to resolve
 
 ### 📋 Not Yet Implemented
 
@@ -247,6 +246,9 @@ Network-Health-Monitor/
 ```bash
 # Install dependencies
 npm install
+
+# Fix TypeScript type issues (if needed)
+npm i --save-dev @types/three
 
 # Run development server
 npm run dev
