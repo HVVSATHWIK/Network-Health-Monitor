@@ -11,7 +11,7 @@ import AdvancedAnalytics from './components/AdvancedAnalytics';
 import NetworkHeatmap from './components/NetworkHeatmap';
 import PredictiveAnalytics from './components/PredictiveAnalytics';
 import DataFlowVisualization from './components/DataFlowVisualization';
-import ChaosPanel from './components/ChaosPanel';
+
 import { devices as initialDevices, layerKPIs, alerts as initialAlerts, connections, dependencyPaths } from './data/mockData';
 import { Device, Alert } from './types/network';
 
