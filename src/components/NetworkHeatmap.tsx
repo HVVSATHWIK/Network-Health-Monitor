@@ -1,24 +1,58 @@
 import { useMemo } from 'react';
 import { Flame } from 'lucide-react';
+import { Alert } from '../types/network';
 
-export default function NetworkHeatmap() {
+interface NetworkHeatmapProps {
+  alerts?: Alert[];
+}
+
+export default function NetworkHeatmap({ alerts = [] }: NetworkHeatmapProps) {
   const heatmapData = useMemo(() => {
     const data = [];
     const layers = ['L1', 'L2', 'L3', 'L4', 'L5-7'];
     const metrics = ['Utilization', 'Latency', 'Errors', 'Packets', 'Jitter'];
 
+    // Check if we have the specific "Rigged" faults active
+    const hasL1Fault = alerts.some(a => a.layer === 'L1' && a.severity === 'critical');
+    const hasL7Fault = alerts.some(a => a.layer === 'L7' && a.severity === 'high');
+
     for (let i = 0; i < layers.length; i++) {
       for (let j = 0; j < metrics.length; j++) {
-        const baseValue = 50 + Math.sin(i * 0.5) * 20 + Math.cos(j * 0.3) * 15;
+        const layer = layers[i];
+        const metric = metrics[j];
+
+        // Default Logic: Skew towards Healthy (0-20)
+        // 85% chance of being Healthy (0-20)
+        // 10% chance of being Warning (40-60)
+        // 5% chance of being Critical (80-100)
+        const rand = Math.random();
+        let val = 0;
+        if (rand < 0.85) {
+          val = Math.floor(Math.random() * 20); // Healthy
+        } else if (rand < 0.95) {
+          val = Math.floor(Math.random() * 20) + 40; // Warning
+        } else {
+          val = Math.floor(Math.random() * 20) + 80; // Critical
+        }
+
+        // --- DYNAMIC DEMO SCENARIO ---
+        // Only trigger the spike if the Fault is actually active in the system
+        if (hasL1Fault && layer === 'L1' && metric === 'Errors') {
+          val = 95; // SPIKE!
+        }
+        if (hasL7Fault && layer === 'L5-7' && metric === 'Latency') {
+          val = 88; // SPIKE!
+        }
+
         data.push({
-          layer: layers[i],
-          metric: metrics[j],
-          value: Math.min(100, Math.max(0, baseValue + Math.random() * 20))
+          layer,
+          metric,
+          value: Math.min(100, Math.max(0, val))
         });
       }
     }
     return data;
-  }, []);
+  }, [alerts]); // Re-run when alerts change
 
   const getColor = (value: number) => {
     if (value < 20) return 'bg-blue-600';
@@ -57,10 +91,10 @@ export default function NetworkHeatmap() {
               <div key={`layer-${layer}`} className="font-semibold text-gray-800 text-sm py-2 pl-2 flex items-center bg-white">
                 {layer}
               </div>
-              {metrics.map(metric => {
+              {metrics.map((metric, metricIndex) => {
                 const data = heatmapData.find(d => d.layer === layer && d.metric === metric);
                 return (
-                  <div key={`${layer}-${metric}`} className="relative">
+                  <div key={`${layer}-${metricIndex}`} className="relative">
                     <div
                       className={`${getColor(data?.value || 0)} ${getTextColor(data?.value || 0)} rounded px-2 py-2 text-center text-xs font-semibold transition-all hover:shadow-lg cursor-pointer`}
                       title={`${layer} ${metric}: ${data?.value.toFixed(1) || 0}%`}

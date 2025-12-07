@@ -1,4 +1,4 @@
-import { Device, LayerKPI, Alert, NetworkConnection } from '../types/network';
+import { Device, LayerKPI, Alert, NetworkConnection, DependencyPath } from '../types/network';
 
 export const devices: Device[] = [
   { id: 'd1', name: 'Core Switch 01', type: 'switch', status: 'healthy', ip: '192.168.1.1', location: 'Server Room', manufacturer: 'Hirschmann' },
@@ -83,4 +83,25 @@ export const connections: NetworkConnection[] = [
   { source: 'd10', target: 'd5', bandwidth: 380, latency: 3, status: 'healthy' },
   { source: 'd10', target: 'd6', bandwidth: 120, latency: 6, status: 'healthy' },
   { source: 'd10', target: 'd7', bandwidth: 85, latency: 45, status: 'down' },
+];
+
+export const dependencyPaths: DependencyPath[] = [
+  {
+    appId: 'app1',
+    appName: 'SCADA Control Loop',
+    criticality: 'mission-critical',
+    path: ['d5', 'd10', 'd1', 'd8', 'd3'] // SCADA -> Switch -> Core -> Gateway -> PLC
+  },
+  {
+    appId: 'app2',
+    appName: 'Inventory Sync',
+    criticality: 'medium',
+    path: ['d9', 'd1', 'd2'] // Server -> Core Switch -> Edge Router
+  },
+  {
+    appId: 'app3',
+    appName: 'Zone B Monitoring',
+    criticality: 'high',
+    path: ['d7', 'd10', 'd1', 'd5'] // Sensor -> Switch -> Core -> SCADA
+  }
 ];

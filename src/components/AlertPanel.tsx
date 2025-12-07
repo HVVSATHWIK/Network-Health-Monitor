@@ -1,11 +1,14 @@
-import { Alert } from '../types/network';
-import { AlertCircle, AlertTriangle, Info, Sparkles } from 'lucide-react';
+import { Alert, Device, DependencyPath } from '../types/network';
+import { AlertCircle, AlertTriangle, Info, Sparkles, BrainCircuit } from 'lucide-react';
+import { analyzeRootCause } from '../utils/aiLogic';
 
 interface AlertPanelProps {
   alerts: Alert[];
+  devices: Device[];
+  dependencyPaths: DependencyPath[];
 }
 
-export default function AlertPanel({ alerts }: AlertPanelProps) {
+export default function AlertPanel({ alerts, devices, dependencyPaths }: AlertPanelProps) {
   const severityConfig = {
     critical: { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
     high: { icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
@@ -35,8 +38,13 @@ export default function AlertPanel({ alerts }: AlertPanelProps) {
           const config = severityConfig[alert.severity];
           const Icon = config.icon;
 
+          // Run AI Root Cause Analysis
+          // We pass the alert's device name as the appName because in our mock data 
+          // application alerts are logged against the App Name (e.g., "SCADA Control Loop")
+          const rootCauseInsight = analyzeRootCause(alert.device, alerts, devices, dependencyPaths);
+
           return (
-            <div key={alert.id} className={`border ${config.border} ${config.bg} rounded-lg p-4`}>
+            <div key={alert.id} className={`border ${config.border} ${config.bg} rounded-lg p-4 transition-all hover:shadow-md`}>
               <div className="flex items-start gap-3">
                 <Icon className={`w-5 h-5 ${config.color} flex-shrink-0 mt-0.5`} />
                 <div className="flex-1">
@@ -54,13 +62,15 @@ export default function AlertPanel({ alerts }: AlertPanelProps) {
                   <div className="text-sm text-gray-700 mb-2">
                     {alert.message}
                   </div>
-                  {alert.aiCorrelation && (
+
+                  {/* Standard AI Correlation (from static data) */}
+                  {alert.aiCorrelation && !rootCauseInsight && (
                     <div className="mt-3 pt-3 border-t border-gray-200">
                       <div className="flex items-start gap-2">
                         <Sparkles className="w-4 h-4 text-purple-600 flex-shrink-0 mt-0.5" />
                         <div>
                           <div className="text-xs font-semibold text-purple-700 mb-1">
-                            AI Insight
+                            AI Context
                           </div>
                           <div className="text-xs text-gray-600">
                             {alert.aiCorrelation}
@@ -69,6 +79,29 @@ export default function AlertPanel({ alerts }: AlertPanelProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Deep-Dive AI Root Cause Insight (Dynamic) */}
+                  {rootCauseInsight && (
+                    <div className="mt-4 relative group">
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg blur opacity-30 group-hover:opacity-60 transition duration-200"></div>
+                      <div className="relative bg-white bg-opacity-90 backdrop-blur-sm p-4 rounded-lg border border-purple-100 shadow-xl">
+                        <div className="flex items-start gap-3">
+                          <div className="bg-gradient-to-br from-purple-500 to-indigo-600 p-2 rounded-lg shadow-inner">
+                            <BrainCircuit className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-700 to-indigo-700 mb-1">
+                              Deep-Dive Root Cause
+                            </div>
+                            <div className="text-xs text-gray-800 leading-relaxed font-medium">
+                              {rootCauseInsight}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               </div>
             </div>

@@ -35,3 +35,10 @@ export interface NetworkConnection {
   latency: number;
   status: 'healthy' | 'degraded' | 'down';
 }
+
+export interface DependencyPath {
+  appId: string;
+  appName: string;
+  criticality: 'low' | 'medium' | 'high' | 'mission-critical';
+  path: string[]; // Array of Device IDs involved in this workflow
+}

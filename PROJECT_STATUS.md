@@ -154,6 +154,11 @@ Network-Health-Monitor/
     - Pattern recognition and anomaly detection
     - Intelligent alert correlation
 
+ 12. **Topology & Dependency Mapper (Architecture)**
+     - Maps physical connections (L1/L2) to logical workflows (L3-L7)
+     - Traces application traffic paths through specific network devices
+     - Enables "Deep-Dive Diagnostics" by linking App health to Physical root causes
+
 12. **Responsive UI**
     - Tailwind CSS-based responsive design
     - Modern gradient backgrounds

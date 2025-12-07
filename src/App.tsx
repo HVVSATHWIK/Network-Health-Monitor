@@ -11,13 +11,63 @@ import AdvancedAnalytics from './components/AdvancedAnalytics';
 import NetworkHeatmap from './components/NetworkHeatmap';
 import PredictiveAnalytics from './components/PredictiveAnalytics';
 import DataFlowVisualization from './components/DataFlowVisualization';
-import { devices, layerKPIs, alerts, connections } from './data/mockData';
+import ChaosPanel from './components/ChaosPanel';
+import { devices as initialDevices, layerKPIs, alerts as initialAlerts, connections, dependencyPaths } from './data/mockData';
+import { Device, Alert } from './types/network';
 
 function App() {
   const [activeView, setActiveView] = useState<'overview' | '3d' | 'analytics' | 'predictions'>('overview');
+
+  // Dynamic State for Simulation
+  const [devices, setDevices] = useState<Device[]>(initialDevices);
+  const [alerts, setAlerts] = useState<Alert[]>(initialAlerts);
+
   const healthyDevices = devices.filter(d => d.status === 'healthy').length;
   const totalDevices = devices.length;
   const healthPercentage = Math.round((healthyDevices / totalDevices) * 100);
+
+  // Fault Injection Logic
+  const handleInjectFault = (type: 'l1' | 'l7') => {
+    if (type === 'l1') {
+      // 1. Break the Switch (Physical Layer)
+      setDevices(prev => prev.map(d =>
+        d.name === 'Access Switch 02' ? { ...d, status: 'critical' } : d
+      ));
+
+      // 2. Add Critical Alert
+      const newAlert: Alert = {
+        id: `sim-l1-${Date.now()}`,
+        severity: 'critical',
+        layer: 'L1',
+        device: 'Access Switch 02',
+        message: 'Port 4 Link Down (CRC Errors > 90%)',
+        timestamp: new Date()
+      };
+      setAlerts(prev => [newAlert, ...prev]);
+    }
+    else if (type === 'l7') {
+      // 1. Lag the Server (Application Layer)
+      setDevices(prev => prev.map(d =>
+        d.type === 'scada' ? { ...d, status: 'warning' } : d
+      ));
+
+      // 2. Add High Latency Alert
+      const newAlert: Alert = {
+        id: `sim-l7-${Date.now()}`,
+        severity: 'high',
+        layer: 'L7',
+        device: 'SCADA Control Loop', // Matches dependency path appName
+        message: 'Response Time > 5000ms (Timeout)',
+        timestamp: new Date()
+      };
+      setAlerts(prev => [newAlert, ...prev]);
+    }
+  };
+
+  const handleReset = () => {
+    setDevices(initialDevices);
+    setAlerts(initialAlerts);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
@@ -39,7 +89,7 @@ function App() {
                 <Shield className="w-5 h-5 text-green-400" />
                 <div>
                   <div className="text-xs text-slate-400">Network Health</div>
-                  <div className="text-lg font-bold text-green-400">{healthPercentage}%</div>
+                  <div className={`text-lg font-bold ${healthPercentage < 90 ? 'text-red-400' : 'text-green-400'}`}>{healthPercentage}%</div>
                 </div>
               </div>
               <div className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg">
@@ -61,42 +111,38 @@ function App() {
         <div className="flex gap-2 mb-6 bg-white rounded-lg shadow-lg p-2">
           <button
             onClick={() => setActiveView('overview')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-              activeView === 'overview'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`px-6 py-2 rounded-lg font-semibold transition-all ${activeView === 'overview'
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'text-gray-700 hover:bg-gray-100'
+              }`}
           >
             Overview
           </button>
           <button
             onClick={() => setActiveView('3d')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-              activeView === '3d'
-                ? 'bg-purple-600 text-white shadow-lg'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeView === '3d'
+              ? 'bg-purple-600 text-white shadow-lg'
+              : 'text-gray-700 hover:bg-gray-100'
+              }`}
           >
             <Zap className="w-4 h-4" />
             3D Topology
           </button>
           <button
             onClick={() => setActiveView('analytics')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-              activeView === 'analytics'
-                ? 'bg-green-600 text-white shadow-lg'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`px-6 py-2 rounded-lg font-semibold transition-all ${activeView === 'analytics'
+              ? 'bg-green-600 text-white shadow-lg'
+              : 'text-gray-700 hover:bg-gray-100'
+              }`}
           >
             Analytics
           </button>
           <button
             onClick={() => setActiveView('predictions')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-              activeView === 'predictions'
-                ? 'bg-orange-600 text-white shadow-lg'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
+            className={`px-6 py-2 rounded-lg font-semibold transition-all ${activeView === 'predictions'
+              ? 'bg-orange-600 text-white shadow-lg'
+              : 'text-gray-700 hover:bg-gray-100'
+              }`}
           >
             Predictions
           </button>
@@ -128,7 +174,7 @@ function App() {
             </div>
 
             <div className="col-span-12 lg:col-span-6">
-              <AlertPanel alerts={alerts} />
+              <AlertPanel alerts={alerts} devices={devices} dependencyPaths={dependencyPaths} />
             </div>
 
             <div className="col-span-12 lg:col-span-6">
@@ -140,13 +186,18 @@ function App() {
         {activeView === '3d' && (
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12">
-              <Advanced3DTopology devices={devices} connections={connections} />
+              <Advanced3DTopology
+                devices={devices}
+                connections={connections}
+                onInjectFault={handleInjectFault}
+                onReset={handleReset}
+              />
             </div>
             <div className="col-span-12">
               <DataFlowVisualization />
             </div>
             <div className="col-span-12">
-              <NetworkHeatmap />
+              <NetworkHeatmap alerts={alerts} />
             </div>
           </div>
         )}
@@ -169,10 +220,12 @@ function App() {
             <span className="text-slate-400">|</span>
             <span className="flex items-center gap-1">
               <Activity className="w-4 h-4 text-green-500" />
-              System Status: Operational
+              System Status: {healthyDevices === totalDevices ? 'Operational' : 'Degraded'}
             </span>
           </div>
         </footer>
+
+        {/* Floating Chaos Control Panel moved inside 3D Topology */}
       </main>
     </div>
   );
