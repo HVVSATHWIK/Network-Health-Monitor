@@ -29,8 +29,8 @@ function App() {
                 <Network className="w-8 h-8" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">Network Health Monitor</h1>
-                <p className="text-sm text-slate-300">IT/OT Convergence Dashboard</p>
+                <h1 className="text-2xl font-bold">NetMonit</h1>
+                <p className="text-sm text-slate-300">Network Health Monitor</p>
               </div>
             </div>
 
@@ -165,9 +165,7 @@ function App() {
 
         <footer className="mt-6 text-center text-sm text-slate-600 bg-white rounded-lg shadow-lg p-4">
           <div className="flex items-center justify-center gap-8">
-            <span>Powered by Belden Industrial Connectivity Solutions</span>
-            <span className="text-slate-400">|</span>
-            <span>Hirschmann • EAGLE • BHNO Platform</span>
+            <span>NetMonit - Network Health Monitor</span>
             <span className="text-slate-400">|</span>
             <span className="flex items-center gap-1">
               <Activity className="w-4 h-4 text-green-500" />
