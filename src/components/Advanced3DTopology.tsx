@@ -135,7 +135,6 @@ export default function Advanced3DTopology({ devices, connections, onInjectFault
         // Color code the label border if critical
         if (device.status === 'critical') {
           div.style.borderColor = '#ef4444';
-          div.style.color = '#fca5a5';
           div.className += ' animate-pulse';
         }
 

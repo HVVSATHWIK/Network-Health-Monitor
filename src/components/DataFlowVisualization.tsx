@@ -115,7 +115,7 @@ export default function DataFlowVisualization() {
         ctx.arc(node.x, node.y, 6, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 11px Arial';
         ctx.textAlign = 'center';
         ctx.fillText(node.label, node.x, node.y + 20);
