@@ -1,22 +1,17 @@
 import { Activity, Network, Shield, Zap } from 'lucide-react';
 import { useState } from 'react';
-import KPICard from './components/KPICard';
 import AlertPanel from './components/AlertPanel';
 import DeviceStatus from './components/DeviceStatus';
-import NetworkTopology from './components/NetworkTopology';
-import AIInsights from './components/AIInsights';
-import LayerOverview from './components/LayerOverview';
 import Advanced3DTopology from './components/Advanced3DTopology';
 import AdvancedAnalytics from './components/AdvancedAnalytics';
 import NetworkHeatmap from './components/NetworkHeatmap';
-import PredictiveAnalytics from './components/PredictiveAnalytics';
 import DataFlowVisualization from './components/DataFlowVisualization';
 
-import { devices as initialDevices, layerKPIs, alerts as initialAlerts, connections, dependencyPaths } from './data/mockData';
+import { devices as initialDevices, alerts as initialAlerts, connections, dependencyPaths } from './data/mockData';
 import { Device, Alert } from './types/network';
 
 function App() {
-  const [activeView, setActiveView] = useState<'overview' | '3d' | 'analytics' | 'predictions'>('overview');
+  const [activeView, setActiveView] = useState<'3d' | 'analytics'>('3d');
 
   // Dynamic State for Simulation
   const [devices, setDevices] = useState<Device[]>(initialDevices);
@@ -70,8 +65,8 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
-      <header className="bg-slate-900 text-white shadow-lg">
+    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">
+      <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 shadow-2xl">
         <div className="max-w-[1800px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -108,21 +103,12 @@ function App() {
       </header>
 
       <main className="max-w-[1800px] mx-auto px-6 py-6">
-        <div className="flex gap-2 mb-6 bg-white rounded-lg shadow-lg p-2">
-          <button
-            onClick={() => setActiveView('overview')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all ${activeView === 'overview'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'text-gray-700 hover:bg-gray-100'
-              }`}
-          >
-            Overview
-          </button>
+        <div className="flex gap-2 mb-6 bg-slate-900/50 border border-slate-800 rounded-lg p-1.5 backdrop-blur-sm w-fit shadow-lg">
           <button
             onClick={() => setActiveView('3d')}
             className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeView === '3d'
               ? 'bg-purple-600 text-white shadow-lg'
-              : 'text-gray-700 hover:bg-gray-100'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
           >
             <Zap className="w-4 h-4" />
@@ -132,56 +118,12 @@ function App() {
             onClick={() => setActiveView('analytics')}
             className={`px-6 py-2 rounded-lg font-semibold transition-all ${activeView === 'analytics'
               ? 'bg-green-600 text-white shadow-lg'
-              : 'text-gray-700 hover:bg-gray-100'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
           >
             Analytics
           </button>
-          <button
-            onClick={() => setActiveView('predictions')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all ${activeView === 'predictions'
-              ? 'bg-orange-600 text-white shadow-lg'
-              : 'text-gray-700 hover:bg-gray-100'
-              }`}
-          >
-            Predictions
-          </button>
         </div>
-
-        {activeView === 'overview' && (
-          <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-12">
-              <LayerOverview kpis={layerKPIs} />
-            </div>
-
-            <div className="col-span-12 lg:col-span-8">
-              <NetworkTopology devices={devices} connections={connections} />
-            </div>
-
-            <div className="col-span-12 lg:col-span-4">
-              <DeviceStatus devices={devices} />
-            </div>
-
-            <div className="col-span-12">
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-6">Layer KPI Metrics</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                  {layerKPIs.map((kpi, idx) => (
-                    <KPICard key={idx} kpi={kpi} />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="col-span-12 lg:col-span-6">
-              <AlertPanel alerts={alerts} devices={devices} dependencyPaths={dependencyPaths} />
-            </div>
-
-            <div className="col-span-12 lg:col-span-6">
-              <AIInsights />
-            </div>
-          </div>
-        )}
 
         {activeView === '3d' && (
           <div className="grid grid-cols-12 gap-6">
@@ -193,10 +135,19 @@ function App() {
                 onReset={handleReset}
               />
             </div>
-            <div className="col-span-12">
-              <DataFlowVisualization />
+
+            {/* Critical Panels: Status & Alerts */}
+            <div className="col-span-12 lg:col-span-4">
+              <DeviceStatus devices={devices} />
             </div>
-            <div className="col-span-12">
+            <div className="col-span-12 lg:col-span-8">
+              <AlertPanel alerts={alerts} devices={devices} dependencyPaths={dependencyPaths} />
+            </div>
+
+            <div className="col-span-12 lg:col-span-6">
+              <DataFlowVisualization onInjectFault={handleInjectFault} onReset={handleReset} />
+            </div>
+            <div className="col-span-12 lg:col-span-6">
               <NetworkHeatmap alerts={alerts} />
             </div>
           </div>
@@ -208,13 +159,9 @@ function App() {
           </div>
         )}
 
-        {activeView === 'predictions' && (
-          <div>
-            <PredictiveAnalytics />
-          </div>
-        )}
 
-        <footer className="mt-6 text-center text-sm text-slate-600 bg-white rounded-lg shadow-lg p-4">
+
+        <footer className="mt-6 text-center text-sm text-slate-600 bg-slate-900/80 border-t border-slate-800 p-4 backdrop-blur-sm">
           <div className="flex items-center justify-center gap-8">
             <span>NetMonit - Network Health Monitor</span>
             <span className="text-slate-400">|</span>

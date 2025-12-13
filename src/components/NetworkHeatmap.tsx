@@ -71,15 +71,15 @@ export default function NetworkHeatmap({ alerts = [] }: NetworkHeatmapProps) {
   const metrics = ['Utilization', 'Latency', 'Errors', 'Packets', 'Jitter'];
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-2xl">
       <div className="flex items-center gap-2 mb-6">
-        <Flame className="w-6 h-6 text-orange-600" />
-        <h2 className="text-xl font-bold text-gray-800">Network Performance Heatmap</h2>
+        <Flame className="w-6 h-6 text-orange-500" />
+        <h2 className="text-xl font-bold text-white tracking-wide">Network Performance Heatmap</h2>
       </div>
 
       <div className="overflow-x-auto">
-        <div className="grid gap-1 p-4 bg-gray-50 rounded-lg" style={{ gridTemplateColumns: `120px repeat(${metrics.length}, 1fr)`, minWidth: '100%' }}>
-          <div className="font-semibold text-gray-700 text-sm text-center py-2">Layer</div>
+        <div className="grid gap-1 p-4 bg-slate-900/50 rounded-lg border border-slate-800" style={{ gridTemplateColumns: `120px repeat(${metrics.length}, 1fr)`, minWidth: '100%' }}>
+          <div className="font-semibold text-slate-400 text-sm text-center py-2">Layer</div>
           {metrics.map(m => (
             <div key={m} className="font-semibold text-gray-700 text-sm text-center py-2 truncate">
               {m}
@@ -88,7 +88,7 @@ export default function NetworkHeatmap({ alerts = [] }: NetworkHeatmapProps) {
 
           {layers.map(layer => (
             <>
-              <div key={`layer-${layer}`} className="font-semibold text-gray-800 text-sm py-2 pl-2 flex items-center bg-white">
+              <div key={`layer-${layer}`} className="font-semibold text-slate-300 text-sm py-2 pl-2 flex items-center bg-slate-800/30 rounded">
                 {layer}
               </div>
               {metrics.map((metric, metricIndex) => {
@@ -112,29 +112,29 @@ export default function NetworkHeatmap({ alerts = [] }: NetworkHeatmapProps) {
       <div className="mt-6 flex items-center justify-center gap-6 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-blue-600 rounded"></div>
-          <span className="text-gray-700">Optimal (0-20%)</span>
+          <span className="text-slate-400">Optimal</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-green-500 rounded"></div>
-          <span className="text-gray-700">Good (20-40%)</span>
+          <span className="text-slate-400">Good</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-yellow-400 rounded"></div>
-          <span className="text-gray-700">Fair (40-60%)</span>
+          <span className="text-slate-400">Fair</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-orange-500 rounded"></div>
-          <span className="text-gray-700">Caution (60-80%)</span>
+          <span className="text-slate-400">Caution</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-red-600 rounded"></div>
-          <span className="text-gray-700">Critical (80%+)</span>
+          <span className="text-slate-400">Critical</span>
         </div>
       </div>
 
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <div className="text-sm text-blue-900">
-          <strong>Legend:</strong> Each cell shows performance metrics for that layer. Lower values indicate better performance. Hover over cells for exact values.
+      <div className="mt-6 p-4 bg-slate-800/50 border border-slate-700/50 rounded-lg backdrop-blur-sm">
+        <div className="text-sm text-slate-300">
+          <strong className="text-white">Legend:</strong> Each cell shows performance metrics for that layer. Lower values indicate better performance.
         </div>
       </div>
     </div>

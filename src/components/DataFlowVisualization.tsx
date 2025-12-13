@@ -1,8 +1,19 @@
-import { useEffect, useRef } from 'react';
-import { Activity } from 'lucide-react';
+import { useRef, useEffect, useState } from 'react';
+import { Activity, Settings, Zap, RefreshCw, X } from 'lucide-react';
 
-export default function DataFlowVisualization() {
+interface DataFlowVisualizationProps {
+  onInjectFault?: (type: 'l1' | 'l7') => void;
+  onReset?: () => void;
+}
+
+export default function DataFlowVisualization({ onInjectFault, onReset }: DataFlowVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [showControls, setShowControls] = useState(false);
+
+  // Viewport State for Pan/Zoom
+  const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
+  const isDragging = useRef(false);
+  const lastPos = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -73,8 +84,13 @@ export default function DataFlowVisualization() {
     };
 
     const animate = () => {
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.1)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (!canvas || !ctx) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // Crisp clear, no trails
+
+      ctx.save();
+      ctx.translate(transform.x, transform.y);
+      ctx.scale(transform.k, transform.k);
 
       connections.forEach(([from, to]) => {
         const fromNode = nodes[from];
@@ -125,23 +141,120 @@ export default function DataFlowVisualization() {
         emitParticles();
       }
 
+      ctx.restore(); // Restore transform
       requestAnimationFrame(animate);
     };
 
     animate();
-  }, []);
+  }, [transform]); // Re-bind on transform change
+
+  // Mouse Handlers for Pan/Zoom
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const scaleAmount = -e.deltaY * 0.001;
+    const newScale = Math.min(Math.max(0.5, transform.k + scaleAmount), 3);
+    setTransform(prev => ({ ...prev, k: newScale }));
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+    const dx = e.clientX - lastPos.current.x;
+    const dy = e.clientY - lastPos.current.y;
+    lastPos.current = { x: e.clientX, y: e.clientY };
+    setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+  };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-2xl relative">
       <div className="flex items-center gap-3 mb-4">
-        <Activity className="w-6 h-6 text-green-600" />
-        <h2 className="text-xl font-bold text-gray-800">Real-Time Data Flow</h2>
+        <Activity className="w-6 h-6 text-emerald-400" />
+        <h2 className="text-xl font-bold text-white tracking-wide">Real-Time Data Flow</h2>
       </div>
-      <p className="text-sm text-gray-600 mb-4">Live packet flow visualization across network tiers</p>
-      <canvas
-        ref={canvasRef}
-        className="w-full h-80 border-2 border-slate-200 rounded-lg bg-gradient-to-br from-slate-950 to-slate-900"
-      />
+      <p className="text-sm text-slate-400 mb-4">Live packet flow visualization across network tiers</p>
+      <div className="relative w-full h-80 overflow-hidden rounded-lg border border-slate-700/50 bg-slate-950 shadow-inner cursor-move">
+        <canvas
+          ref={canvasRef}
+          className="w-full h-full block"
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        />
+        {/* Reset View Button */}
+        {(transform.k !== 1 || transform.x !== 0 || transform.y !== 0) && (
+          <button
+            onClick={() => setTransform({ x: 0, y: 0, k: 1 })}
+            className="absolute top-4 right-4 bg-slate-800/80 text-white text-xs px-2 py-1 rounded border border-white/10 hover:bg-slate-700"
+          >
+            Reset View
+          </button>
+        )}
+      </div>
+
+      {/* Internal Chaos Control Toggle */}
+      <div className="absolute bottom-6 right-6 z-30">
+        <button
+          onClick={() => setShowControls(!showControls)}
+          className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-full shadow-lg border border-slate-600 transition-all active:scale-95"
+          title="Open Simulation Controls"
+        >
+          {showControls ? <X className="w-5 h-5" /> : <Settings className="w-5 h-5 animate-spin-slow" />}
+        </button>
+      </div>
+
+      {/* Internal Chaos Control Panel */}
+      {showControls && onInjectFault && (
+        <div className="absolute bottom-16 right-6 bg-slate-900/95 backdrop-blur-md border border-slate-700 p-4 rounded-xl shadow-2xl z-30 w-72 animate-in slide-in-from-bottom-5 fade-in duration-200">
+          <div className="flex items-center gap-2 mb-4 border-b border-slate-700 pb-2">
+            <Zap className="w-5 h-5 text-yellow-500" />
+            <h3 className="text-white font-bold">Chaos Simulator</h3>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={() => onInjectFault('l1')}
+              className="w-full flex items-center gap-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/50 p-3 rounded-lg transition-all text-sm font-medium group text-left"
+            >
+              <Activity className="w-4 h-4 group-hover:animate-pulse shrink-0" />
+              <div>
+                <div className="font-bold">Simulate Cable Cut (L1)</div>
+                <div className="text-xs text-red-400/70">Breaks Access Switch 02</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => onInjectFault('l7')}
+              className="w-full flex items-center gap-3 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/50 p-3 rounded-lg transition-all text-sm font-medium text-left"
+            >
+              <Activity className="w-4 h-4 shrink-0" />
+              <div>
+                <div className="font-bold">Simulate Server Lag (L7)</div>
+                <div className="text-xs text-orange-400/70">Slows SCADA Control Loop</div>
+              </div>
+            </button>
+
+            {onReset && (
+              <button
+                onClick={onReset}
+                className="w-full flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 p-2 rounded-lg transition-all text-sm font-medium mt-4"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reset System
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

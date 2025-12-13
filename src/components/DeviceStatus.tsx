@@ -17,10 +17,10 @@ export default function DeviceStatus({ devices }: DeviceStatusProps) {
   };
 
   const statusConfig = {
-    healthy: { bg: 'bg-green-100', text: 'text-green-800', dot: 'bg-green-500' },
-    warning: { bg: 'bg-yellow-100', text: 'text-yellow-800', dot: 'bg-yellow-500' },
-    critical: { bg: 'bg-red-100', text: 'text-red-800', dot: 'bg-red-500' },
-    offline: { bg: 'bg-gray-100', text: 'text-gray-800', dot: 'bg-gray-500' }
+    healthy: { bg: 'bg-emerald-950/30', text: 'text-emerald-400', dot: 'bg-emerald-500 shadow-[0_0_8px_#10b981]' },
+    warning: { bg: 'bg-yellow-950/30', text: 'text-yellow-400', dot: 'bg-yellow-500 shadow-[0_0_8px_#eab308]' },
+    critical: { bg: 'bg-red-950/30', text: 'text-red-400', dot: 'bg-red-500 shadow-[0_0_8px_#ef4444]' },
+    offline: { bg: 'bg-slate-800/50', text: 'text-slate-400', dot: 'bg-slate-500' }
   };
 
   const statusCounts = {
@@ -31,25 +31,25 @@ export default function DeviceStatus({ devices }: DeviceStatusProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <h2 className="text-xl font-bold text-gray-800 mb-6">Asset Status</h2>
+    <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-2xl h-full flex flex-col">
+      <h2 className="text-xl font-bold text-white mb-6 tracking-wide">Asset Status</h2>
 
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="text-center p-3 bg-green-50 rounded-lg">
-          <div className="text-2xl font-bold text-green-700">{statusCounts.healthy}</div>
-          <div className="text-xs text-green-600 font-medium mt-1">Healthy</div>
+        <div className="text-center p-3 bg-emerald-950/30 border border-emerald-500/20 rounded-lg backdrop-blur-sm">
+          <div className="text-2xl font-bold text-emerald-400">{statusCounts.healthy}</div>
+          <div className="text-xs text-emerald-500/70 font-medium mt-1 uppercase tracking-wider">Healthy</div>
         </div>
-        <div className="text-center p-3 bg-yellow-50 rounded-lg">
-          <div className="text-2xl font-bold text-yellow-700">{statusCounts.warning}</div>
-          <div className="text-xs text-yellow-600 font-medium mt-1">Warning</div>
+        <div className="text-center p-3 bg-yellow-950/30 border border-yellow-500/20 rounded-lg backdrop-blur-sm">
+          <div className="text-2xl font-bold text-yellow-400">{statusCounts.warning}</div>
+          <div className="text-xs text-yellow-500/70 font-medium mt-1 uppercase tracking-wider">Warning</div>
         </div>
-        <div className="text-center p-3 bg-red-50 rounded-lg">
-          <div className="text-2xl font-bold text-red-700">{statusCounts.critical}</div>
-          <div className="text-xs text-red-600 font-medium mt-1">Critical</div>
+        <div className="text-center p-3 bg-red-950/30 border border-red-500/20 rounded-lg backdrop-blur-sm">
+          <div className="text-2xl font-bold text-red-500">{statusCounts.critical}</div>
+          <div className="text-xs text-red-500/70 font-medium mt-1 uppercase tracking-wider">Critical</div>
         </div>
-        <div className="text-center p-3 bg-gray-50 rounded-lg">
-          <div className="text-2xl font-bold text-gray-700">{statusCounts.offline}</div>
-          <div className="text-xs text-gray-600 font-medium mt-1">Offline</div>
+        <div className="text-center p-3 bg-slate-800/50 border border-slate-700/50 rounded-lg backdrop-blur-sm">
+          <div className="text-2xl font-bold text-slate-400">{statusCounts.offline}</div>
+          <div className="text-xs text-slate-500 font-medium mt-1 uppercase tracking-wider">Offline</div>
         </div>
       </div>
 
@@ -59,7 +59,7 @@ export default function DeviceStatus({ devices }: DeviceStatusProps) {
           const config = statusConfig[device.status];
 
           return (
-            <div key={device.id} className="border border-gray-200 rounded-lg p-3 hover:border-blue-300 transition-colors">
+            <div key={device.id} className="border border-slate-700/50 bg-slate-800/20 rounded-lg p-3 hover:border-blue-500 hover:bg-blue-900/10 hover:shadow-[0_0_15px_rgba(59,130,246,0.15)] transition-all duration-300 group cursor-pointer">
               <div className="flex items-center gap-3">
                 <div className={`${config.bg} p-2 rounded-lg`}>
                   <Icon className={`w-5 h-5 ${config.text}`} />
@@ -71,12 +71,18 @@ export default function DeviceStatus({ devices }: DeviceStatusProps) {
                   </div>
                   <div className="text-xs text-gray-500">
                     {device.ip} • {device.location}
-                    {device.manufacturer && ` • ${device.manufacturer}`}
                   </div>
                 </div>
-                <span className={`${config.bg} ${config.text} text-xs font-semibold px-2 py-1 rounded uppercase`}>
-                  {device.status}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  {device.manufacturer && (['Hirschmann', 'Belden', 'EAGLE'].includes(device.manufacturer)) && (
+                    <span className="bg-orange-950/40 text-orange-400 text-[10px] font-bold px-2 py-0.5 rounded border border-orange-500/30 shadow-[0_0_10px_rgba(249,115,22,0.1)]">
+                      {device.manufacturer}
+                    </span>
+                  )}
+                  <span className={`${config.bg} ${config.text} text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider border border-white/5`}>
+                    {device.status}
+                  </span>
+                </div>
               </div>
             </div>
           );
