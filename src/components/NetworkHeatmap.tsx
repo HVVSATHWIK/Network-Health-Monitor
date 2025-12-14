@@ -87,8 +87,8 @@ export default function NetworkHeatmap({ alerts = [] }: NetworkHeatmapProps) {
           ))}
 
           {layers.map(layer => (
-            <>
-              <div key={`layer-${layer}`} className="font-semibold text-slate-300 text-sm py-2 pl-2 flex items-center bg-slate-800/30 rounded">
+            <div key={layer} className="contents">
+              <div className="font-semibold text-slate-300 text-sm py-2 pl-2 flex items-center bg-slate-800/30 rounded">
                 {layer}
               </div>
               {metrics.map((metric, metricIndex) => {
@@ -104,7 +104,7 @@ export default function NetworkHeatmap({ alerts = [] }: NetworkHeatmapProps) {
                   </div>
                 );
               })}
-            </>
+            </div>
           ))}
         </div>
       </div>

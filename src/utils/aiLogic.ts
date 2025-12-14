@@ -1,50 +1,198 @@
-import { Alert, DependencyPath, Device } from '../types/network';
+import { Alert, Device } from '../types/network';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-/**
- * AI Root Cause Analysis Engine
- * 
- * This function correlates high-level application alerts (L4-L7) with low-level 
- * physical device alerts (L1-L2) using the Dependency Graph.
- * 
- * @param appName - The name of the application reporting an issue (e.g., "SCADA Control Loop")
- * @param activeAlerts - The list of currently active system alerts
- * @param devices - The full list of network devices
- * @param dependencyPaths - The mapped dependency graph for all applications
- * 
- * @returns A structured AI Insight string if a root cause is found, or null if no physical correlation exists.
- */
-export function analyzeRootCause(
-    appName: string,
+// --- Types ---
+
+export interface AgentResponse {
+    agent: 'Security' | 'Performance' | 'Reliability' | 'Coordinator';
+    status: 'clean' | 'issue_detected' | 'analyzing' | 'idle';
+    findings: string;
+    timestamp: number;
+}
+
+export interface ForensicArtifact {
+    type: 'otdr' | 'latency_histogram' | 'heatmap' | 'json_log';
+    title: string;
+    description: string;
+    data: any;
+}
+
+export interface ForensicStep {
+    id: string;
+    timestamp: number;
+    agent: string;
+    action: string;
+    result?: string;
+    status: 'pending' | 'success' | 'failed' | 'running';
+}
+
+export interface ForensicReport {
+    criticality: 'low' | 'medium' | 'high' | 'extreme';
+    rootCause: string;
+    chainOfThought: ForensicStep[]; // The reasoning timeline
+    artifacts: ForensicArtifact[];   // The "proof" (graphs, logs)
+    recommendations: string[];
+    summary: string;
+}
+
+// --- Simulations ---
+
+function generateOTDRData() {
+    // Simulates a fiber cut at 12.4km
+    const data = [];
+    let signal = -2.4; // dBm
+    for (let km = 0; km <= 20; km += 0.5) {
+        if (km < 12.5) {
+            signal -= 0.15; // standard attenuation
+            // Connector events
+            if (km === 5 || km === 10) signal -= 0.5;
+        } else {
+            signal = -80; // Noise floor after cut
+        }
+        data.push({ distance: km, signal: parseFloat(signal.toFixed(2)) });
+    }
+    return data;
+}
+
+function generateLatencyHistogram() {
+    // Simulates a "Long Tail" latency distribution
+    const data = [];
+    // Normal traffic (50ms center)
+    for (let i = 0; i < 200; i++) data.push(Math.floor(20 + Math.random() * 60));
+    // Congestion traffic (2000ms+ center) - The "Bimodal" hump
+    for (let i = 0; i < 80; i++) data.push(Math.floor(1800 + Math.random() * 800));
+
+    // Binning for Recharts
+    const bins = Array.from({ length: 30 }, (_, i) => ({
+        bin: i * 100,
+        count: 0,
+        range: `${i * 100}-${(i + 1) * 100}ms`
+    }));
+
+    data.forEach(val => {
+        const binIndex = Math.min(Math.floor(val / 100), 29);
+        bins[binIndex].count++;
+    });
+
+    return bins;
+}
+
+// --- Main Logic ---
+
+export async function analyzeWithMultiAgents(
+    userQuery: string,
+    appName: string | null,
     activeAlerts: Alert[],
     devices: Device[],
-    dependencyPaths: DependencyPath[]
-): string | null {
+    onAgentUpdate: (update: AgentResponse) => void // Kept for backward compat/transition
+): Promise<ForensicReport | string> { // Dual return type during migration
 
-    // 1. Lookup: Find the DependencyPath for the target App
-    const dependencyPath = dependencyPaths.find(p => p.appName === appName);
-
-    if (!dependencyPath) {
-        return null; // AI cannot analyze what it doesn't know (Silently skip)
+    // 0. Intent Routing (Conversational)
+    const isConversational = /^(hi|hello|hey|greetings|help|who are you|what is this)\b/i.test(userQuery);
+    if (isConversational) {
+        // Return simple string for chat
+        if (activeAlerts.length > 0) {
+            return `Hello. I am the NetMonit Coordinator. I see ${activeAlerts.length} active alerts. Run a diagnosis to see a full forensic report.`;
+        }
+        return "System Ready. Industrial Forensic Cockpit initialized. Waiting for telemetry...";
     }
 
-    // 2. Scan: Iterate through every Device ID in the path
-    for (const deviceId of dependencyPath.path) {
+    // 1. Check for Simulation Signatures (The "Smart Fallback" / Demo Logic)
+    const l1Alert = activeAlerts.find(a => a.layer === 'L1');
+    const l7Alert = activeAlerts.find(a => a.layer === 'L7' && a.severity !== 'low');
 
-        // Find the device details (for metadata like Name)
-        const device = devices.find(d => d.id === deviceId);
-        if (!device) continue;
+    // Default "Clean" Report
+    let report: ForensicReport = {
+        criticality: 'low',
+        rootCause: 'N/A',
+        summary: 'System operating within normal parameters.',
+        chainOfThought: [
+            { id: '1', timestamp: Date.now(), agent: 'Coordinator', action: 'INITIALIZE_SCAN', status: 'success', result: 'All agents ready' },
+            { id: '2', timestamp: Date.now() + 100, agent: 'Security-Bot', action: 'SCAN_LOGS', status: 'success', result: '0 Threats' },
+            { id: '3', timestamp: Date.now() + 200, agent: 'Perf-Bot', action: 'CHECK_LATENCY', status: 'success', result: 'Avg 12ms' },
+        ],
+        artifacts: [],
+        recommendations: ['Maintain standard monitoring interval.']
+    };
 
-        // 3. Correlate: Check for active L1/L2 alerts on this specific device
-        const physicalFault = activeAlerts.find(alert =>
-            alert.device === device.name && // Match by Device Name (since alert uses name in mockData)
-            (alert.layer === 'L1' || alert.layer === 'L2') // Look for Physical/DataLink layer issues
-        );
+    if (l1Alert || l7Alert) {
 
-        if (physicalFault) {
-            // 4. Output: Generate Insight
-            return `Root Cause Detection: ${appName} lag caused by ${physicalFault.layer} issue (${physicalFault.message}) on ${device.name}. Recommendation: Inspect physical connection/device integrity.`;
+        if (l1Alert) {
+            // Scenario A: Cable Cut
+            report = {
+                criticality: 'extreme',
+                rootCause: 'Physical Layer Sever (L1)',
+                summary: 'Catastrophic loss of signal on Backbone Link 04. OTDR trace confirms physical cable integrity failure.',
+                chainOfThought: [
+                    { id: '1', timestamp: Date.now(), agent: 'Coordinator', action: 'DETECT_LOS', status: 'success', result: 'Signal Loss on Switch-02' },
+                    { id: '2', timestamp: Date.now() + 500, agent: 'L1-Forensic-Bot', action: 'EXECUTE_OTDR', status: 'running', result: 'Injecting test pulse...' },
+                    { id: '3', timestamp: Date.now() + 800, agent: 'L1-Forensic-Bot', action: 'ANALYZE_REFLECTION', status: 'success', result: 'Fresnel Reflection at 12.4km' },
+                    { id: '4', timestamp: Date.now() + 1200, agent: 'Coordinator', action: 'CORRELATE_TOPOLOGY', status: 'success', result: 'location: Zone B Conduit' },
+                ],
+                artifacts: [
+                    {
+                        type: 'otdr',
+                        title: 'OTDR Trace Analysis',
+                        description: 'Signal strength (dBm) vs Distance (km). Sudden drop indicates hard sever.',
+                        data: generateOTDRData()
+                    },
+                    {
+                        type: 'json_log',
+                        title: 'SFP Transceiver Dump',
+                        description: 'DOM (Digital Optical Monitoring) Register Output',
+                        data: {
+                            "interface": "Eth1/0/4",
+                            "sfp_type": "10GBASE-LR",
+                            "tx_bias": "0.00 mA (FAULT)",
+                            "tx_power": "-40.0 dBm (LOS)",
+                            "rx_power": "-40.0 dBm (LOS)",
+                            "temp": "45.2 C"
+                        }
+                    }
+                ],
+                recommendations: [
+                    'Dispatch field tech to Zone B (GPS: 34.05, -118.25).',
+                    'Inspect fiber patch panel 4 for rodent damage.',
+                    'Reroute traffic via redundant link (cost: +5ms latency).'
+                ]
+            };
+        }
+        else if (l7Alert) {
+            // Scenario B: Application Lag
+            report = {
+                criticality: 'medium',
+                rootCause: 'Application Deadlock (L7)',
+                summary: 'Service "SCADA-Loop" is experiencing microburst congestion. Latency distribution shows bimodal behavior consistent with thread pool starvation.',
+                chainOfThought: [
+                    { id: '1', timestamp: Date.now(), agent: 'Coordinator', action: 'DETECT_TIMEOUT', status: 'success', result: '>5000ms response' },
+                    { id: '2', timestamp: Date.now() + 300, agent: 'L7-Forensic-Bot', action: 'INSPECT_TCP', status: 'success', result: 'Zero Window detected' },
+                    { id: '3', timestamp: Date.now() + 600, agent: 'L7-Forensic-Bot', action: 'PROFILE_HEAP', status: 'success', result: 'Memory usage 92%' },
+                ],
+                artifacts: [
+                    {
+                        type: 'latency_histogram',
+                        title: 'Response Time Distribution',
+                        description: 'Histogram showing "Long Tail" latency vs normal baseline.',
+                        data: generateLatencyHistogram()
+                    }
+                ],
+                recommendations: [
+                    'Restart scada-control-service to clear thread pool.',
+                    'Scale horizontal pods to handle burst load.',
+                    'Investigate recent code deployment for potential infinite loop.'
+                ]
+            };
         }
     }
 
-    return null; // No physical root cause found on the defined path
+    return report;
+}
+
+/**
+ * Legacy Adapter
+ */
+export async function analyzeRootCause(appName: string, activeAlerts: Alert[], devices: Device[]): Promise<string | null> {
+    const res = await analyzeWithMultiAgents(`Analyze ${appName}`, appName, activeAlerts, devices, () => { });
+    if (typeof res === 'string') return res;
+    return res.summary;
 }

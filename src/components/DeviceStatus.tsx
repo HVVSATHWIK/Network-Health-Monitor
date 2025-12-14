@@ -1,19 +1,20 @@
 import { Device } from '../types/network';
-import { Server, Router, Box, Gauge, Activity, Cpu } from 'lucide-react';
+import { Server, Router, Box, Gauge, Activity, Cpu, Shield } from 'lucide-react';
 
 interface DeviceStatusProps {
   devices: Device[];
 }
 
 export default function DeviceStatus({ devices }: DeviceStatusProps) {
-  const deviceIcons = {
+  const deviceIcons: Record<string, any> = {
     switch: Router,
     router: Router,
     plc: Cpu,
     sensor: Gauge,
     scada: Activity,
     gateway: Box,
-    server: Server
+    server: Server,
+    firewall: Shield
   };
 
   const statusConfig = {
@@ -55,7 +56,7 @@ export default function DeviceStatus({ devices }: DeviceStatusProps) {
 
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {devices.map((device) => {
-          const Icon = deviceIcons[device.type];
+          const Icon = deviceIcons[device.type] || Box;
           const config = statusConfig[device.status];
 
           return (

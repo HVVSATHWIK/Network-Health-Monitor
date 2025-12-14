@@ -1,19 +1,46 @@
-import { Alert, Device, DependencyPath } from '../types/network';
+import { Alert, Device } from '../types/network';
 import { AlertCircle, AlertTriangle, Info, Sparkles, BrainCircuit } from 'lucide-react';
 import { analyzeRootCause } from '../utils/aiLogic';
+import { useState, useEffect } from 'react';
 
 interface AlertPanelProps {
   alerts: Alert[];
   devices: Device[];
-  dependencyPaths: DependencyPath[];
 }
 
-export default function AlertPanel({ alerts, devices, dependencyPaths }: AlertPanelProps) {
+export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
+  const [insights, setInsights] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchInsights = async () => {
+      const newInsights: Record<string, string> = {};
+
+      for (const alert of alerts) {
+        // Run AI Root Cause Analysis only if not already cached and relevant
+        // We pass the alert's device name as the appName because in our mock data 
+        // application alerts are logged against the App Name (e.g., "SCADA Control Loop")
+        if (!insights[alert.id]) {
+          const insight = await analyzeRootCause(alert.device, alerts, devices);
+          if (insight) {
+            newInsights[alert.id] = insight;
+          }
+        }
+      }
+
+      if (Object.keys(newInsights).length > 0) {
+        setInsights(prev => ({ ...prev, ...newInsights }));
+      }
+    };
+
+    fetchInsights();
+  }, [alerts, devices]);
+
   const severityConfig = {
     critical: { icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-950/30', border: 'border-red-500/30' },
     high: { icon: AlertCircle, color: 'text-orange-400', bg: 'bg-orange-950/30', border: 'border-orange-500/30' },
     medium: { icon: AlertTriangle, color: 'text-yellow-400', bg: 'bg-yellow-950/30', border: 'border-yellow-500/30' },
-    low: { icon: Info, color: 'text-blue-400', bg: 'bg-blue-950/30', border: 'border-blue-500/30' }
+    low: { icon: Info, color: 'text-blue-400', bg: 'bg-blue-950/30', border: 'border-blue-500/30' },
+    info: { icon: Info, color: 'text-blue-400', bg: 'bg-blue-950/30', border: 'border-blue-500/30' } // Added info fallback
   };
 
   const formatTime = (date: Date) => {
@@ -35,13 +62,11 @@ export default function AlertPanel({ alerts, devices, dependencyPaths }: AlertPa
 
       <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
         {alerts.map((alert) => {
-          const config = severityConfig[alert.severity];
+          // Use type assertion or fallback to avoid implicit any error
+          // @ts-ignore - Valid severity check handled by fallback
+          const config = severityConfig[alert.severity] || severityConfig.medium;
           const Icon = config.icon;
-
-          // Run AI Root Cause Analysis
-          // We pass the alert's device name as the appName because in our mock data 
-          // application alerts are logged against the App Name (e.g., "SCADA Control Loop")
-          const rootCauseInsight = analyzeRootCause(alert.device, alerts, devices, dependencyPaths);
+          const rootCauseInsight = insights[alert.id];
 
           return (
             <div key={alert.id} className={`border ${config.border} ${config.bg} rounded-lg p-4 transition-all hover:shadow-md`}>

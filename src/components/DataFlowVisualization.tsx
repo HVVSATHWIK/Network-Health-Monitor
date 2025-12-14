@@ -1,14 +1,34 @@
 import { useRef, useEffect, useState } from 'react';
-import { Activity, Settings, Zap, RefreshCw, X } from 'lucide-react';
+import { Activity, Settings, Zap, RefreshCw, X, ScanLine } from 'lucide-react';
 
 interface DataFlowVisualizationProps {
-  onInjectFault?: (type: 'l1' | 'l7') => void;
-  onReset?: () => void;
+  onInjectFault: (type: 'l1' | 'l7') => void;
+  onReset: () => void;
+  mode: 'default' | 'scan';
+  // showControlsExternal?: boolean; // Removed
+  onShowControlsChange?: (show: boolean) => void;
+  selectedDeviceId?: string | null;
 }
 
-export default function DataFlowVisualization({ onInjectFault, onReset }: DataFlowVisualizationProps) {
+export default function DataFlowVisualization({
+  onInjectFault,
+  onReset,
+  mode,
+  // showControlsExternal = false,
+  onShowControlsChange,
+  selectedDeviceId
+}: DataFlowVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // const [data, setData] = useState<any[]>([]); // Unused
   const [showControls, setShowControls] = useState(false);
+
+  useEffect(() => {
+    if (onShowControlsChange) {
+      onShowControlsChange(showControls);
+    }
+  }, [showControls, onShowControlsChange]);
+
+  // showControlsExternal logic removed
 
   // Viewport State for Pan/Zoom
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
@@ -37,15 +57,15 @@ export default function DataFlowVisualization({ onInjectFault, onReset }: DataFl
 
     // Vertical Tiered Layout (Bottom -> Up)
     const nodes = [
-      { x: canvas.width * 0.2, y: canvas.height * 0.9, label: 'Sensor', color: '#10b981' }, // Floor
-      { x: canvas.width * 0.5, y: canvas.height * 0.9, label: 'Switch', color: '#10b981' }, // Floor
-      { x: canvas.width * 0.8, y: canvas.height * 0.9, label: 'IO-Mod', color: '#10b981' }, // Floor
+      { x: canvas.width * 0.2, y: canvas.height * 0.9, label: 'Sensor', color: '#10b981', layer: 1 }, // Floor
+      { x: canvas.width * 0.5, y: canvas.height * 0.9, label: 'Switch', color: '#10b981', layer: 1 }, // Floor
+      { x: canvas.width * 0.8, y: canvas.height * 0.9, label: 'IO-Mod', color: '#10b981', layer: 1 }, // Floor
 
-      { x: canvas.width * 0.3, y: canvas.height * 0.5, label: 'PLC', color: '#3b82f6' },    // Edge
-      { x: canvas.width * 0.7, y: canvas.height * 0.5, label: 'Gateway', color: '#f59e0b' },// Edge
+      { x: canvas.width * 0.3, y: canvas.height * 0.5, label: 'PLC', color: '#3b82f6', layer: 2 },    // Edge
+      { x: canvas.width * 0.7, y: canvas.height * 0.5, label: 'Gateway', color: '#f59e0b', layer: 2 },// Edge
 
-      { x: canvas.width * 0.3, y: canvas.height * 0.15, label: 'Server', color: '#8b5cf6' }, // Cloud
-      { x: canvas.width * 0.7, y: canvas.height * 0.15, label: 'Cloud', color: '#ec4899' }  // Cloud
+      { x: canvas.width * 0.3, y: canvas.height * 0.15, label: 'Server', color: '#8b5cf6', layer: 3 }, // Cloud
+      { x: canvas.width * 0.7, y: canvas.height * 0.15, label: 'Cloud', color: '#ec4899', layer: 3 }  // Cloud
     ];
 
     const connections = [
@@ -59,11 +79,18 @@ export default function DataFlowVisualization({ onInjectFault, onReset }: DataFl
       [5, 6]  // Server -> Cloud
     ];
 
-    const emitParticles = () => {
+    const emitParticles = (forcedSourceIndex?: number) => {
+      let candidates = connections;
+
+      // If specific source is requested, filter connections
+      if (forcedSourceIndex !== undefined) {
+        candidates = connections.filter(([from]) => from === forcedSourceIndex);
+      }
+
       // Prioritize "upward" flow
-      for (let i = 0; i < connections.length; i++) {
-        if (Math.random() < 0.3) {
-          const [from, to] = connections[i];
+      for (let i = 0; i < candidates.length; i++) {
+        if (forcedSourceIndex !== undefined || Math.random() < 0.3) {
+          const [from, to] = candidates[i];
           const source = nodes[from];
           const target = nodes[to];
 
@@ -76,12 +103,14 @@ export default function DataFlowVisualization({ onInjectFault, onReset }: DataFl
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
             life: 1,
-            color: source.color,
-            size: 3 + Math.random() * 2
+            color: mode === 'scan' ? '#ffffff' : source.color, // White for scan
+            size: mode === 'scan' ? 5 : 3 + Math.random() * 2
           });
         }
       }
     };
+
+    let animationFrameId: number;
 
     const animate = () => {
       if (!canvas || !ctx) return;
@@ -92,18 +121,20 @@ export default function DataFlowVisualization({ onInjectFault, onReset }: DataFl
       ctx.translate(transform.x, transform.y);
       ctx.scale(transform.k, transform.k);
 
+      // Draw Connections
       connections.forEach(([from, to]) => {
         const fromNode = nodes[from];
         const toNode = nodes[to];
 
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = mode === 'scan' ? 'rgba(74, 222, 128, 0.3)' : 'rgba(148, 163, 184, 0.2)'; // Green tint in scan mode
+        ctx.lineWidth = mode === 'scan' ? 3 : 2;
         ctx.beginPath();
         ctx.moveTo(fromNode.x, fromNode.y);
         ctx.lineTo(toNode.x, toNode.y);
         ctx.stroke();
       });
 
+      // Update & Draw Particles
       particles.forEach((p, idx) => {
         p.x += p.vx;
         p.y += p.vy;
@@ -118,8 +149,18 @@ export default function DataFlowVisualization({ onInjectFault, onReset }: DataFl
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
         ctx.fill();
-      });
 
+        // Glow effect for scan particles
+        if (mode === 'scan') {
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = '#ffffff';
+        } else {
+          ctx.shadowBlur = 0;
+        }
+      });
+      ctx.shadowBlur = 0; // Reset
+
+      // Draw Nodes
       nodes.forEach(node => {
         ctx.fillStyle = node.color;
         ctx.beginPath();
@@ -137,16 +178,54 @@ export default function DataFlowVisualization({ onInjectFault, onReset }: DataFl
         ctx.fillText(node.label, node.x, node.y + 20);
       });
 
-      if (Math.random() < 0.25) {
+      // Default random emission
+      if (mode === 'default' && Math.random() < 0.25) {
         emitParticles();
       }
 
       ctx.restore(); // Restore transform
-      requestAnimationFrame(animate);
+      animationFrameId = requestAnimationFrame(animate);
     };
 
     animate();
-  }, [transform]); // Re-bind on transform change
+
+    // Scan Mode Sequence logic
+    let scanIntervals: NodeJS.Timeout[] = [];
+    if (mode === 'scan') {
+      // Clear existing particles for clean start (optional, but cleaner)
+      // particles.length = 0; // Might be too abrupt
+
+      // Wave 1: L1 (Nodes 0, 1, 2)
+      const t1 = setTimeout(() => {
+        [0, 1, 2].forEach(idx => emitParticles(idx));
+      }, 500);
+
+      const t2 = setTimeout(() => {
+        [0, 1, 2].forEach(idx => emitParticles(idx));
+      }, 1000);
+
+      // Wave 2: L2 (Nodes 3, 4)
+      const t3 = setTimeout(() => {
+        [3, 4].forEach(idx => emitParticles(idx));
+      }, 2000);
+
+      const t4 = setTimeout(() => {
+        [3, 4].forEach(idx => emitParticles(idx));
+      }, 2500);
+
+      // Wave 3: L3 (Nodes 5)
+      const t5 = setTimeout(() => {
+        emitParticles(5);
+      }, 3500);
+
+      scanIntervals.push(t1, t2, t3, t4, t5);
+    }
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      scanIntervals.forEach(clearTimeout);
+    };
+  }, [transform, mode]); // Re-bind on transform or mode change
 
   // Mouse Handlers for Pan/Zoom
   const handleWheel = (e: React.WheelEvent) => {
@@ -174,13 +253,18 @@ export default function DataFlowVisualization({ onInjectFault, onReset }: DataFl
   };
 
   return (
-    <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-2xl relative">
+    <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-2xl relative transition-all duration-500">
       <div className="flex items-center gap-3 mb-4">
-        <Activity className="w-6 h-6 text-emerald-400" />
-        <h2 className="text-xl font-bold text-white tracking-wide">Real-Time Data Flow</h2>
+        {mode === 'scan' ? <ScanLine className="w-6 h-6 text-purple-400 animate-pulse" /> : <Activity className="w-6 h-6 text-emerald-400" />}
+        <h2 className="text-xl font-bold text-white tracking-wide">
+          {mode === 'scan' ? 'Full Stack Diagnostic Scan' : 'Real-Time Data Flow'}
+        </h2>
       </div>
-      <p className="text-sm text-slate-400 mb-4">Live packet flow visualization across network tiers</p>
-      <div className="relative w-full h-80 overflow-hidden rounded-lg border border-slate-700/50 bg-slate-950 shadow-inner cursor-move">
+      <p className="text-sm text-slate-400 mb-4">
+        {mode === 'scan' ? 'Analyzing packet telemetry from Layer 1 to Layer 7...' : 'Live packet flow visualization across network tiers'}
+      </p>
+
+      <div className={`relative w-full h-80 overflow-hidden rounded-lg border shadow-inner cursor-move transition-colors duration-500 ${mode === 'scan' ? 'border-purple-500/50 bg-purple-900/10' : 'border-slate-700/50 bg-slate-950'}`}>
         <canvas
           ref={canvasRef}
           className="w-full h-full block"
@@ -201,9 +285,10 @@ export default function DataFlowVisualization({ onInjectFault, onReset }: DataFl
         )}
       </div>
 
-      {/* Internal Chaos Control Toggle */}
-      <div className="absolute bottom-6 right-6 z-30">
+      {/* Internal Chaos Control Toggle - Moved to Bottom Left to allow Copilot on Right */}
+      <div className="absolute bottom-6 left-6 z-30">
         <button
+          id="chaos-control-trigger"
           onClick={() => setShowControls(!showControls)}
           className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-full shadow-lg border border-slate-600 transition-all active:scale-95"
           title="Open Simulation Controls"
@@ -214,7 +299,7 @@ export default function DataFlowVisualization({ onInjectFault, onReset }: DataFl
 
       {/* Internal Chaos Control Panel */}
       {showControls && onInjectFault && (
-        <div className="absolute bottom-16 right-6 bg-slate-900/95 backdrop-blur-md border border-slate-700 p-4 rounded-xl shadow-2xl z-30 w-72 animate-in slide-in-from-bottom-5 fade-in duration-200">
+        <div id="chaos-control-panel-body" className="absolute bottom-16 left-6 bg-slate-900/95 backdrop-blur-md border border-slate-700 p-4 rounded-xl shadow-2xl z-30 w-72 animate-in slide-in-from-bottom-5 zoom-in-95 fade-in duration-200 origin-bottom-left">
           <div className="flex items-center gap-2 mb-4 border-b border-slate-700 pb-2">
             <Zap className="w-5 h-5 text-yellow-500" />
             <h3 className="text-white font-bold">Chaos Simulator</h3>
@@ -258,3 +343,4 @@ export default function DataFlowVisualization({ onInjectFault, onReset }: DataFl
     </div>
   );
 }
+
