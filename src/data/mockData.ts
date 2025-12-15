@@ -6,7 +6,10 @@ export const devices: Device[] = [
     metrics: {
       l1: { temperature: 42, fanSpeed: 4500 },
       l2: { crcErrors: 0, linkUtilization: 45 },
+      l3: { packetLoss: 0.1, routingTableSize: 245, firewallDrops: 0 },
       l4: { tcpRetransmissions: 0.01, jitter: 2 },
+      l5: { sessionResets: 0, sessionStability: 99.9 },
+      l6: { tlsHandshakeFailures: 0, encryptionOverheadMs: 1 },
       l7: { appLatency: 15 }
     }
   },
@@ -15,7 +18,10 @@ export const devices: Device[] = [
     metrics: {
       l1: { temperature: 45, fanSpeed: 4200 },
       l2: { crcErrors: 2, linkUtilization: 60 },
+      l3: { packetLoss: 0.2, routingTableSize: 310, firewallDrops: 12 },
       l4: { tcpRetransmissions: 0.05, jitter: 5 },
+      l5: { sessionResets: 1, sessionStability: 99.6 },
+      l6: { tlsHandshakeFailures: 2, encryptionOverheadMs: 3 },
       l7: { appLatency: 25 }
     }
   },
@@ -24,7 +30,10 @@ export const devices: Device[] = [
     metrics: {
       l1: { temperature: 65, fanSpeed: 0 },
       l2: { crcErrors: 150, linkUtilization: 10 },
+      l3: { packetLoss: 2.1, routingTableSize: 48, firewallDrops: 0 },
       l4: { tcpRetransmissions: 2.4, jitter: 45 },
+      l5: { sessionResets: 6, sessionStability: 93.2 },
+      l6: { tlsHandshakeFailures: 0, encryptionOverheadMs: 0 },
       l7: { appLatency: 350 }
     }
   },
@@ -33,7 +42,10 @@ export const devices: Device[] = [
     metrics: {
       l1: { temperature: 38 },
       l2: { crcErrors: 0, linkUtilization: 12 },
+      l3: { packetLoss: 0.0, routingTableSize: 44, firewallDrops: 0 },
       l4: { tcpRetransmissions: 0, jitter: 1 },
+      l5: { sessionResets: 0, sessionStability: 99.8 },
+      l6: { tlsHandshakeFailures: 0, encryptionOverheadMs: 0 },
       l7: { appLatency: 5 }
     }
   },
@@ -42,7 +54,10 @@ export const devices: Device[] = [
     metrics: {
       l1: { temperature: 35 },
       l2: { crcErrors: 0, linkUtilization: 30 },
+      l3: { packetLoss: 0.1, routingTableSize: 120, firewallDrops: 1 },
       l4: { tcpRetransmissions: 0.02, jitter: 3 },
+      l5: { sessionResets: 0, sessionStability: 99.7 },
+      l6: { tlsHandshakeFailures: 1, encryptionOverheadMs: 2 },
       l7: { appLatency: 12 }
     }
   },
@@ -51,17 +66,23 @@ export const devices: Device[] = [
     metrics: {
       l1: { temperature: 25 },
       l2: { crcErrors: 0, linkUtilization: 1 },
+      l3: { packetLoss: 0.0, routingTableSize: 10, firewallDrops: 0 },
       l4: { tcpRetransmissions: 0, jitter: 0 },
+      l5: { sessionResets: 0, sessionStability: 100.0 },
+      l6: { tlsHandshakeFailures: 0, encryptionOverheadMs: 0 },
       l7: { appLatency: 2 }
     }
   },
   {
-    id: 'd7', name: 'Pressure Sensor 02', type: 'sensor', status: 'critical', category: 'OT', ip: '192.168.20.16', location: 'Zone B', position: [-30, -10, -5],
+    id: 'd7', name: 'Pressure Sensor 02', type: 'sensor', status: 'warning', category: 'OT', ip: '192.168.20.16', location: 'Zone B', position: [-30, -10, -5],
     metrics: {
-      l1: { temperature: 80 },
-      l2: { crcErrors: 0, linkUtilization: 0 },
-      l4: { tcpRetransmissions: 0, jitter: 0 },
-      l7: { appLatency: 0 }
+      l1: { temperature: 55 },
+      l2: { crcErrors: 6, linkUtilization: 2 },
+      l3: { packetLoss: 2.8, routingTableSize: 10, firewallDrops: 0 },
+      l4: { tcpRetransmissions: 0.1, jitter: 4 },
+      l5: { sessionResets: 4, sessionStability: 95.2 },
+      l6: { tlsHandshakeFailures: 0, encryptionOverheadMs: 0 },
+      l7: { appLatency: 22 }
     }
   },
   {
@@ -69,7 +90,10 @@ export const devices: Device[] = [
     metrics: {
       l1: { temperature: 40 },
       l2: { crcErrors: 5, linkUtilization: 55 },
+      l3: { packetLoss: 0.4, routingTableSize: 180, firewallDrops: 3 },
       l4: { tcpRetransmissions: 0.1, jitter: 8 },
+      l5: { sessionResets: 2, sessionStability: 98.9 },
+      l6: { tlsHandshakeFailures: 1, encryptionOverheadMs: 4 },
       l7: { appLatency: 45 }
     }
   },
@@ -78,7 +102,10 @@ export const devices: Device[] = [
     metrics: {
       l1: { temperature: 22, fanSpeed: 6000 },
       l2: { crcErrors: 0, linkUtilization: 80 },
+      l3: { packetLoss: 0.0, routingTableSize: 520, firewallDrops: 0 },
       l4: { tcpRetransmissions: 0, jitter: 1 },
+      l5: { sessionResets: 0, sessionStability: 99.95 },
+      l6: { tlsHandshakeFailures: 0, encryptionOverheadMs: 1 },
       l7: { appLatency: 5 }
     }
   },
@@ -87,7 +114,10 @@ export const devices: Device[] = [
     metrics: {
       l1: { temperature: 48, opticalRxPower: -24 },
       l2: { crcErrors: 45, linkUtilization: 35 },
+      l3: { packetLoss: 1.8, routingTableSize: 160, firewallDrops: 0 },
       l4: { tcpRetransmissions: 1.2, jitter: 20 },
+      l5: { sessionResets: 3, sessionStability: 97.2 },
+      l6: { tlsHandshakeFailures: 0, encryptionOverheadMs: 0 },
       l7: { appLatency: 120 }
     }
   }
@@ -110,18 +140,24 @@ export const layerKPIs: LayerKPI[] = [
   { layer: 'L4', name: 'UDP Packet Rate', value: 1250, unit: 'pps', status: 'healthy', trend: 'up', threshold: 2000 },
   { layer: 'L4', name: 'Connection Timeouts', value: 8, unit: 'count/hr', status: 'warning', trend: 'up', threshold: 5 },
 
-  { layer: 'L5-7', name: 'Application Response', value: 145, unit: 'ms', status: 'healthy', trend: 'stable', threshold: 200 },
-  { layer: 'L5-7', name: 'Modbus/TCP Success', value: 99.2, unit: '%', status: 'healthy', trend: 'stable', threshold: 98 },
-  { layer: 'L5-7', name: 'EtherNet/IP Health', value: 98.5, unit: '%', status: 'healthy', trend: 'stable', threshold: 97 },
+  { layer: 'L5', name: 'Session Stability', value: 99.4, unit: '%', status: 'healthy', trend: 'stable', threshold: 98 },
+  { layer: 'L5', name: 'Session Resets', value: 2, unit: 'count/hr', status: 'healthy', trend: 'down', threshold: 10 },
+
+  { layer: 'L6', name: 'TLS Handshake Failures', value: 1, unit: 'count/hr', status: 'healthy', trend: 'stable', threshold: 5 },
+  { layer: 'L6', name: 'Encryption Overhead', value: 3, unit: 'ms', status: 'healthy', trend: 'stable', threshold: 10 },
+
+  { layer: 'L7', name: 'Application Response', value: 145, unit: 'ms', status: 'healthy', trend: 'stable', threshold: 200 },
+  { layer: 'L7', name: 'Modbus/TCP Success', value: 99.2, unit: '%', status: 'healthy', trend: 'stable', threshold: 98 },
+  { layer: 'L7', name: 'EtherNet/IP Health', value: 98.5, unit: '%', status: 'healthy', trend: 'stable', threshold: 97 },
 ];
 
 export const alerts: Alert[] = [
   {
     id: 'a1',
-    severity: 'critical',
+    severity: 'medium',
     layer: 'L1',
     device: 'Pressure Sensor 02',
-    message: 'Signal degradation detected - possible cable damage',
+    message: 'Signal degradation detected - monitor link quality',
     timestamp: new Date(Date.now() - 5 * 60000),
     aiCorrelation: 'Correlated with L3 routing issues in Zone B - likely physical layer root cause'
   },
@@ -162,7 +198,7 @@ export const connections: NetworkConnection[] = [
   { id: 'c6', source: 'd8', target: 'd4', bandwidth: 520, latency: 4, status: 'healthy' },
   { id: 'c7', source: 'd10', target: 'd5', bandwidth: 380, latency: 3, status: 'healthy' },
   { id: 'c8', source: 'd10', target: 'd6', bandwidth: 120, latency: 6, status: 'healthy' },
-  { id: 'c9', source: 'd10', target: 'd7', bandwidth: 85, latency: 45, status: 'down' },
+  { id: 'c9', source: 'd10', target: 'd7', bandwidth: 85, latency: 18, status: 'degraded' },
 ];
 
 export const dependencyPaths: DependencyPath[] = [
@@ -175,7 +211,7 @@ export const dependencyPaths: DependencyPath[] = [
   {
     appId: 'p2',
     appName: 'SCADA Control Loop',
-    criticality: 'critical',
+    criticality: 'mission-critical',
     path: ['d3', 'd1', 'd5'] // Mapped to IDs: PLC A, DRAGON, SCADA Master
   }
 ];

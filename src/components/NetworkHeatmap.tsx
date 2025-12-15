@@ -9,7 +9,7 @@ interface NetworkHeatmapProps {
 export default function NetworkHeatmap({ alerts = [] }: NetworkHeatmapProps) {
   const heatmapData = useMemo(() => {
     const data = [];
-    const layers = ['L1', 'L2', 'L3', 'L4', 'L5-7'];
+    const layers = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'];
     const metrics = ['Utilization', 'Latency', 'Errors', 'Packets', 'Jitter'];
 
     // Check if we have the specific "Rigged" faults active
@@ -40,7 +40,7 @@ export default function NetworkHeatmap({ alerts = [] }: NetworkHeatmapProps) {
         if (hasL1Fault && layer === 'L1' && metric === 'Errors') {
           val = 95; // SPIKE!
         }
-        if (hasL7Fault && layer === 'L5-7' && metric === 'Latency') {
+        if (hasL7Fault && layer === 'L7' && metric === 'Latency') {
           val = 88; // SPIKE!
         }
 
@@ -67,7 +67,7 @@ export default function NetworkHeatmap({ alerts = [] }: NetworkHeatmapProps) {
     return 'text-gray-800';
   };
 
-  const layers = ['L1', 'L2', 'L3', 'L4', 'L5-7'];
+  const layers = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'];
   const metrics = ['Utilization', 'Latency', 'Errors', 'Packets', 'Jitter'];
 
   return (

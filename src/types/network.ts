@@ -18,9 +18,22 @@ export interface Device {
       linkUtilization: number; // Percentage
       macFlapping?: boolean;
     };
+    l3: {
+      packetLoss: number; // Percentage
+      routingTableSize: number; // Count
+      firewallDrops?: number; // Count
+    };
     l4: {
       tcpRetransmissions: number; // Rate
       jitter: number; // ms
+    };
+    l5: {
+      sessionResets: number; // count/hr
+      sessionStability: number; // Percentage
+    };
+    l6: {
+      tlsHandshakeFailures: number; // count/hr
+      encryptionOverheadMs: number; // ms
     };
     l7: {
       appLatency: number; // ms
@@ -45,7 +58,7 @@ export interface LayerKPI {
 export interface Alert {
   id: string;
   severity: 'low' | 'medium' | 'high' | 'critical' | 'info';
-  layer: 'L1' | 'L2' | 'L3' | 'L4' | 'L7';
+  layer: 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7';
   device: string;
   message: string;
   timestamp: Date;

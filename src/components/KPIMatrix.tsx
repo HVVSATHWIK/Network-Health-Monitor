@@ -9,12 +9,18 @@ interface KPIMatrixProps {
 export default function KPIMatrix({ devices, onClose }: KPIMatrixProps) {
 
     // Helper to determine cell color based on thresholds
-    const getStatusColor = (val: number, type: 'crc' | 'temp' | 'jitter' | 'latency' | 'power') => {
+    const getStatusColor = (val: number, type: 'crc' | 'temp' | 'jitter' | 'latency' | 'power' | 'loss' | 'routes' | 'resets' | 'stability' | 'tls' | 'overhead') => {
         if (type === 'crc') return val > 10 ? 'bg-red-500/10 text-red-500 border border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : (val > 0 ? 'bg-amber-500/10 text-amber-500 border border-amber-500/50' : 'text-slate-400');
         if (type === 'temp') return val > 70 ? 'text-red-500' : (val > 55 ? 'text-amber-500' : 'text-slate-200');
         if (type === 'jitter') return val > 30 ? 'text-red-500' : (val > 10 ? 'text-amber-500' : 'text-slate-400');
         if (type === 'latency') return val > 200 ? 'bg-red-500/10 text-red-500 border border-red-500/50' : (val > 100 ? 'bg-amber-500/10 text-amber-500 border border-amber-500/50' : 'bg-slate-800/50 text-emerald-400 border border-emerald-500/20');
         if (type === 'power') return val < -25 ? 'text-red-500' : (val < -20 ? 'text-amber-500' : 'text-slate-400');
+        if (type === 'loss') return val > 1 ? 'text-red-500' : (val > 0.2 ? 'text-amber-500' : 'text-slate-400');
+        if (type === 'routes') return val > 500 ? 'text-amber-500' : 'text-slate-400';
+        if (type === 'resets') return val > 10 ? 'text-red-500' : (val > 2 ? 'text-amber-500' : 'text-slate-400');
+        if (type === 'stability') return val < 95 ? 'text-red-500' : (val < 98 ? 'text-amber-500' : 'text-slate-400');
+        if (type === 'tls') return val > 5 ? 'text-red-500' : (val > 1 ? 'text-amber-500' : 'text-slate-400');
+        if (type === 'overhead') return val > 10 ? 'text-red-500' : (val > 4 ? 'text-amber-500' : 'text-slate-400');
         return 'text-slate-400';
     };
 
@@ -47,7 +53,7 @@ export default function KPIMatrix({ devices, onClose }: KPIMatrixProps) {
                 {/* Matrix Grid */}
                 <div className="flex-1 overflow-auto bg-[#0B0F17]">
                     <div className="min-w-[1000px]">
-                        <div className="grid grid-cols-[300px_1fr_1fr_1fr_1fr] sticky top-0 z-10 bg-[#0B0F17]/95 backdrop-blur border-b border-white/5 text-[10px] uppercase tracking-widest font-bold text-slate-500">
+                        <div className="grid grid-cols-[300px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] sticky top-0 z-10 bg-[#0B0F17]/95 backdrop-blur border-b border-white/5 text-[10px] uppercase tracking-widest font-bold text-slate-500">
                             <div className="p-4 pl-8 flex items-center gap-2">
                                 <Server className="w-3 h-3" /> Asset Identity
                             </div>
@@ -57,8 +63,17 @@ export default function KPIMatrix({ devices, onClose }: KPIMatrixProps) {
                             <div className="p-4 text-center border-l border-white/5 text-emerald-400 bg-emerald-500/5">
                                 Layer 2 (Data Link)
                             </div>
+                            <div className="p-4 text-center border-l border-white/5 text-cyan-400 bg-cyan-500/5">
+                                Layer 3 (Network)
+                            </div>
                             <div className="p-4 text-center border-l border-white/5 text-orange-400 bg-orange-500/5">
                                 Layer 4 (Transport)
+                            </div>
+                            <div className="p-4 text-center border-l border-white/5 text-sky-400 bg-sky-500/5">
+                                Layer 5 (Session)
+                            </div>
+                            <div className="p-4 text-center border-l border-white/5 text-fuchsia-400 bg-fuchsia-500/5">
+                                Layer 6 (Presentation)
                             </div>
                             <div className="p-4 text-center border-l border-white/5 text-purple-400 bg-purple-500/5">
                                 Layer 7 (Application)
@@ -67,7 +82,7 @@ export default function KPIMatrix({ devices, onClose }: KPIMatrixProps) {
 
                         <div className="divide-y divide-white/5">
                             {devices.map(device => (
-                                <div key={device.id} className="grid grid-cols-[300px_1fr_1fr_1fr_1fr] hover:bg-white/[0.02] transition-colors group">
+                                <div key={device.id} className="grid grid-cols-[300px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] hover:bg-white/[0.02] transition-colors group">
 
                                     {/* Asset Info */}
                                     <div className="p-4 pl-8 flex flex-col justify-center">
@@ -97,6 +112,18 @@ export default function KPIMatrix({ devices, onClose }: KPIMatrixProps) {
                                         </div>
                                     </div>
 
+                                    {/* L3 Metric Cell */}
+                                    <div className="p-4 border-l border-white/5 flex flex-col items-center justify-center gap-1.5">
+                                        <div className="flex items-center justify-between w-full max-w-[140px] text-xs">
+                                            <span className="text-slate-500">Loss</span>
+                                            <span className={`font-mono ${getStatusColor(device.metrics.l3.packetLoss, 'loss')}`}>{device.metrics.l3.packetLoss}%</span>
+                                        </div>
+                                        <div className="flex items-center justify-between w-full max-w-[140px] text-xs">
+                                            <span className="text-slate-500">Routes</span>
+                                            <span className={`font-mono ${getStatusColor(device.metrics.l3.routingTableSize, 'routes')}`}>{device.metrics.l3.routingTableSize}</span>
+                                        </div>
+                                    </div>
+
                                     {/* L4 Metric Cell */}
                                     <div className="p-4 border-l border-white/5 flex flex-col items-center justify-center gap-1.5">
                                         <div className="flex items-center justify-between w-full max-w-[120px] text-xs">
@@ -106,6 +133,30 @@ export default function KPIMatrix({ devices, onClose }: KPIMatrixProps) {
                                         <div className="flex items-center justify-between w-full max-w-[120px] text-xs">
                                             <span className="text-slate-500">Jitter</span>
                                             <span className={`font-mono ${getStatusColor(device.metrics.l4.jitter, 'jitter')}`}>{device.metrics.l4.jitter}ms</span>
+                                        </div>
+                                    </div>
+
+                                    {/* L5 Metric Cell */}
+                                    <div className="p-4 border-l border-white/5 flex flex-col items-center justify-center gap-1.5">
+                                        <div className="flex items-center justify-between w-full max-w-[140px] text-xs">
+                                            <span className="text-slate-500">Stability</span>
+                                            <span className={`font-mono ${getStatusColor(device.metrics.l5.sessionStability, 'stability')}`}>{device.metrics.l5.sessionStability}%</span>
+                                        </div>
+                                        <div className="flex items-center justify-between w-full max-w-[140px] text-xs">
+                                            <span className="text-slate-500">Resets</span>
+                                            <span className={`font-mono ${getStatusColor(device.metrics.l5.sessionResets, 'resets')}`}>{device.metrics.l5.sessionResets}/hr</span>
+                                        </div>
+                                    </div>
+
+                                    {/* L6 Metric Cell */}
+                                    <div className="p-4 border-l border-white/5 flex flex-col items-center justify-center gap-1.5">
+                                        <div className="flex items-center justify-between w-full max-w-[160px] text-xs">
+                                            <span className="text-slate-500">TLS Fail</span>
+                                            <span className={`font-mono ${getStatusColor(device.metrics.l6.tlsHandshakeFailures, 'tls')}`}>{device.metrics.l6.tlsHandshakeFailures}/hr</span>
+                                        </div>
+                                        <div className="flex items-center justify-between w-full max-w-[160px] text-xs">
+                                            <span className="text-slate-500">Overhead</span>
+                                            <span className={`font-mono ${getStatusColor(device.metrics.l6.encryptionOverheadMs, 'overhead')}`}>{device.metrics.l6.encryptionOverheadMs}ms</span>
                                         </div>
                                     </div>
 

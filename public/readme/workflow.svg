@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22c55e"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+    <style>
+      .t { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="520" rx="24" fill="url(#bg)"/>
+  <text class="t" x="60" y="70" font-size="28" font-weight="800" fill="#e2e8f0">Demo Workflow (What judges should try)</text>
+  <text class="t" x="60" y="98" font-size="14" fill="#94a3b8">A tight, end-to-end story: select → observe → investigate → act.</text>
+
+  <g filter="url(#soft)">
+    <rect x="60" y="150" width="260" height="110" rx="18" fill="#0b1220" stroke="#334155"/>
+    <text class="t" x="88" y="185" font-size="16" font-weight="700" fill="#e2e8f0">1) Select an Asset</text>
+    <text class="t" x="88" y="210" font-size="13" fill="#94a3b8">Click in 3D topology</text>
+    <text class="t" x="88" y="232" font-size="13" fill="#94a3b8">or Asset Status list</text>
+
+    <rect x="340" y="150" width="260" height="110" rx="18" fill="#0b1220" stroke="#334155"/>
+    <text class="t" x="368" y="185" font-size="16" font-weight="700" fill="#e2e8f0">2) See Data Flow</text>
+    <text class="t" x="368" y="210" font-size="13" fill="#94a3b8">Flow focuses to tier</text>
+    <text class="t" x="368" y="232" font-size="13" fill="#94a3b8">for selected asset</text>
+
+    <rect x="620" y="150" width="260" height="110" rx="18" fill="#0b1220" stroke="#334155"/>
+    <text class="t" x="648" y="185" font-size="16" font-weight="700" fill="#e2e8f0">3) Run Scan</text>
+    <text class="t" x="648" y="210" font-size="13" fill="#94a3b8">Run Diagnostic Scan</text>
+    <text class="t" x="648" y="232" font-size="13" fill="#94a3b8">(L1–L7 telemetry)</text>
+
+    <rect x="900" y="150" width="260" height="110" rx="18" fill="#0b1220" stroke="#334155"/>
+    <text class="t" x="928" y="185" font-size="16" font-weight="700" fill="#e2e8f0">4) Investigate</text>
+    <text class="t" x="928" y="210" font-size="13" fill="#94a3b8">Forensic Cockpit</text>
+    <text class="t" x="928" y="232" font-size="13" fill="#94a3b8">Analyze Stream → RCA</text>
+
+    <rect x="200" y="320" width="360" height="140" rx="18" fill="#0b1220" stroke="#334155"/>
+    <text class="t" x="228" y="355" font-size="16" font-weight="700" fill="#e2e8f0">Optional: Inject a Fault</text>
+    <text class="t" x="228" y="380" font-size="13" fill="#94a3b8">Chaos Simulator: simulate L1 cable cut</text>
+    <text class="t" x="228" y="402" font-size="13" fill="#94a3b8">or L7 latency to demonstrate correlation</text>
+
+    <rect x="620" y="320" width="360" height="140" rx="18" fill="#0b1220" stroke="#334155"/>
+    <text class="t" x="648" y="355" font-size="16" font-weight="700" fill="#e2e8f0">NetMonitAI Assistant</text>
+    <text class="t" x="648" y="380" font-size="13" fill="#94a3b8">Ask questions and get quick summaries</text>
+    <text class="t" x="648" y="402" font-size="13" fill="#94a3b8">without disrupting investigation flow</text>
+  </g>
+
+  <g stroke="url(#accent)" stroke-width="4" fill="none" opacity="0.95" stroke-linecap="round">
+    <path d="M320 205H340"/>
+    <path d="M600 205H620"/>
+    <path d="M880 205H900"/>
+    <path d="M530 390H620"/>
+  </g>
+
+  <g fill="url(#accent)">
+    <circle cx="340" cy="205" r="6"/>
+    <circle cx="620" cy="205" r="6"/>
+    <circle cx="900" cy="205" r="6"/>
+    <circle cx="620" cy="390" r="6"/>
+  </g>
+
+  <text class="mono" x="60" y="500" font-size="12" fill="#64748b">Tip: Open the in-app Guide (book icon) for a step-by-step walkthrough.</text>
+</svg>

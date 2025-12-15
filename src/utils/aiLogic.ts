@@ -97,7 +97,15 @@ export async function analyzeWithMultiAgents(
     }
 
     // 1. Check for Simulation Signatures (The "Smart Fallback" / Demo Logic)
-    const l1Alert = activeAlerts.find(a => a.layer === 'L1');
+    // IMPORTANT: Only treat L1 as "cable sever" when the alert is severe, otherwise
+    // the demo starts in a broken state (mock data includes non-fatal L1 degradations).
+    const userWantsL1Scenario = /(cable|fiber|otdr|loss\s+of\s+signal|\blos\b|link\s+down)/i.test(userQuery);
+    const userWantsL7Scenario = /(latency|timeout|response\s*time|deadlock|thread\s*pool|\bl7\b)/i.test(userQuery);
+    const isAnalysisIntent = /(analy|diagnos|scan|investigat|root\s*cause|\brca\b|forensic)/i.test(userQuery);
+
+    const l1Alert = activeAlerts.find(
+        a => a.layer === 'L1' && (a.severity === 'critical' || a.severity === 'high')
+    );
     const l7Alert = activeAlerts.find(a => a.layer === 'L7' && a.severity !== 'low');
 
     // Default "Clean" Report
@@ -114,9 +122,9 @@ export async function analyzeWithMultiAgents(
         recommendations: ['Maintain standard monitoring interval.']
     };
 
-    if (l1Alert || l7Alert) {
+    if (l1Alert || l7Alert || userWantsL1Scenario || userWantsL7Scenario) {
 
-        if (l1Alert) {
+        if (l1Alert || userWantsL1Scenario) {
             // Scenario A: Cable Cut
             report = {
                 criticality: 'extreme',
@@ -156,7 +164,7 @@ export async function analyzeWithMultiAgents(
                 ]
             };
         }
-        else if (l7Alert) {
+        else if (l7Alert || userWantsL7Scenario) {
             // Scenario B: Application Lag
             report = {
                 criticality: 'medium',
@@ -182,6 +190,98 @@ export async function analyzeWithMultiAgents(
                 ]
             };
         }
+    }
+
+    // 2. Generic fallback: if the user is asking for analysis and there are alerts,
+    // produce a meaningful L1–L7 report even when it's not the special L1/L7 demo signature.
+    if (isAnalysisIntent && activeAlerts.length > 0 && report.rootCause === 'N/A') {
+        const severityRank: Record<Alert['severity'], number> = {
+            info: 0,
+            low: 1,
+            medium: 2,
+            high: 3,
+            critical: 4,
+        };
+        const mostSevere = [...activeAlerts].sort(
+            (a, b) => severityRank[b.severity] - severityRank[a.severity]
+        )[0];
+
+        const criticality: ForensicReport['criticality'] =
+            mostSevere.severity === 'critical'
+                ? 'high'
+                : mostSevere.severity === 'high'
+                    ? 'medium'
+                    : mostSevere.severity === 'medium'
+                        ? 'medium'
+                        : 'low';
+
+        const layerRootCause: Record<Alert['layer'], string> = {
+            L1: 'Physical Layer Degradation (L1)',
+            L2: 'Link-Layer Instability (L2)',
+            L3: 'Routing / Packet Loss Event (L3)',
+            L4: 'Transport Congestion / Retransmissions (L4)',
+            L5: 'Session Churn / Reset Storm (L5)',
+            L6: 'TLS / Encoding Negotiation Failures (L6)',
+            L7: 'Application Performance / Availability Issue (L7)',
+        };
+
+        const layerRecommendations: Record<Alert['layer'], string[]> = {
+            L1: [
+                'Verify cabling/connector integrity and check optical power (DOM) readings.',
+                'Inspect ports for CRC errors and validate link negotiation (speed/duplex).',
+                'Fail over to redundant physical path if available.'
+            ],
+            L2: [
+                'Check for MAC flaps, STP topology changes, or VLAN mismatches.',
+                'Validate trunk/tagging configuration and port security events.',
+                'Review switch interface counters and broadcast/multicast rates.'
+            ],
+            L3: [
+                'Check routing adjacency stability (OSPF/BGP) and recent route changes.',
+                'Review packet loss hotspots and validate MTU consistency.',
+                'Inspect ACL/firewall drops for unintended blocking.'
+            ],
+            L4: [
+                'Inspect retransmissions, SYN backlog, and socket exhaustion indicators.',
+                'Identify microburst/congestion points and validate QoS policies.',
+                'Capture a short PCAP to confirm handshake/ACK patterns.'
+            ],
+            L5: [
+                'Check for session resets, keepalive failures, or state table churn.',
+                'Validate load balancer persistence/stickiness policies.',
+                'Review timeout settings across client, proxy, and server tiers.'
+            ],
+            L6: [
+                'Check TLS handshake failures (cert expiry, cipher mismatch, SNI issues).',
+                'Validate intermediate CA chain and time sync (NTP) across endpoints.',
+                'Confirm any recent policy updates to crypto libraries or proxies.'
+            ],
+            L7: [
+                'Inspect application logs for error spikes and upstream dependency timeouts.',
+                'Check resource saturation (CPU/memory) and thread pool metrics.',
+                'Roll back recent deployments if correlated with start of incident.'
+            ],
+        };
+
+        report = {
+            criticality,
+            rootCause: layerRootCause[mostSevere.layer],
+            summary: `${mostSevere.layer} alert detected on ${mostSevere.device}: ${mostSevere.message}`,
+            chainOfThought: [
+                { id: '1', timestamp: Date.now(), agent: 'Coordinator', action: 'INGEST_ALERT', status: 'success', result: `${mostSevere.layer}/${mostSevere.severity}` },
+                { id: '2', timestamp: Date.now() + 250, agent: 'Reliability-Bot', action: 'CORRELATE_TELEMETRY', status: 'success', result: 'Correlated with recent KPI drift' },
+                { id: '3', timestamp: Date.now() + 500, agent: 'Coordinator', action: 'GENERATE_REMEDIATION', status: 'success', result: 'Action list prepared' },
+            ],
+            artifacts: [
+                {
+                    type: 'json_log',
+                    title: 'Alert Payload',
+                    description: 'Normalized alert object used for correlation.',
+                    data: mostSevere,
+                }
+            ],
+            recommendations: layerRecommendations[mostSevere.layer],
+        };
     }
 
     return report;

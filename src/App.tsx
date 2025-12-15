@@ -1,14 +1,16 @@
-import { Activity, Network, Shield, Zap, Play, Signal } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Activity, Network, Shield, Zap, Play, Signal, Terminal, Bot } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import AlertPanel from './components/AlertPanel';
 import DeviceStatus from './components/DeviceStatus';
 import Advanced3DTopology from './components/Advanced3DTopology';
 import AdvancedAnalytics from './components/AdvancedAnalytics';
 import NetworkHeatmap from './components/NetworkHeatmap';
 import DataFlowVisualization from './components/DataFlowVisualization';
+import ForensicCockpit from './components/forensics/ForensicCockpit';
+import AICopilot from './components/AICopilot';
 
-import { devices as initialDevices, alerts as initialAlerts, connections, dependencyPaths } from './data/mockData';
-import { Device, Alert } from './types/network';
+import { devices as initialDevices, alerts as initialAlerts, connections as initialConnections, dependencyPaths } from './data/mockData';
+import { Device, Alert, NetworkConnection } from './types/network';
 
 import VisualGuide from './components/VisualGuide';
 import BootSequence from './components/BootSequence';
@@ -33,6 +35,10 @@ function App() {
   // const [aiMessage, setAiMessage] = useState<string | undefined>(undefined); // Unused
   const [visualMode, setVisualMode] = useState<'default' | 'scan'>('default');
   const [isChaosOpen, setIsChaosOpen] = useState(false);
+  const scanTimeoutsRef = useRef<number[]>([]);
+  const [isForensicOpen, setIsForensicOpen] = useState(false);
+  const [forensicSystemMessage, setForensicSystemMessage] = useState<string | undefined>(undefined);
+  const [isNetMonitAIOpen, setIsNetMonitAIOpen] = useState(false);
 
   // Persistent Auth Listener
   useEffect(() => {
@@ -65,9 +71,31 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  const cloneDevices = (source: Device[]) => source.map(d => ({
+    ...d,
+    metrics: {
+      ...d.metrics,
+      l1: { ...d.metrics.l1 },
+      l2: { ...d.metrics.l2 },
+      l3: { ...d.metrics.l3 },
+      l4: { ...d.metrics.l4 },
+      l5: { ...d.metrics.l5 },
+      l6: { ...d.metrics.l6 },
+      l7: { ...d.metrics.l7 },
+    }
+  }));
+
+  const cloneAlerts = (source: Alert[]) => source.map(a => ({
+    ...a,
+    timestamp: new Date(a.timestamp)
+  }));
+
+  const cloneConnections = (source: NetworkConnection[]) => source.map(c => ({ ...c }));
+
   // Dynamic State for Simulation
-  const [devices, setDevices] = useState<Device[]>(initialDevices);
-  const [alerts, setAlerts] = useState<Alert[]>(initialAlerts);
+  const [devices, setDevices] = useState<Device[]>(() => cloneDevices(initialDevices));
+  const [alerts, setAlerts] = useState<Alert[]>(() => cloneAlerts(initialAlerts));
+  const [connections, setConnections] = useState<NetworkConnection[]>(() => cloneConnections(initialConnections));
 
 
   const healthyDevices = devices.filter(d => d.status === 'healthy').length;
@@ -99,25 +127,42 @@ function App() {
   };
 
   const runSimulation = () => {
-    // 1. Start Visual Scan
-    setVisualMode('scan');
+    // Make the scan visible: DataFlowVisualization lives in the 3D view.
+    setActiveView('3d');
+
+    // Open the forensic scan modal and auto-run a "full stack" diagnosis.
+    setForensicSystemMessage(`Initiate full stack diagnostic scan (L1–L7) for ${userName}.`);
+    setIsForensicOpen(true);
+
+    // Clear previous scan timers so repeated clicks behave predictably.
+    scanTimeoutsRef.current.forEach((id) => window.clearTimeout(id));
+    scanTimeoutsRef.current = [];
+
+    // Force a restart so repeated clicks still visibly re-trigger scan mode.
+    setVisualMode('default');
+    scanTimeoutsRef.current.push(window.setTimeout(() => setVisualMode('scan'), 0));
+
+    // Bring the scan visualization into view (wait a beat for the view to render).
+    scanTimeoutsRef.current.push(window.setTimeout(() => {
+      document.getElementById('data-flow-viz')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150));
 
     // 2. AI Narration Sequence (Removed legacy setAiMessage)
     // setAiMessage(`Initiating Full Stack Telemetry Scan for ${userName}...`);
 
-    setTimeout(() => {
+    scanTimeoutsRef.current.push(window.setTimeout(() => {
       // setAiMessage("Analyzing Layer 1 Physical Links... Detected 2ms jitter on Switch-02.");
-    }, 15000);
+    }, 15000));
 
-    setTimeout(() => {
+    scanTimeoutsRef.current.push(window.setTimeout(() => {
       // setAiMessage("Correlating with Layer 7 Application Latency...");
       // Inject a simulated "fix" or "optimization" visual
-    }, 30000);
+    }, 30000));
 
-    setTimeout(() => {
+    scanTimeoutsRef.current.push(window.setTimeout(() => {
       // setAiMessage("Optimization Complete. Routing efficiency improved by 15%. Dashboard updated.");
       setVisualMode('default');
-    }, 45000);
+    }, 45000));
   };
 
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
@@ -130,47 +175,231 @@ function App() {
 
   // Fault Injection Logic
   const handleInjectFault = (type: 'l1' | 'l7') => {
+    const baseDevices = cloneDevices(initialDevices);
+    const baseAlerts = cloneAlerts(initialAlerts);
+    const baseConnections = cloneConnections(initialConnections);
+    const now = Date.now();
+
     if (type === 'l1') {
-      // 1. Break the Switch (Physical Layer)
-      setDevices(prev => prev.map(d =>
-        d.name === 'Hirschmann BOBCAT Switch' ? { ...d, status: 'critical' } : d
-      ));
+      // Scenario: L1 physical failure on Access Switch (BOBCAT) that manifests as L3/L4/L7 symptoms.
+      const nextDevices: Device[] = baseDevices.map((d): Device => {
+        if (d.id === 'd10') {
+          return {
+            ...d,
+            status: 'critical',
+            metrics: {
+              ...d.metrics,
+              l1: { ...d.metrics.l1, temperature: 78, opticalRxPower: -32 },
+              l2: { ...d.metrics.l2, crcErrors: 980, linkUtilization: 0, macFlapping: true },
+              l3: { ...d.metrics.l3, packetLoss: 18.5 },
+              l4: { ...d.metrics.l4, tcpRetransmissions: 0.12, jitter: 85 },
+              l5: { ...d.metrics.l5, sessionResets: 28, sessionStability: 82.1 },
+              l7: { ...d.metrics.l7, appLatency: 1200, protocolAnomaly: true }
+            }
+          };
+        }
 
-      // 2. Add Critical Alert
-      const newAlert: Alert = {
-        id: `sim-l1-${Date.now()}`,
-        severity: 'critical',
-        layer: 'L1',
-        device: 'Hirschmann BOBCAT Switch',
-        message: 'Port 4 Link Down (CRC Errors > 90%)',
-        timestamp: new Date()
-      };
-      setAlerts(prev => [newAlert, ...prev]);
+        // Downstream production impact
+        if (d.id === 'd5') {
+          return {
+            ...d,
+            status: 'warning',
+            metrics: {
+              ...d.metrics,
+              l3: { ...d.metrics.l3, packetLoss: 3.6 },
+              l4: { ...d.metrics.l4, tcpRetransmissions: 0.08, jitter: 42 },
+              l5: { ...d.metrics.l5, sessionResets: 7, sessionStability: 94.1 },
+              l7: { ...d.metrics.l7, appLatency: 1400, protocolAnomaly: true }
+            }
+          };
+        }
+
+        if (d.id === 'd3') {
+          return {
+            ...d,
+            status: 'critical',
+            metrics: {
+              ...d.metrics,
+              l3: { ...d.metrics.l3, packetLoss: 9.2 },
+              l4: { ...d.metrics.l4, tcpRetransmissions: 0.14, jitter: 65 },
+              l5: { ...d.metrics.l5, sessionResets: 16, sessionStability: 78.4 },
+              l7: { ...d.metrics.l7, appLatency: 3200, protocolAnomaly: true }
+            }
+          };
+        }
+
+        if (d.id === 'd6' || d.id === 'd7') {
+          return {
+            ...d,
+            status: 'warning',
+            metrics: {
+              ...d.metrics,
+              l2: { ...d.metrics.l2, crcErrors: Math.max(d.metrics.l2.crcErrors, 12) },
+              l3: { ...d.metrics.l3, packetLoss: Math.max(d.metrics.l3.packetLoss, 4.8) },
+              l7: { ...d.metrics.l7, appLatency: Math.max(d.metrics.l7.appLatency, 220), protocolAnomaly: true }
+            }
+          };
+        }
+
+        if (d.id === 'd1') {
+          // Core switch shows routing/transport symptoms even though root cause is L1 edge.
+          return {
+            ...d,
+            status: 'warning',
+            metrics: {
+              ...d.metrics,
+              l3: { ...d.metrics.l3, packetLoss: 2.4, routingTableSize: d.metrics.l3.routingTableSize + 40 },
+              l4: { ...d.metrics.l4, tcpRetransmissions: 0.04, jitter: 18 },
+            }
+          };
+        }
+
+        return d;
+      });
+
+      const nextConnections: NetworkConnection[] = baseConnections.map((c): NetworkConnection => {
+        if (c.id === 'c2') return { ...c, status: 'down', latency: 0, bandwidth: 0 };
+        if (c.id === 'c7' || c.id === 'c8' || c.id === 'c9') return { ...c, status: 'down', latency: 0, bandwidth: 0 };
+        if (c.id === 'c3') return { ...c, status: 'degraded', latency: 14, bandwidth: Math.max(120, Math.round(c.bandwidth * 0.6)) };
+        return c;
+      });
+
+      const simAlerts: Alert[] = [
+        {
+          id: `sim-l1-${now}-a`,
+          severity: 'critical',
+          layer: 'L1',
+          device: 'Hirschmann BOBCAT Switch',
+          message: 'Fiber link down on Port 4 (Optical RX < -30 dBm) — physical disconnect suspected',
+          timestamp: new Date(),
+          aiCorrelation: 'Primary fault likely at L1. Expect secondary symptoms at L3 (loss) and L4 (timeouts) across OT cells.'
+        },
+        {
+          id: `sim-l1-${now}-b`,
+          severity: 'high',
+          layer: 'L2',
+          device: 'Hirschmann BOBCAT Switch',
+          message: 'CRC error storm + MAC flapping detected — unstable physical medium',
+          timestamp: new Date(),
+          aiCorrelation: 'L2 anomalies coincide with L1 optical power drop; treat L3 alarms as downstream effects.'
+        },
+        {
+          id: `sim-l1-${now}-c`,
+          severity: 'high',
+          layer: 'L3',
+          device: 'Hirschmann DRAGON MACH4x00',
+          message: 'Packet loss spike and route churn observed for Zone A/Zone B subnets',
+          timestamp: new Date(),
+          aiCorrelation: 'This can look like routing/firewall issues, but correlation points back to edge physical instability.'
+        },
+        {
+          id: `sim-l1-${now}-d`,
+          severity: 'high',
+          layer: 'L4',
+          device: 'Lion-M PLC Node A',
+          message: 'TCP retransmissions/timeouts rising — control loop reliability degraded',
+          timestamp: new Date(),
+          aiCorrelation: 'Transport reliability degradation aligns with L1/L2 faults upstream of the PLC segment.'
+        },
+        {
+          id: `sim-l1-${now}-e`,
+          severity: 'high',
+          layer: 'L7',
+          device: 'SCADA Control Loop',
+          message: 'SCADA command latency elevated; intermittent protocol anomalies',
+          timestamp: new Date(),
+          aiCorrelation: 'Application symptoms are secondary. Mitigate by restoring physical link and validating switch port optics.'
+        }
+      ];
+
+      setDevices(nextDevices);
+      setConnections(nextConnections);
+      setAlerts([ ...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-')) ]);
+      return;
     }
-    else if (type === 'l7') {
-      // 1. Lag the Server (Application Layer)
-      setDevices(prev => prev.map(d =>
-        d.type === 'scada' ? { ...d, status: 'warning' } : d
-      ));
 
-      // 2. Add High Latency Alert
-      const newAlert: Alert = {
-        id: `sim-l7-${Date.now()}`,
-        severity: 'high',
-        layer: 'L7',
-        device: 'SCADA Control Loop', // Matches dependency path appName
-        message: 'Response Time > 5000ms (Timeout)',
-        timestamp: new Date()
-      };
-      setAlerts(prev => [newAlert, ...prev]);
+    if (type === 'l7') {
+      // Scenario: L7 server-side latency/timeout with clean lower layers.
+      const nextDevices: Device[] = baseDevices.map((d): Device => {
+        if (d.id === 'd5') {
+          return {
+            ...d,
+            status: 'warning',
+            metrics: {
+              ...d.metrics,
+              l4: { ...d.metrics.l4, tcpRetransmissions: 0.06, jitter: 12 },
+              l5: { ...d.metrics.l5, sessionResets: 12, sessionStability: 93.8 },
+              l6: { ...d.metrics.l6, tlsHandshakeFailures: 6, encryptionOverheadMs: 7 },
+              l7: { ...d.metrics.l7, appLatency: 5200, protocolAnomaly: true },
+            }
+          };
+        }
+
+        if (d.id === 'd3' || d.id === 'd4') {
+          // Controllers perceive lag but physical layer stays healthy.
+          return {
+            ...d,
+            status: 'warning',
+            metrics: {
+              ...d.metrics,
+              l4: { ...d.metrics.l4, tcpRetransmissions: Math.max(d.metrics.l4.tcpRetransmissions, 0.05), jitter: Math.max(d.metrics.l4.jitter, 22) },
+              l5: { ...d.metrics.l5, sessionResets: Math.max(d.metrics.l5.sessionResets, 5), sessionStability: Math.min(d.metrics.l5.sessionStability, 95.5) },
+              l7: { ...d.metrics.l7, appLatency: Math.max(d.metrics.l7.appLatency, 900) }
+            }
+          };
+        }
+
+        return d;
+      });
+
+      const nextConnections: NetworkConnection[] = baseConnections.map((c): NetworkConnection => {
+        if (c.id === 'c7') return { ...c, status: 'degraded', latency: 120, bandwidth: Math.max(80, Math.round(c.bandwidth * 0.4)) };
+        return c;
+      });
+
+      const simAlerts: Alert[] = [
+        {
+          id: `sim-l7-${now}-a`,
+          severity: 'high',
+          layer: 'L7',
+          device: 'SCADA Control Loop',
+          message: 'Response time > 5000ms; command acknowledgements delayed',
+          timestamp: new Date(),
+          aiCorrelation: 'L1–L3 telemetry remains nominal; likely application/service-side contention or overloaded control runtime.'
+        },
+        {
+          id: `sim-l7-${now}-b`,
+          severity: 'medium',
+          layer: 'L5',
+          device: 'SCADA Control Loop',
+          message: 'Session instability: frequent reconnects observed',
+          timestamp: new Date(),
+          aiCorrelation: 'Sessions reset due to delayed responses rather than transport loss. Validate SCADA service health and thread saturation.'
+        },
+        {
+          id: `sim-l7-${now}-c`,
+          severity: 'medium',
+          layer: 'L4',
+          device: 'Lion-M PLC Node A',
+          message: 'Transport retries increasing (client-side timeouts)',
+          timestamp: new Date(),
+          aiCorrelation: 'Retries driven by slow application responses; lower layers are stable (no L1/L2 error storm).' 
+        }
+      ];
+
+      setDevices(nextDevices);
+      setConnections(nextConnections);
+      setAlerts([ ...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-')) ]);
+      return;
     }
     // AI Reaction
     // setAiMessage(`Alert Detected: ${type.toUpperCase()} Anomaly. Analyzing root cause...`); // Removed
   };
 
   const handleReset = () => {
-    setDevices(initialDevices);
-    setAlerts(initialAlerts);
+    setDevices(cloneDevices(initialDevices));
+    setAlerts(cloneAlerts(initialAlerts));
+    setConnections(cloneConnections(initialConnections));
     // setAiMessage("System Reset. Telemetry metrics normalized."); // Removed
   };
 
@@ -196,7 +425,7 @@ function App() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold">NetMonit</h1>
-                <p className="text-sm text-slate-300">Network Health Monitor</p>
+                <p className="text-sm text-slate-300">Network Monitoring System</p>
               </div>
             </div>
 
@@ -205,13 +434,34 @@ function App() {
               <button
                 id="diagnostic-scan-trigger"
                 onClick={runSimulation}
-                className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-full shadow-lg transition-all text-sm font-bold"
+                className={`flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full shadow-lg transition-all text-sm font-bold ${visualMode === 'scan'
+                  ? 'opacity-90'
+                  : 'hover:from-purple-500 hover:to-blue-500'
+                  }`}
               >
-                <Play className="w-4 h-4 fill-current" />
-                <span>Run Diagnostic Scan</span>
+                <Play className={`w-4 h-4 fill-current ${visualMode === 'scan' ? 'animate-pulse' : ''}`} />
+                <span>{visualMode === 'scan' ? 'Scanning…' : 'Run Diagnostic Scan'}</span>
               </button>
 
-              <div className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg">
+              <button
+                id="forensic-cockpit-trigger"
+                onClick={() => setIsCopilotOpen(true)}
+                className="flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full shadow-lg transition-all text-sm font-semibold"
+              >
+                <Terminal className="w-4 h-4" />
+                <span>Forensic Cockpit</span>
+              </button>
+
+              <button
+                id="netmonit-ai-trigger"
+                onClick={() => setIsNetMonitAIOpen(true)}
+                className="flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full shadow-lg transition-all text-sm font-semibold"
+              >
+                <Bot className="w-4 h-4" />
+                <span>NetMonit AI</span>
+              </button>
+
+              <div id="network-health-badge" className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg">
                 <Shield className="w-5 h-5 text-green-400" />
                 <div>
                   <div className="text-xs text-slate-400">Network Health</div>
@@ -261,6 +511,7 @@ function App() {
       <main className="max-w-[1800px] mx-auto px-6 py-6">
         <div className="flex gap-2 mb-6 bg-slate-900/50 border border-slate-800 rounded-lg p-1.5 backdrop-blur-sm w-fit shadow-lg">
           <button
+            id="view-3d-trigger"
             onClick={() => setActiveView('3d')}
             className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeView === '3d'
               ? 'bg-purple-600 text-white shadow-lg'
@@ -302,7 +553,11 @@ function App() {
 
             {/* Critical Panels: Status & Alerts */}
             <div className="col-span-12 lg:col-span-4">
-              <DeviceStatus devices={devices} />
+              <DeviceStatus
+                devices={devices}
+                selectedDeviceId={selectedDeviceId}
+                onSelectDevice={setSelectedDeviceId}
+              />
             </div>
             <div className="col-span-12 lg:col-span-8">
               <AlertPanel alerts={alerts} devices={devices} />
@@ -310,12 +565,9 @@ function App() {
 
             <div className="col-span-12 lg:col-span-6" id="data-flow-viz">
               <DataFlowVisualization
-                onInjectFault={handleInjectFault}
-                onReset={handleReset}
                 mode={visualMode}
                 // showControlsExternal={showTour && tourStep === 3} // Removed forced external control to enforce 'Active Learning' (User must click)
-                onShowControlsChange={setIsChaosOpen}
-                selectedDeviceId={selectedDeviceId}
+                selectedDevice={devices.find(d => d.id === selectedDeviceId) ?? null}
               />
             </div>
             <div className="col-span-12 lg:col-span-6">
@@ -336,7 +588,7 @@ function App() {
 
         <footer className="mt-6 text-center text-sm text-slate-600 bg-slate-900/80 border-t border-slate-800 p-4 backdrop-blur-sm">
           <div className="flex items-center justify-center gap-8">
-            <span>NetMonit - Network Health Monitor</span>
+            <span>NetMonit - Network Monitoring System</span>
             <span className="text-slate-400">|</span>
             <span className="flex items-center gap-1">
               <Activity className="w-4 h-4 text-green-500" />
@@ -356,6 +608,27 @@ function App() {
           alerts={alerts}
           devices={devices}
           onClose={() => setIsCopilotOpen(false)}
+        />
+      )}
+
+      {/* NetMonitAI Assistant (floating button + chat panel) */}
+      <AICopilot
+        userName={userName}
+        alerts={alerts}
+        devices={devices}
+        isOpen={isNetMonitAIOpen}
+        onOpenChange={setIsNetMonitAIOpen}
+      />
+
+      {/* Diagnostic Scan Forensic Console (only mounted when open to avoid extra launcher UI) */}
+      {isForensicOpen && (
+        <ForensicCockpit
+          userName={userName}
+          alerts={alerts}
+          devices={devices}
+          isOpen={isForensicOpen}
+          onOpenChange={setIsForensicOpen}
+          systemMessage={forensicSystemMessage}
         />
       )}
     </div >

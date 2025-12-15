@@ -3,9 +3,11 @@ import { Server, Router, Box, Gauge, Activity, Cpu, Shield } from 'lucide-react'
 
 interface DeviceStatusProps {
   devices: Device[];
+  selectedDeviceId?: string | null;
+  onSelectDevice?: (deviceId: string) => void;
 }
 
-export default function DeviceStatus({ devices }: DeviceStatusProps) {
+export default function DeviceStatus({ devices, selectedDeviceId, onSelectDevice }: DeviceStatusProps) {
   const deviceIcons: Record<string, any> = {
     switch: Router,
     router: Router,
@@ -58,9 +60,24 @@ export default function DeviceStatus({ devices }: DeviceStatusProps) {
         {devices.map((device) => {
           const Icon = deviceIcons[device.type] || Box;
           const config = statusConfig[device.status];
+          const isSelected = selectedDeviceId === device.id;
 
           return (
-            <div key={device.id} className="border border-slate-700/50 bg-slate-800/20 rounded-lg p-3 hover:border-blue-500 hover:bg-blue-900/10 hover:shadow-[0_0_15px_rgba(59,130,246,0.15)] transition-all duration-300 group cursor-pointer">
+            <div
+              key={device.id}
+              className={`border rounded-lg p-3 transition-all duration-300 group cursor-pointer ${
+                isSelected
+                  ? 'border-blue-500 bg-blue-900/10 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+                  : 'border-slate-700/50 bg-slate-800/20 hover:border-blue-500 hover:bg-blue-900/10 hover:shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+              }`}
+              onClick={() => onSelectDevice?.(device.id)}
+              role={onSelectDevice ? 'button' : undefined}
+              tabIndex={onSelectDevice ? 0 : undefined}
+              onKeyDown={(e) => {
+                if (!onSelectDevice) return;
+                if (e.key === 'Enter' || e.key === ' ') onSelectDevice(device.id);
+              }}
+            >
               <div className="flex items-center gap-3">
                 <div className={`${config.bg} p-2 rounded-lg`}>
                   <Icon className={`w-5 h-5 ${config.text}`} />

@@ -20,9 +20,11 @@ const terminalTheme = {
 
 interface ForensicTerminalProps {
     streamUrl?: string;
+    text?: string;
+    filterPattern?: string;
 }
 
-export const ForensicTerminal = ({ streamUrl: _streamUrl }: ForensicTerminalProps) => {
+export const ForensicTerminal = ({ streamUrl: _streamUrl, text, filterPattern }: ForensicTerminalProps) => {
     // Use the streamUrl prop to silence linter, or default to mock
     // const _url = streamUrl || "mock";
 
@@ -44,13 +46,34 @@ export const ForensicTerminal = ({ streamUrl: _streamUrl }: ForensicTerminalProp
 [14:02:06.111] -- END OF LIVE STREAM --
     `;
 
+    const baseText = text?.trim() ? text : demoLogs;
+
+    const applyFilter = (raw: string, pattern: string | undefined) => {
+        const p = pattern?.trim();
+        if (!p) return raw;
+
+        try {
+            const re = new RegExp(p, 'i');
+            const lines = raw.split(/\r?\n/);
+            const matched = lines.filter((line) => re.test(line));
+            if (matched.length === 0) {
+                return `-- 0 matches for /${p}/ (showing unfiltered log) --\n\n${raw}`;
+            }
+            return matched.join('\n');
+        } catch {
+            return `-- invalid regex: ${p} (showing unfiltered log) --\n\n${raw}`;
+        }
+    };
+
+    const logText = applyFilter(baseText, filterPattern);
+
     return (
         <div className="h-full w-full font-mono text-xs overflow-hidden rounded bg-gunmetal-950">
             <ScrollFollow
                 startFollowing={true}
                 render={({ follow, onScroll }) => (
                     <LazyLog
-                        text={demoLogs}
+                        text={logText}
                         stream={true}
                         follow={follow}
                         onScroll={onScroll}

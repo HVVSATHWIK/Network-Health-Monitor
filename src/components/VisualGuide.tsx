@@ -21,6 +21,7 @@ interface GuideStep {
     description: string;
     targetId: string | null;
     icon: React.ReactNode;
+    ensureView?: '3d' | 'analytics';
 }
 
 export default function VisualGuide() {
@@ -31,8 +32,8 @@ export default function VisualGuide() {
     const steps: GuideStep[] = [
         {
             id: 'welcome',
-            title: 'Welcome to NetMonit',
-            description: 'This interactive dashboard monitors your network health in real-time. Click "Next" to learn how to navigate.',
+            title: 'Welcome',
+            description: 'This interactive dashboard monitors network health in real-time across OSI Layers L1–L7. Click "Next" to learn how to navigate.',
             targetId: null,
             icon: <Info className="w-6 h-6 text-blue-400" />
         },
@@ -41,12 +42,13 @@ export default function VisualGuide() {
             title: '3D Controls',
             description: 'Use your mouse to interact with the 3D map. Left-click to rotate, Right-click to pan, and Scroll to zoom.',
             targetId: 'canvas-container',
-            icon: <MousePointer2 className="w-6 h-6 text-purple-400" />
+            icon: <MousePointer2 className="w-6 h-6 text-purple-400" />,
+            ensureView: '3d'
         },
         {
             id: 'simulation',
             title: 'Run Diagnostic',
-            description: 'Start here! Click this button to run a full diagnostic scan of your network layers.',
+            description: 'Start here. Click this to run a full diagnostic scan across L1–L7 and open forensic results.',
             targetId: 'diagnostic-scan-trigger',
             icon: <Play className="w-6 h-6 text-green-400" />
         },
@@ -54,8 +56,24 @@ export default function VisualGuide() {
             id: 'health',
             title: 'Network Health',
             description: 'Monitor the overall system health score here. It updates in real-time based on active alerts.',
-            targetId: null, // Depending on if we have an ID for this, simpler to just float or point generally if no ID
+            targetId: 'network-health-badge',
             icon: <Activity className="w-6 h-6 text-red-400" />
+        },
+        {
+            id: 'select',
+            title: 'Select an Asset',
+            description: 'Click a device in the 3D topology (or the Asset Status list). Selection will drive the Data Flow focus and investigations.',
+            targetId: 'canvas-container',
+            icon: <MousePointer2 className="w-6 h-6 text-purple-300" />,
+            ensureView: '3d'
+        },
+        {
+            id: 'flow',
+            title: 'Real-Time Data Flow',
+            description: 'This panel visualizes packet flow across tiers. Selecting an asset focuses the flow to make the connection obvious.',
+            targetId: 'data-flow-viz',
+            icon: <Activity className="w-6 h-6 text-emerald-400" />,
+            ensureView: '3d'
         },
         {
             id: 'kpi',
@@ -65,25 +83,34 @@ export default function VisualGuide() {
             icon: <BarChart3 className="w-6 h-6 text-yellow-400" />
         },
         {
-            id: 'copilot',
+            id: 'forensics',
             title: 'Forensic Cockpit',
-            description: 'Open the Unified Forensic Cockpit for deep investigation, terminal streams, and root cause analysis.',
-            targetId: 'ai-copilot-trigger',
+            description: 'Open the Forensic Cockpit to analyze alert streams, run root-cause investigation, and filter terminal logs (regex supported).',
+            targetId: 'forensic-cockpit-trigger',
             icon: <Search className="w-6 h-6 text-blue-400" />
+        },
+        {
+            id: 'assistant',
+            title: 'NetMonitAI Assistant',
+            description: 'Use NetMonitAI for conversational help and quick summaries. It’s separate from the Forensic Cockpit so it won’t interrupt workflows.',
+            targetId: 'netmonit-ai-trigger',
+            icon: <Zap className="w-6 h-6 text-indigo-300" />
         },
         {
             id: 'chaos',
             title: 'Fault Injection',
-            description: 'Test system resilience by injecting faults (Cable Cuts, Latency) using the Chaos Simulator.',
+            description: 'Use the gear in 3D Topology to inject demo faults (L1 cable cut / L7 latency) and see correlated impact.',
             targetId: 'chaos-control-trigger-3d',
-            icon: <Zap className="w-6 h-6 text-orange-400" />
+            icon: <Zap className="w-6 h-6 text-orange-400" />,
+            ensureView: '3d'
         },
         {
             id: 'analytics',
             title: 'Advanced Analytics',
             description: 'Switch to the Analytics view for historical trends and ROI analysis.',
-            targetId: 'view-analytics-trigger', // Needs to be added to App.tsx button
-            icon: <BarChart3 className="w-6 h-6 text-indigo-400" />
+            targetId: 'view-analytics-trigger',
+            icon: <BarChart3 className="w-6 h-6 text-indigo-400" />,
+            ensureView: 'analytics'
         },
         {
             id: 'ready',
@@ -101,6 +128,16 @@ export default function VisualGuide() {
         if (!isOpen) return;
 
         const updatePosition = () => {
+            // If this step lives in a specific view and the target isn't mounted yet,
+            // attempt to switch views using the tab buttons.
+            if (currentStep.ensureView) {
+                const targetExists = currentStep.targetId ? document.getElementById(currentStep.targetId) : true;
+                if (!targetExists) {
+                    const triggerId = currentStep.ensureView === '3d' ? 'view-3d-trigger' : 'view-analytics-trigger';
+                    document.getElementById(triggerId)?.click();
+                }
+            }
+
             if (currentStep.targetId) {
                 const el = document.getElementById(currentStep.targetId);
                 if (el) {
@@ -182,9 +219,9 @@ export default function VisualGuide() {
                         transform: targetRect ? 'none' : 'translate(-50%, -50%)'
                     }}
                 >
-                    <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-2xl w-80 backdrop-blur-xl flex flex-col gap-4">
+                    <div className="bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-2xl w-72 backdrop-blur-xl flex flex-col gap-3">
                         <div className="flex items-start justify-between">
-                            <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
+                            <div className="p-2.5 bg-slate-800 rounded-lg border border-slate-700">
                                 {currentStep.icon}
                             </div>
                             <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">

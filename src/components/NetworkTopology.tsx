@@ -1,5 +1,5 @@
 import { Device, NetworkConnection } from '../types/network';
-import { Server, Router, Box, Gauge, Activity, Cpu } from 'lucide-react';
+import { Server, Router, Box, Gauge, Activity, Cpu, Shield } from 'lucide-react';
 
 interface NetworkTopologyProps {
   devices: Device[];
@@ -14,7 +14,8 @@ export default function NetworkTopology({ devices, connections }: NetworkTopolog
     sensor: Gauge,
     scada: Activity,
     gateway: Box,
-    server: Server
+    server: Server,
+    firewall: Shield
   };
 
   const statusColors = {
@@ -87,7 +88,7 @@ export default function NetworkTopology({ devices, connections }: NetworkTopolog
           const pos = positions[device.id];
           if (!pos) return null;
 
-          const Icon = deviceIcons[device.type];
+          const Icon = deviceIcons[device.type] || Box;
           const statusColor = statusColors[device.status];
 
           return (

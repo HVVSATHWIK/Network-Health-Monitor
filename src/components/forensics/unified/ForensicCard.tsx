@@ -1,14 +1,114 @@
 import { X, Maximize2, Download, ShieldCheck, Cpu, Globe, Search } from 'lucide-react';
 import { ForensicTerminal } from './ForensicTerminal';
 import { Alert, Device } from '../../../types/network';
+import { useEffect, useMemo, useState } from 'react';
+import { analyzeWithMultiAgents, ForensicReport } from '../../../utils/aiLogic';
 
 interface ForensicCardProps {
     alert: Alert;
     device?: Device;
+    devices: Device[];
     onClose: () => void;
 }
 
-export const ForensicCard: React.FC<ForensicCardProps> = ({ alert, device: _device, onClose }) => {
+export const ForensicCard: React.FC<ForensicCardProps> = ({ alert, device, devices, onClose }) => {
+    const [isAnalyzing, setIsAnalyzing] = useState(true);
+    const [report, setReport] = useState<ForensicReport | null>(null);
+    const [analysisText, setAnalysisText] = useState<string | null>(null);
+    const [grepPattern, setGrepPattern] = useState('error|refused|fail');
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const run = async () => {
+            setIsAnalyzing(true);
+            setReport(null);
+            setAnalysisText(null);
+
+            const query = `Analyze this ${alert.layer} alert and provide root cause and remediation: ${alert.message}`;
+
+            try {
+                const res = await analyzeWithMultiAgents(query, null, [alert], devices, () => { });
+                if (cancelled) return;
+
+                if (typeof res === 'string') {
+                    setAnalysisText(res);
+                } else {
+                    setReport(res);
+                }
+            } catch (e) {
+                if (cancelled) return;
+                setAnalysisText('Analysis failed to run.');
+            } finally {
+                if (!cancelled) setIsAnalyzing(false);
+            }
+        };
+
+        run();
+        return () => {
+            cancelled = true;
+        };
+    }, [alert.id, alert.layer, alert.message, devices]);
+
+    const severityBadge = useMemo(() => {
+        switch (report?.criticality ?? 'low') {
+            case 'extreme':
+                return { bg: 'bg-alert-critical/10', text: 'text-alert-critical', border: 'border-alert-critical/20' };
+            case 'high':
+                return { bg: 'bg-alert-warning/10', text: 'text-alert-warning', border: 'border-alert-warning/20' };
+            case 'medium':
+                return { bg: 'bg-alert-info/10', text: 'text-alert-info', border: 'border-alert-info/20' };
+            default:
+                return { bg: 'bg-alert-success/10', text: 'text-alert-success', border: 'border-alert-success/20' };
+        }
+    }, [report?.criticality]);
+
+    const terminalText = useMemo(() => {
+        const levelForAlert = (() => {
+            if (alert.severity === 'critical') return 'ERROR';
+            if (alert.severity === 'high') return 'ERROR';
+            if (alert.severity === 'medium') return 'WARN';
+            return 'INFO';
+        })();
+
+        const levelForStep = (status: string) => {
+            if (status === 'failed') return 'ERROR';
+            if (status === 'running') return 'INFO';
+            if (status === 'pending') return 'INFO';
+            return 'INFO';
+        };
+
+        if (isAnalyzing) {
+            const now = new Date();
+            const ts = now.toLocaleTimeString();
+            return `[${ts}] COORDINATOR: Opening investigation for ${alert.id.slice(0, 8)}
+[${ts}] ${levelForAlert}: Alert layer=${alert.layer} severity=${alert.severity} device="${alert.device}" msg="${alert.message}"
+[${ts}] PIPELINE: Running multi-agent correlation...
+[${ts}] PIPELINE: Awaiting findings...
+`;
+        }
+
+        if (analysisText) {
+            const ts = new Date().toLocaleTimeString();
+            return `[${ts}] COORDINATOR: Analysis summary
+[${ts}] ${analysisText}
+`;
+        }
+
+        if (!report) return undefined;
+
+        const lines: string[] = [];
+        report.chainOfThought.forEach((step) => {
+            const ts = new Date(step.timestamp).toLocaleTimeString();
+            const status = step.status.toUpperCase();
+            const lvl = levelForStep(step.status);
+            const maybeFail = step.status === 'failed' ? ' FAIL' : '';
+            lines.push(`[${ts}] ${lvl}${maybeFail}: ${step.agent} ${step.action} -> ${status}${step.result ? ` (${step.result})` : ''}`);
+        });
+        lines.push(`[${new Date().toLocaleTimeString()}] ${report.criticality === 'extreme' || report.criticality === 'high' ? 'ERROR' : 'INFO'}: SUMMARY ${report.summary}`);
+        return lines.join('\n') + '\n';
+    }, [alert.device, alert.id, alert.layer, alert.severity, analysisText, isAnalyzing, report]);
+
     return (
         <div className="w-full overflow-hidden rounded-xl border border-gunmetal-600 bg-gunmetal-800 shadow-2xl ring-1 ring-white/5 animate-in fade-in zoom-in-95 duration-300 my-8">
 
@@ -52,40 +152,68 @@ export const ForensicCard: React.FC<ForensicCardProps> = ({ alert, device: _devi
                             type="text"
                             placeholder="Grep logs (regex supported)..."
                             className="flex-1 bg-transparent text-xs font-mono text-gunmetal-300 placeholder-gunmetal-600 focus:outline-none"
-                            defaultValue="error|refused|fail"
+                            value={grepPattern}
+                            onChange={(e) => setGrepPattern(e.target.value)}
                         />
                     </div>
 
                     {/* The Virtualized Log Component */}
                     <div className="flex-1 relative overflow-hidden">
-                        <ForensicTerminal streamUrl={`wss://api.monitor.net/stream/${alert.id}`} />
+                        <ForensicTerminal
+                            streamUrl={`wss://api.monitor.net/stream/${alert.id}`}
+                            text={terminalText}
+                            filterPattern={grepPattern}
+                        />
                     </div>
                 </div>
 
                 {/* Right: Context & Remediation (25% Width) */}
                 <div className="lg:col-span-3 flex flex-col bg-gunmetal-800">
 
-                    {/* Device Vitals */}
+                    {/* AI Findings */}
                     <div className="p-5 border-b border-gunmetal-700">
-                        <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-gunmetal-500">Target Vitals</h3>
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs text-gunmetal-400">CPU Load</span>
-                                <div className="flex items-center gap-2">
-                                    <div className="h-1.5 w-16 rounded-full bg-gunmetal-700 overflow-hidden">
-                                        <div className="h-full w-[85%] bg-alert-critical" />
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-gunmetal-500">Findings</h3>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${severityBadge.bg} ${severityBadge.text} ${severityBadge.border}`}>
+                                {isAnalyzing ? 'ANALYZING' : (report?.criticality ?? 'LOW').toUpperCase()}
+                            </span>
+                        </div>
+
+                        <div className="space-y-2">
+                            <div className="text-xs text-gunmetal-400">
+                                <span className="text-gunmetal-500">Target:</span>{' '}
+                                <span className="font-mono text-gunmetal-200">{device?.name ?? alert.device}</span>
+                            </div>
+                            <div className="text-xs text-gunmetal-400">
+                                <span className="text-gunmetal-500">Alert:</span>{' '}
+                                <span className="text-gunmetal-200">{alert.message}</span>
+                            </div>
+
+                            {isAnalyzing && (
+                                <div className="text-xs font-mono text-gunmetal-500">Running correlation across L1–L7 telemetry…</div>
+                            )}
+
+                            {!isAnalyzing && analysisText && (
+                                <div className="text-xs text-gunmetal-200">{analysisText}</div>
+                            )}
+
+                            {!isAnalyzing && report && (
+                                <>
+                                    <div className="text-xs">
+                                        <div className="text-gunmetal-500">Root Cause</div>
+                                        <div className="text-gunmetal-100 font-semibold">{report.rootCause}</div>
                                     </div>
-                                    <span className="text-xs font-mono text-alert-critical">85%</span>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs text-gunmetal-400">Memory</span>
-                                <span className="text-xs font-mono text-gunmetal-200">14GB / 16GB</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs text-gunmetal-400">Disk I/O</span>
-                                <span className="text-xs font-mono text-alert-warning">HIGH</span>
-                            </div>
+                                    <div className="text-xs text-gunmetal-200">{report.summary}</div>
+                                    <div className="text-xs">
+                                        <div className="text-gunmetal-500">Recommended Actions</div>
+                                        <div className="text-gunmetal-200">
+                                            {report.recommendations.slice(0, 3).map((r, idx) => (
+                                                <div key={idx}>• {r}</div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
 

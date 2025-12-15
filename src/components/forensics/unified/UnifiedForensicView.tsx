@@ -121,6 +121,7 @@ export const UnifiedForensicView: React.FC<UnifiedViewProps> = ({ alerts, device
                                 <ForensicCard
                                     alert={alert}
                                     device={devices.find(d => d.name === alert.device)}
+                                    devices={devices}
                                     onClose={() => setActiveAnalysisId(null)}
                                 />
                             ) : (

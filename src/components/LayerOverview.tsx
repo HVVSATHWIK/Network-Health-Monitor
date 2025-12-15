@@ -5,7 +5,7 @@ interface LayerOverviewProps {
 }
 
 export default function LayerOverview({ kpis }: LayerOverviewProps) {
-  const layers = ['L1', 'L2', 'L3', 'L4', 'L5-7'];
+  const layers = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'];
 
   const getLayerStatus = (layer: string) => {
     const layerKPIs = kpis.filter(k => k.layer === layer);
@@ -28,7 +28,9 @@ export default function LayerOverview({ kpis }: LayerOverviewProps) {
     'L2': 'Data Link Layer - Switching, VLANs, MAC',
     'L3': 'Network Layer - Routing, Subnets, IP',
     'L4': 'Transport Layer - TCP/UDP, Reliability',
-    'L5-7': 'Application Layer - Protocols, Services'
+    'L5': 'Session Layer - Sessions, Stability, Resets',
+    'L6': 'Presentation Layer - Encryption, Encoding',
+    'L7': 'Application Layer - Protocols, Services'
   };
 
   return (

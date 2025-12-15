@@ -322,7 +322,6 @@ export default function Advanced3DTopology({
         div.className = 'flex flex-col items-center pointer-events-none';
 
         const isCritical = device.status === 'critical';
-        const color = isCritical ? 'red' : (device.status === 'warning' ? 'amber' : 'emerald'); // Tailwind colors
         const hexColor = isCritical ? '#ef4444' : (device.status === 'warning' ? '#f59e0b' : '#34d399');
 
         const glitchClass = isCritical ? 'animate-pulse' : ''; // Simple pulse for now, actual glitch needs keyframes
@@ -332,10 +331,10 @@ export default function Advanced3DTopology({
           <div style="height: 40px; width: 1px; background: linear-gradient(to top, ${hexColor}, transparent);"></div>
           
           <!-- Glass Panel -->
-          <div class="px-3 py-2 bg-slate-900/40 backdrop-blur-sm border-l-2 border-${color}-500 shadow-[0_0_15px_${hexColor}40] mt-1 ${glitchClass}"
-               style="clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);"
+          <div class="px-3 py-2 bg-slate-900/40 backdrop-blur-sm border-l-2 mt-1 ${glitchClass}"
+            style="border-left-color: ${hexColor}; box-shadow: 0 0 15px ${hexColor}40; clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);"
           >
-            <div class="text-[10px] uppercase tracking-widest text-${color}-400 font-mono mb-0.5">ID: ${device.id.toUpperCase()}</div>
+            <div class="text-[10px] uppercase tracking-widest font-mono mb-0.5" style="color: ${hexColor};">ID: ${device.id.toUpperCase()}</div>
             <div class="text-xs font-bold text-white whitespace-nowrap flex items-center gap-2">
               <span style="width: 6px; height: 6px; background-color: ${hexColor}; box-shadow: 0 0 8px ${hexColor};"></span>
               ${device.name}
@@ -654,7 +653,7 @@ export default function Advanced3DTopology({
         </p>
       </div>
 
-      <div ref={containerRef} style={{ width: '100%', height: '600px', background: 'radial-gradient(circle at center, #0f172a 0%, #020617 100%)' }} className="rounded-lg overflow-hidden relative" />
+      <div id="canvas-container" ref={containerRef} style={{ width: '100%', height: '600px', background: 'radial-gradient(circle at center, #0f172a 0%, #020617 100%)' }} className="rounded-lg overflow-hidden relative" />
 
       {/* Controls Hint */}
       <div className="absolute top-8 right-8 bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-lg text-xs text-white z-20 shadow-xl pointer-events-none">
