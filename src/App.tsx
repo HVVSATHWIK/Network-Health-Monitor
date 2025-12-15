@@ -417,9 +417,9 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">
       <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 shadow-2xl">
-        <div className="max-w-[1800px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+        <div className="max-w-[1800px] mx-auto px-6 py-3">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-center gap-3 shrink-0">
               <div className="bg-blue-600 p-2 rounded-lg">
                 <Network className="w-8 h-8" />
               </div>
@@ -429,12 +429,12 @@ function App() {
               </div>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-3 xl:justify-end">
               {/* Simulation Trigger */}
               <button
                 id="diagnostic-scan-trigger"
                 onClick={runSimulation}
-                className={`flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full shadow-lg transition-all text-sm font-bold ${visualMode === 'scan'
+                className={`whitespace-nowrap flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full shadow-lg transition-all text-sm font-bold ${visualMode === 'scan'
                   ? 'opacity-90'
                   : 'hover:from-purple-500 hover:to-blue-500'
                   }`}
@@ -446,7 +446,7 @@ function App() {
               <button
                 id="forensic-cockpit-trigger"
                 onClick={() => setIsCopilotOpen(true)}
-                className="flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full shadow-lg transition-all text-sm font-semibold"
+                className="whitespace-nowrap flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full shadow-lg transition-all text-sm font-semibold"
               >
                 <Terminal className="w-4 h-4" />
                 <span>Forensic Cockpit</span>
@@ -455,31 +455,30 @@ function App() {
               <button
                 id="netmonit-ai-trigger"
                 onClick={() => setIsNetMonitAIOpen(true)}
-                className="flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full shadow-lg transition-all text-sm font-semibold"
+                className="whitespace-nowrap flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full shadow-lg transition-all text-sm font-semibold"
               >
                 <Bot className="w-4 h-4" />
                 <span>NetMonit AI</span>
               </button>
 
-              <div id="network-health-badge" className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg">
+              <div id="network-health-badge" className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg whitespace-nowrap">
                 <Shield className="w-5 h-5 text-green-400" />
                 <div>
                   <div className="text-xs text-slate-400">Network Health</div>
                   <div className={`text-lg font-bold ${healthPercentage < 90 ? 'text-red-400' : 'text-green-400'}`}>{healthPercentage}%</div>
                 </div>
               </div>
-            </div>
 
-            {/* Network Status Badge */}
-            <div className="hidden xl:flex items-center gap-2 bg-purple-900/20 border border-purple-500/30 px-4 py-2 rounded-lg">
-              <Signal className="w-4 h-4 text-purple-400" />
-              <div>
-                <div className="text-[10px] text-purple-300 uppercase font-bold tracking-wider">Network Status</div>
-                <div className="text-sm font-bold text-white leading-none">Live Monitoring</div>
+              {/* Network Status Badge (de-emphasized + only on wide screens) */}
+              <div className="hidden 2xl:flex items-center gap-2 bg-purple-900/20 border border-purple-500/30 px-4 py-2 rounded-lg whitespace-nowrap">
+                <Signal className="w-4 h-4 text-purple-400" />
+                <div>
+                  <div className="text-[10px] text-purple-300 uppercase font-bold tracking-wider">Network Status</div>
+                  <div className="text-sm font-bold text-white leading-none">Live Monitoring</div>
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg">
+              <div className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg whitespace-nowrap">
               <Activity className="w-5 h-5 text-blue-400" />
               <div>
                 <div className="text-xs text-slate-400">Active Devices</div>
@@ -489,18 +488,20 @@ function App() {
             <button
               id="kpi-matrix-trigger"
               onClick={() => setShowMatrix(true)}
-              className="flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/30 rounded-full transition-all text-sm font-medium"
+              className="whitespace-nowrap flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/30 rounded-full transition-all text-sm font-medium"
             >
               <Activity className="w-4 h-4" />
-              <span>KPI Matrix (L1-L7)</span>
+              <span>KPI Matrix</span>
             </button>
-            <div className="w-px h-6 bg-slate-700 mx-2"></div>
-            <div className="flex items-center gap-2 text-sm text-slate-400">
+            <div className="hidden xl:block w-px h-6 bg-slate-700 mx-1"></div>
+            <div className="flex items-center gap-2 text-sm text-slate-400 whitespace-nowrap max-w-[220px]">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              {userName} Online
+              <span className="truncate">{userName}</span>
+              <span className="hidden xl:inline">Online</span>
             </div>
           </div>
         </div>
+      </div>
       </header>
 
       {/* OVERLAYS */}
