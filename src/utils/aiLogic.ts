@@ -1,5 +1,4 @@
 import { Alert, Device } from '../types/network';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // --- Types ---
 
@@ -81,10 +80,10 @@ function generateLatencyHistogram() {
 
 export async function analyzeWithMultiAgents(
     userQuery: string,
-    appName: string | null,
+    _appName: string | null,
     activeAlerts: Alert[],
-    devices: Device[],
-    onAgentUpdate: (update: AgentResponse) => void // Kept for backward compat/transition
+    _devices: Device[],
+    _onAgentUpdate: (update: AgentResponse) => void // Kept for backward compat/transition
 ): Promise<ForensicReport | string> { // Dual return type during migration
 
     // 0. Intent Routing (Conversational)

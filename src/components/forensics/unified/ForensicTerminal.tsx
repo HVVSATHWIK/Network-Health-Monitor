@@ -22,9 +22,9 @@ interface ForensicTerminalProps {
     streamUrl?: string;
 }
 
-export const ForensicTerminal = ({ streamUrl }: ForensicTerminalProps) => {
+export const ForensicTerminal = ({ streamUrl: _streamUrl }: ForensicTerminalProps) => {
     // Use the streamUrl prop to silence linter, or default to mock
-    const _url = streamUrl || "mock";
+    // const _url = streamUrl || "mock";
 
     const demoLogs = `[14:02:01.233] KERNEL: Initializing forensic logic probe...
 [14:02:01.450] NET: Interface eth0 promiscuous mode ENABLED

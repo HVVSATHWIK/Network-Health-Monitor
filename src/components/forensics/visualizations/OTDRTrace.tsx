@@ -1,5 +1,5 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot } from 'recharts';
-import ForensicGraphCard from './ForensicGraphCard';
+import ForensicGraphCard from '../ForensicGraphCard';
 
 interface OTDRTraceProps {
     data: any[];

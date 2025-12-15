@@ -7,7 +7,6 @@ interface DataFlowVisualizationProps {
   mode: 'default' | 'scan';
   // showControlsExternal?: boolean; // Removed
   onShowControlsChange?: (show: boolean) => void;
-  selectedDeviceId?: string | null;
 }
 
 export default function DataFlowVisualization({
@@ -15,8 +14,7 @@ export default function DataFlowVisualization({
   onReset,
   mode,
   // showControlsExternal = false,
-  onShowControlsChange,
-  selectedDeviceId
+  onShowControlsChange
 }: DataFlowVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // const [data, setData] = useState<any[]>([]); // Unused

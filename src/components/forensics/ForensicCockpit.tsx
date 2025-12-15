@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, ShieldAlert, Terminal, Activity, ChevronRight, Play } from 'lucide-react';
-import { analyzeWithMultiAgents, ForensicReport, ForensicStep } from '../../utils/aiLogic';
+import { X, Search, ShieldAlert, Terminal, Activity, Play } from 'lucide-react';
+import { analyzeWithMultiAgents, ForensicReport } from '../../utils/aiLogic';
 import { Alert, Device } from '../../types/network';
 import OTDRTrace from './visualizations/OTDRTrace';
 import LatencyHistogram from './visualizations/LatencyHistogram';
@@ -60,7 +60,7 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
 
                 // Reveal Final Artifacts
                 setTimeout(() => {
-                    setReport(prev => fullReport); // Show everything including artifacts/summary
+                    setReport(() => fullReport); // Show everything including artifacts/summary
                     setIsAnalyzing(false);
                 }, fullReport.chainOfThought.length * 800 + 500);
             }

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Circle, XCircle, ArrowDown, ChevronRight } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { CheckCircle2, Circle, XCircle, ChevronRight } from 'lucide-react';
 import { ForensicStep } from '../../utils/aiLogic';
 
 interface InvestigationStreamProps {
@@ -18,9 +18,7 @@ export default function InvestigationStream({ steps }: InvestigationStreamProps)
             {/* Timeline Line */}
             <div className="absolute left-[19px] top-2 bottom-2 w-[1px] bg-[#1F2833]"></div>
 
-            {steps.map((step, idx) => {
-                const isLast = idx === steps.length - 1;
-                const isRunning = step.status === 'running';
+            {steps.map((step) => {
 
                 return (
                     <div key={step.id} className="group flex gap-4 animate-in slide-in-from-left-2 fade-in duration-300">

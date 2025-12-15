@@ -1,7 +1,7 @@
 import { Alert, Device } from '../types/network';
 import { AlertCircle, AlertTriangle, Info, Sparkles, BrainCircuit } from 'lucide-react';
 import { analyzeRootCause } from '../utils/aiLogic';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface AlertPanelProps {
   alerts: Alert[];
@@ -10,30 +10,27 @@ interface AlertPanelProps {
 
 export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
   const [insights, setInsights] = useState<Record<string, string>>({});
+  const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    const fetchInsights = async () => {
-      const newInsights: Record<string, string> = {};
+  const handleAnalyze = async (alertId: string, deviceName: string) => {
+    setAnalyzingIds(prev => new Set(prev).add(alertId));
 
-      for (const alert of alerts) {
-        // Run AI Root Cause Analysis only if not already cached and relevant
-        // We pass the alert's device name as the appName because in our mock data 
-        // application alerts are logged against the App Name (e.g., "SCADA Control Loop")
-        if (!insights[alert.id]) {
-          const insight = await analyzeRootCause(alert.device, alerts, devices);
-          if (insight) {
-            newInsights[alert.id] = insight;
-          }
-        }
-      }
+    // Simulate network delay for effect
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
-      if (Object.keys(newInsights).length > 0) {
-        setInsights(prev => ({ ...prev, ...newInsights }));
-      }
-    };
+    const insight = await analyzeRootCause(deviceName, alerts, devices);
+    if (insight) {
+      setInsights(prev => ({ ...prev, [alertId]: insight }));
+    }
 
-    fetchInsights();
-  }, [alerts, devices]);
+    setAnalyzingIds(prev => {
+      const next = new Set(prev);
+      next.delete(alertId);
+      return next;
+    });
+  };
+
+
 
   const severityConfig = {
     critical: { icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-950/30', border: 'border-red-500/30' },
@@ -106,8 +103,8 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
                   )}
 
                   {/* Deep-Dive AI Root Cause Insight (Dynamic) */}
-                  {rootCauseInsight && (
-                    <div className="mt-4 relative group">
+                  {rootCauseInsight ? (
+                    <div className="mt-4 relative group animate-in fade-in slide-in-from-top-2">
                       <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 rounded-lg blur opacity-20 animate-pulse group-hover:opacity-40 transition duration-1000"></div>
                       <div className="relative bg-slate-950/50 p-4 rounded-lg border border-purple-500/30 shadow-xl backdrop-blur-sm">
                         <div className="flex items-start gap-3">
@@ -124,6 +121,32 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
                           </div>
                         </div>
                       </div>
+                    </div>
+                  ) : (
+                    // On-Demand Analysis Trigger
+                    <div className="mt-3">
+                      <button
+                        onClick={() => handleAnalyze(alert.id, alert.device)}
+                        disabled={analyzingIds.has(alert.id)}
+                        className="w-full relative group overflow-hidden rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-purple-500/50 transition-all p-3"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          {analyzingIds.has(alert.id) ? (
+                            <>
+                              <BrainCircuit className="w-4 h-4 text-purple-400 animate-spin" />
+                              <span className="text-xs font-bold text-purple-300">ANALYZING SIGNALS...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+                              <span className="text-xs font-bold text-slate-300 group-hover:text-purple-300 transition-colors">RUN AI ROOT CAUSE ANALYSIS</span>
+                            </>
+                          )}
+                        </div>
+                        {analyzingIds.has(alert.id) && (
+                          <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent animate-shimmer" />
+                        )}
+                      </button>
                     </div>
                   )}
 

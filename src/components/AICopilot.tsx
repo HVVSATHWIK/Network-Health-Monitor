@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, X, Sparkles, ChevronRight, AlertTriangle, ShieldCheck, Zap, Server, Lock, Send, Search, Activity, CheckCircle2 } from 'lucide-react';
+import { Bot, X, Sparkles, AlertTriangle, ShieldCheck, Zap, Server, Lock, Send, Search, Activity, CheckCircle2 } from 'lucide-react';
 import { analyzeWithMultiAgents, type AgentResponse } from '../utils/aiLogic';
 import { Alert, Device } from '../types/network';
 
@@ -119,7 +119,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'ai',
-                text: finalResponse
+                text: typeof finalResponse === 'string' ? finalResponse : finalResponse.summary
             }]);
         } catch (error) {
             setMessages(prev => [...prev, {
