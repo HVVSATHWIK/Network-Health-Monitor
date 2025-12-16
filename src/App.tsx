@@ -493,6 +493,10 @@ function App() {
               <Activity className="w-4 h-4" />
               <span>KPI Matrix</span>
             </button>
+
+            <div className="flex items-center">
+              <VisualGuide />
+            </div>
             <div className="hidden xl:block w-px h-6 bg-slate-700 mx-1"></div>
             <div className="flex items-center gap-2 text-sm text-slate-400 whitespace-nowrap max-w-[220px]">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -508,7 +512,6 @@ function App() {
       {showMatrix && <KPIMatrix devices={devices} onClose={() => setShowMatrix(false)} />}
 
       {/* Visual Guide Overlay (Manual Trigger) */}
-      <VisualGuide />
       <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6">
         <div className="flex gap-2 mb-6 bg-slate-900/50 border border-slate-800 rounded-lg p-1.5 backdrop-blur-sm w-fit shadow-lg">
           <button

@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Network, Lock, ChevronRight, Server, Activity, AlertCircle, UserPlus } from 'lucide-react';
 import { auth, googleProvider, db } from '../firebase';
-import { signInWithEmailAndPassword, signInWithPopup, createUserWithEmailAndPassword } from 'firebase/auth';
+import {
+    createUserWithEmailAndPassword,
+    getRedirectResult,
+    signInWithEmailAndPassword,
+    signInWithPopup,
+    signInWithRedirect,
+    User,
+} from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 
 interface LoginProps {
@@ -19,6 +26,59 @@ export default function Login({ onLogin }: LoginProps) {
     const [password, setPassword] = useState("");
     const [fullName, setFullName] = useState(""); // For Registration
     const [error, setError] = useState("");
+
+    const isLikelyMobile = () => {
+        if (typeof window === 'undefined') return false;
+        const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
+        const smallScreen = window.matchMedia?.('(max-width: 768px)')?.matches ?? false;
+        return coarsePointer || smallScreen;
+    };
+
+    const upsertGoogleProfileAndContinue = async (user: User) => {
+        const userRef = doc(db, "users", user.uid);
+        await setDoc(
+            userRef,
+            {
+                email: user.email,
+                name: user.displayName || user.email || "Google User",
+                organization: org,
+                lastLogin: new Date().toISOString(),
+            },
+            { merge: true }
+        );
+
+        onLogin(user.displayName || user.email || "Google User", org);
+    };
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const result = await getRedirectResult(auth);
+                if (cancelled) return;
+                if (result?.user) {
+                    setIsLoading(true);
+                    setError("");
+                    await upsertGoogleProfileAndContinue(result.user);
+                }
+            } catch (err: any) {
+                if (cancelled) return;
+                console.error("Google Redirect Login Failed:", err);
+                if (err?.code === 'auth/unauthorized-domain') {
+                    setError("This URL isn't authorized for Firebase Auth. Use the deployed site (Firebase Hosting) or add this domain in Firebase Console → Authentication → Settings → Authorized domains.");
+                } else {
+                    setError("SSO Authorization failed.");
+                }
+            } finally {
+                if (!cancelled) setIsLoading(false);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -63,20 +123,30 @@ export default function Login({ onLogin }: LoginProps) {
         setIsLoading(true);
         setError("");
         try {
-            const result = await signInWithPopup(auth, googleProvider);
-            // We might want to ensure the doc exists
-            const userRef = doc(db, "users", result.user.uid);
-            await setDoc(userRef, {
-                email: result.user.email,
-                name: result.user.displayName || "Google User",
-                organization: org,
-                lastLogin: new Date().toISOString()
-            }, { merge: true });
+            // Popups are commonly blocked on mobile; prefer redirect there.
+            if (isLikelyMobile()) {
+                await signInWithRedirect(auth, googleProvider);
+                return;
+            }
 
-            onLogin(result.user.displayName || result.user.email || "Google User", org);
+            const result = await signInWithPopup(auth, googleProvider);
+            await upsertGoogleProfileAndContinue(result.user);
         } catch (err: any) {
             console.error("Google Login Failed:", err);
-            setError("SSO Authorization failed.");
+            if (err?.code === 'auth/unauthorized-domain') {
+                setError("This URL isn't authorized for Firebase Auth. Use the deployed site (Firebase Hosting) or add this domain in Firebase Console → Authentication → Settings → Authorized domains.");
+            } else if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/popup-closed-by-user') {
+                // Give a seamless fallback when a popup is blocked.
+                try {
+                    await signInWithRedirect(auth, googleProvider);
+                    return;
+                } catch (redirectErr) {
+                    console.error("Google Redirect Fallback Failed:", redirectErr);
+                }
+                setError("SSO popup was blocked. Retrying with redirect...");
+            } else {
+                setError("SSO Authorization failed.");
+            }
         } finally {
             setIsLoading(false);
         }

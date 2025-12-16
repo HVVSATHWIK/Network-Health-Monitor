@@ -266,7 +266,7 @@ export default function VisualGuide() {
         <>
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed top-24 right-6 z-40 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/30 p-3 rounded-full shadow-lg transition-all active:scale-95 group"
+                className="inline-flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/30 p-3 rounded-full shadow-lg transition-all active:scale-95 group"
                 title="Start Visual Guide"
             >
                 <BookOpen className="w-6 h-6 group-hover:scale-110 transition-transform" />
