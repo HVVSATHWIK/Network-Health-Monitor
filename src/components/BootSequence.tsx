@@ -113,7 +113,7 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
     };
 
     return (
-        <div className="fixed inset-0 z-[60] bg-black text-green-500 font-mono flex flex-col items-center justify-center p-8 select-none">
+        <div className="fixed inset-0 z-[60] bg-black text-green-500 font-mono flex flex-col items-center justify-center p-4 sm:p-8 select-none overflow-x-hidden overflow-y-auto">
 
             {/* Central Logo / Icon */}
             <div className="mb-8 relative">

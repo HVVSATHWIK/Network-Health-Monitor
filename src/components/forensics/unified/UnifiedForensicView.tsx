@@ -32,13 +32,13 @@ export const UnifiedForensicView: React.FC<UnifiedViewProps> = ({ alerts, device
     }, []);
 
     return (
-        <div className="flex h-screen w-full flex-col bg-gunmetal-950 text-gunmetal-100 font-sans selection:bg-alert-info selection:text-white fixed inset-0 z-50">
+        <div className="flex h-[100dvh] w-full flex-col bg-gunmetal-950 text-gunmetal-100 font-sans selection:bg-alert-info selection:text-white fixed inset-0 z-50 overflow-x-hidden">
 
             {/* 
         SECTION 1: Top Search/Command Bar 
         Acts as the primary navigation and command dispatch center.
       */}
-            <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-gunmetal-700 bg-gunmetal-900/95 backdrop-blur px-6 shadow-lg shadow-gunmetal-950/50">
+            <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-3 border-b border-gunmetal-700 bg-gunmetal-900/95 backdrop-blur px-4 sm:px-6 py-3 sm:h-16 shadow-lg shadow-gunmetal-950/50">
 
                 {/* Branding & Status */}
                 <div className="flex items-center gap-4">
@@ -60,7 +60,7 @@ export const UnifiedForensicView: React.FC<UnifiedViewProps> = ({ alerts, device
                 {/* Command Trigger (Visual only) */}
                 <button
                     onClick={() => setCmdOpen(true)}
-                    className="group flex w-full max-w-xl items-center justify-between rounded-lg border border-gunmetal-700 bg-gunmetal-950/50 px-4 py-2.5 text-sm text-gunmetal-400 transition-all hover:border-gunmetal-500 hover:bg-gunmetal-900 hover:shadow-md hover:shadow-alert-info/5 focus:outline-none focus:ring-2 focus:ring-alert-info/50 mx-4"
+                    className="group order-last sm:order-none flex w-full sm:w-auto sm:flex-1 max-w-none sm:max-w-xl items-center justify-between rounded-lg border border-gunmetal-700 bg-gunmetal-950/50 px-4 py-2.5 text-sm text-gunmetal-400 transition-all hover:border-gunmetal-500 hover:bg-gunmetal-900 hover:shadow-md hover:shadow-alert-info/5 focus:outline-none focus:ring-2 focus:ring-alert-info/50"
                 >
                     <span className="flex items-center gap-3">
                         <Search className="h-4 w-4 text-gunmetal-500 group-hover:text-gunmetal-300" />

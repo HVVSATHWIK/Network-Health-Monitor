@@ -54,6 +54,7 @@ export default function Login({ onLogin }: LoginProps) {
             else if (err.code === 'auth/weak-password') setError("Password should be at least 6 chars.");
             else if (err.code === 'auth/invalid-credential') setError("Invalid credentials.");
             else setError("Authentication failed. Please try again.");
+        } finally {
             setIsLoading(false);
         }
     };
@@ -76,12 +77,13 @@ export default function Login({ onLogin }: LoginProps) {
         } catch (err: any) {
             console.error("Google Login Failed:", err);
             setError("SSO Authorization failed.");
+        } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-950 flex items-center justify-center font-sans tracking-wide overflow-hidden">
+        <div className="fixed inset-0 bg-slate-950 font-sans tracking-wide overflow-x-hidden overflow-y-auto">
             {/* Abstract Tech Background */}
             <div className="absolute inset-0">
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:40px_40px] opacity-20"></div>
@@ -90,10 +92,11 @@ export default function Login({ onLogin }: LoginProps) {
                 <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[100px]"></div>
             </div>
 
-            <div className="relative z-10 w-full max-w-5xl bg-slate-900/60 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-[600px]">
+            <div className="relative z-10 min-h-[100dvh] flex items-center justify-center p-4 sm:p-6">
+                <div className="w-full max-w-5xl bg-slate-900/60 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row md:h-[600px]">
 
                 {/* Left Side - Product Context */}
-                <div className="w-full md:w-5/12 p-12 flex flex-col justify-between bg-gradient-to-b from-slate-800/50 to-slate-900/50 border-r border-white/5 relative group">
+                <div className="w-full md:w-5/12 p-6 sm:p-10 md:p-12 flex flex-col justify-between bg-gradient-to-b from-slate-800/50 to-slate-900/50 border-b md:border-b-0 md:border-r border-white/5 relative group">
                     <div>
                         <div className="flex items-center gap-3 mb-10">
                             <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow duration-500">
@@ -135,7 +138,7 @@ export default function Login({ onLogin }: LoginProps) {
                 </div>
 
                 {/* Right Side - Login Form */}
-                <div className="w-full md:w-7/12 p-12 bg-black/20 flex flex-col justify-center">
+                <div className="w-full md:w-7/12 p-6 sm:p-10 md:p-12 bg-black/20 flex flex-col justify-center">
 
                     <div className="mb-8 pl-1">
                         <h3 className="text-2xl font-bold text-white mb-2">
@@ -244,6 +247,7 @@ export default function Login({ onLogin }: LoginProps) {
                             </button>
                         </div>
                     </form>
+                </div>
                 </div>
             </div>
         </div>

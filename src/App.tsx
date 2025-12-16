@@ -106,7 +106,7 @@ function App() {
     setUserName(user);
     // setOrganization(org); // Removed
     setIsLoggedIn(true);
-    // setIsBooting(true) is already default, so it will start booting immediately after login
+    setIsBooting(true);
   };
 
   const handleBootComplete = async (name: string) => {
@@ -415,9 +415,9 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">
+    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30 overflow-x-hidden">
       <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 shadow-2xl">
-        <div className="max-w-[1800px] mx-auto px-6 py-3">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 py-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-center gap-3 shrink-0">
               <div className="bg-blue-600 p-2 rounded-lg">
@@ -509,7 +509,7 @@ function App() {
 
       {/* Visual Guide Overlay (Manual Trigger) */}
       <VisualGuide />
-      <main className="max-w-[1800px] mx-auto px-6 py-6">
+      <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6">
         <div className="flex gap-2 mb-6 bg-slate-900/50 border border-slate-800 rounded-lg p-1.5 backdrop-blur-sm w-fit shadow-lg">
           <button
             id="view-3d-trigger"

@@ -90,8 +90,8 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
     }
 
     return createPortal(
-        <div className="fixed inset-0 bg-[#0B0C10]/90 backdrop-blur-sm z-50 flex items-center justify-center p-8 font-sans">
-            <div className="w-full max-w-6xl h-[85vh] bg-[#0B0C10] border border-[#1F2833] shadow-2xl flex flex-col relative animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-[#0B0C10]/90 backdrop-blur-sm z-50 flex items-start sm:items-center justify-center p-4 sm:p-8 font-sans overflow-y-auto overflow-x-hidden">
+            <div className="w-full max-w-6xl h-[85dvh] bg-[#0B0C10] border border-[#1F2833] shadow-2xl flex flex-col relative animate-in zoom-in-95 duration-200 overflow-hidden">
 
                 {/* HEADER */}
                 <div className="h-14 border-b border-[#1F2833] flex items-center justify-between px-6 bg-[#1F2833]/30">
@@ -113,10 +113,10 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
                 </div>
 
                 {/* BODY GRID */}
-                <div className="flex-1 grid grid-cols-12 overflow-hidden">
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
 
                     {/* LEFT PANEL: INPUT & CONTEXT (4 cols) */}
-                    <div className="col-span-4 border-r border-[#1F2833] flex flex-col bg-[#0B0C10]">
+                    <div className="lg:col-span-4 border-b lg:border-b-0 lg:border-r border-[#1F2833] flex flex-col bg-[#0B0C10] min-h-0">
                         {/* Search Bar */}
                         <div className="p-4 border-b border-[#1F2833]">
                             <div className="relative">
@@ -161,7 +161,7 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
                     </div>
 
                     {/* CENTER PANEL: VISUALIZATION (5 cols) */}
-                    <div className="col-span-5 border-r border-[#1F2833] bg-[#0B0C10] p-6 overflow-y-auto flex flex-col gap-6 scrollbar-thin scrollbar-thumb-[#1F2833]">
+                    <div className="lg:col-span-5 border-b lg:border-b-0 lg:border-r border-[#1F2833] bg-[#0B0C10] p-4 sm:p-6 overflow-y-auto flex flex-col gap-6 scrollbar-thin scrollbar-thumb-[#1F2833] min-h-0">
                         {report && (
                             <>
                                 {/* Executive Summary Card */}
@@ -221,7 +221,7 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
                     </div>
 
                     {/* RIGHT PANEL: INVESTIGATION STREAM (3 cols) */}
-                    <div className="col-span-3 bg-[#08090C] p-4 overflow-y-auto scrollbar-thin scrollbar-thumb-[#1F2833]">
+                    <div className="lg:col-span-3 bg-[#08090C] p-4 overflow-y-auto scrollbar-thin scrollbar-thumb-[#1F2833] min-h-0">
                         <h3 className="text-[#889299] text-[10px] font-bold uppercase tracking-widest mb-6 flex items-center gap-2">
                             <Activity className="w-3 h-3" /> Live Investigation Stream
                         </h3>

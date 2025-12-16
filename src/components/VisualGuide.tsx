@@ -219,7 +219,7 @@ export default function VisualGuide() {
                         transform: targetRect ? 'none' : 'translate(-50%, -50%)'
                     }}
                 >
-                    <div className="bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-2xl w-72 backdrop-blur-xl flex flex-col gap-3">
+                    <div className="bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-2xl w-72 max-w-[calc(100vw-2.5rem)] backdrop-blur-xl flex flex-col gap-3">
                         <div className="flex items-start justify-between">
                             <div className="p-2.5 bg-slate-800 rounded-lg border border-slate-700">
                                 {currentStep.icon}

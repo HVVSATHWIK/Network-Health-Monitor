@@ -25,11 +25,11 @@ export default function KPIMatrix({ devices, onClose }: KPIMatrixProps) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-8 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-8 overflow-y-auto overflow-x-hidden">
             {/* Dark Backdrop */}
             <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={onClose} />
 
-            <div className="relative w-full max-w-7xl h-[85vh] bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="relative w-full max-w-7xl h-[85dvh] bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
 
                 {/* Header */}
                 <div className="p-6 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-slate-900/50 to-slate-800/50">
