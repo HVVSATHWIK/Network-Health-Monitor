@@ -1,4 +1,4 @@
-import { Activity, Network, Shield, Zap, Play, Signal, Terminal, Bot } from 'lucide-react';
+import { Activity, Shield, Zap, Play, Signal, Terminal, Bot } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import AlertPanel from './components/AlertPanel';
 import DeviceStatus from './components/DeviceStatus';
@@ -420,9 +420,7 @@ function App() {
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 py-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-center gap-3 shrink-0">
-              <div className="bg-blue-600 p-2 rounded-lg">
-                <Network className="w-8 h-8" />
-              </div>
+              <img src="/favicon.svg" alt="NetMonit network monitoring system logo" className="w-12 h-12" />
               <div>
                 <h1 className="text-2xl font-bold">NetMonit</h1>
                 <p className="text-sm text-slate-300">Network Monitoring System</p>
