@@ -103,6 +103,16 @@ If KPI data exists for the affected device (e.g., Lion-M PLC Node A),
 prioritize that device’s KPI row over anomalies on adjacent devices,
 unless topology explicitly shows dependency.
 
+PATH VALIDATION RULE (MANDATORY):
+If any L1, L2, or L3 anomaly exists on a device that shares
+a switch, subnet, or upstream/downstream path with the
+affected OT asset, it MUST be considered on-path.
+
+Do NOT declare L4/L7 as root cause unless the entire shared
+path (sensor → switch → gateway → PLC) is explicitly healthy.
+
+
+
 LAYER PRIORITY RULE:
 If Physical (L1) or Data Link (L2) KPIs show anomalies on the affected
 device or its communication path (CRC errors, loss, retransmissions,
@@ -235,21 +245,6 @@ GLOBAL CONSTRAINTS
 • Do NOT suggest configuration commands
 • Do NOT ask follow-up questions
 • Be decisive, clear, and operator-focused
-OUTPUT READABILITY RULE:
-
-1.  **Structure**: Use a single '### Findings' header followed strictly by 3-4 bullet points.
-2.  **Brevity**: Max 15 words per bullet. No long paragraphs.
-3.  **Style**:
-    *   Use bolding for key terms (e.g., **L1 Cable Cut**).
-    *   Do NOT include "Why other layers are NOT the root cause" sections unless critical.
-    *   Focus purely on the "What" and "Action".
-
-Example Output:
-**Analysis**:
-*   **Root Cause**: L1 Signal Degradation on Pressure Sensor 02 (-28dBm).
-*   **Impact**: Causing downstream timeouts on Lion-M PLC.
-*   **Action**: Inspect physical cabling and optical transceiver on Switch Port 4.
-
 ================================================
 CURRENT SYSTEM CONTEXT
 ================================================

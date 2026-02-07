@@ -4,13 +4,14 @@ import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRe
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 import { Device, NetworkConnection, Alert, DependencyPath } from '../types/network';
+import AddDeviceModal from './AddDeviceModal';
 
 // Enable BVH Acceleration
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
-import { Settings, Zap, Activity, RefreshCw, X, BrainCircuit, Sparkles } from 'lucide-react';
-import { analyzeRootCause } from '../utils/aiLogic';
+import { Settings, Zap, Activity, RefreshCw, X, Plus } from 'lucide-react';
+// import { analyzeRootCause } from '../utils/aiLogic'; // Removed
 
 interface Advanced3DTopologyProps {
   devices: Device[];
@@ -24,6 +25,7 @@ interface Advanced3DTopologyProps {
   onShowControlsChange?: (show: boolean) => void;
   selectedDeviceId?: string | null;
   onDeviceSelect?: (id: string | null) => void;
+  onAddDevice?: (device: Device, parentId?: string) => void; // Added Prop
 }
 
 export default function Advanced3DTopology({
@@ -37,12 +39,15 @@ export default function Advanced3DTopology({
   showControls = false,
   onShowControlsChange,
   selectedDeviceId,
-  onDeviceSelect
+  onDeviceSelect,
+  onAddDevice
 }: Advanced3DTopologyProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // const [hoveredNode, setHoveredNode] = useState<string | null>(null); // Removed unused state
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [isAddDeviceOpen, setIsAddDeviceOpen] = useState(false); // New State for Modal
+
+  // AI State Removed
+  // const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // const [aiInsight, setAiInsight] = useState<string | null>(null);
 
   // Camera Animation State
   const targetCamPos = useRef(new THREE.Vector3(120, 80, 160));
@@ -602,44 +607,7 @@ export default function Advanced3DTopology({
 
 
   // AI Analysis Handler
-  const handleAnalyze = async () => {
-    setIsAnalyzing(true);
-    setAiInsight(null);
-
-    // 1. Find the most critical active alert
-    const criticalAlert = alerts.find(a => a.severity === 'critical' || a.severity === 'high');
-
-    if (criticalAlert) {
-      // 2. Resolve the Device ID from the name (since mockData alerts use Name)
-      const device = devices.find(d => d.name === criticalAlert.device);
-
-      // 3. Find which Application Dependency Path involves this device
-      let targetAppName = criticalAlert.device; // Fallback to device name
-      if (device) {
-        const affectedPath = dependencyPaths.find(p => p.path.includes(device.id));
-        if (affectedPath) {
-          targetAppName = affectedPath.appName;
-        }
-      }
-
-      // 4. Run Analysis
-      // Note: If targetAppName doesn't match a path, aiLogic returns null. 
-      // We pass the resolved appName or callback to a generic insight if specific path not found.
-      const insight = await analyzeRootCause(targetAppName, alerts, devices);
-
-      if (insight) {
-        setAiInsight(insight);
-      } else {
-        // Fallback: If AI logic returns null (no path found), generate a generic insight
-        // This ensures the user ALWAYS sees a result for a critical alert.
-        setAiInsight(`Detected ${criticalAlert.severity} issue on ${criticalAlert.device}: "${criticalAlert.message}". System recommends immediate inspection of physical connections.`);
-      }
-    } else {
-      setAiInsight("System is healthy. No critical anomalies to analyze.");
-    }
-
-    setIsAnalyzing(false);
-  };
+  // AI Analysis Logic Removed
 
   return (
     <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 relative border border-slate-800 shadow-2xl">
@@ -655,8 +623,8 @@ export default function Advanced3DTopology({
 
       <div id="canvas-container" ref={containerRef} style={{ width: '100%', height: '600px', background: 'radial-gradient(circle at center, #0f172a 0%, #020617 100%)' }} className="rounded-lg overflow-hidden relative" />
 
-      {/* Controls Hint */}
-      <div className="absolute top-8 right-8 bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-lg text-xs text-white z-20 shadow-xl pointer-events-none">
+      {/* Controls Hint - Shifted down slightly */}
+      <div className="absolute top-20 right-8 bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-lg text-xs text-white z-20 shadow-xl pointer-events-none transition-all">
         <h3 className="font-bold mb-2 text-blue-300">Controls</h3>
         <ul className="space-y-1 text-gray-200 border-b border-white/10 pb-2 mb-2">
           <li className="flex items-center gap-2">
@@ -686,69 +654,26 @@ export default function Advanced3DTopology({
         </ul>
       </div>
 
-      {/* AI Analysis Button */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-30">
-        <button
-          onClick={handleAnalyze}
-          disabled={isAnalyzing}
-          className={`
-            flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-white shadow-lg transition-all
-            ${isAnalyzing
-              ? 'bg-purple-900/50 cursor-wait'
-              : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 hover:scale-105 active:scale-95 border border-purple-400/30'}
-          `}
-        >
-          {isAnalyzing ? (
-            <>
-              <BrainCircuit className="w-5 h-5 animate-spin" />
-              <span>Analyzing Network...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-5 h-5" />
-              <span>AI Root Cause Analysis</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* AI Insight Overlay */}
-      {aiInsight && (
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-30 w-full max-w-xl animate-in slide-in-from-top-4 fade-in duration-300">
-          <div className="bg-slate-900/90 backdrop-blur-xl border border-purple-500/40 p-5 rounded-2xl shadow-2xl relative">
-            <button
-              onClick={() => setAiInsight(null)}
-              className="absolute top-3 right-3 text-slate-400 hover:text-white transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <div className="flex items-start gap-4">
-              <div className="bg-gradient-to-br from-purple-600 to-indigo-600 p-3 rounded-xl shadow-lg ring-1 ring-purple-300/30">
-                <BrainCircuit className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 mb-2">
-                  Gemini Diagnostics
-                </h3>
-                <p className="text-slate-200 text-sm leading-relaxed">
-                  {aiInsight}
-                </p>
-                {/* Simulated "Fix" Action */}
-                {aiInsight.includes("Recommendation") && (
-                  <div className="mt-4 flex gap-3">
-                    <button onClick={() => {
-                      onReset?.();
-                      setAiInsight(null);
-                    }} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors shadow-lg shadow-emerald-900/30 flex items-center gap-2">
-                      <Zap className="w-3.5 h-3.5" />
-                      Apply Auto-Fix
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+      {/* Add Device Button - Top Right */}
+      {onAddDevice && (
+        <div className="absolute top-6 right-8 z-30">
+          <button
+            onClick={() => setIsAddDeviceOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 hover:scale-105 active:scale-95 text-white font-bold rounded-full shadow-lg transition-all border border-blue-400/50"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Device</span>
+          </button>
         </div>
+      )}
+
+      {/* Add Device Modal */}
+      {isAddDeviceOpen && onAddDevice && (
+        <AddDeviceModal
+          onClose={() => setIsAddDeviceOpen(false)}
+          onAdd={onAddDevice}
+          devices={devices}
+        />
       )}
 
       {/* Internal Chaos Control Toggle - Exposed for Tour */}

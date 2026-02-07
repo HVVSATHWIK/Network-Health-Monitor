@@ -1,4 +1,4 @@
-import { Activity, Shield, Zap, Play, Signal, Terminal, Bot } from 'lucide-react';
+import { Activity, Shield, Zap, Play, Signal, Terminal, Bot, Menu } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import AlertPanel from './components/AlertPanel';
 import DeviceStatus from './components/DeviceStatus';
@@ -9,7 +9,7 @@ import DataFlowVisualization from './components/DataFlowVisualization';
 import ForensicCockpit from './components/forensics/ForensicCockpit';
 import AICopilot from './components/AICopilot';
 
-import { devices as initialDevices, alerts as initialAlerts, connections as initialConnections, dependencyPaths } from './data/mockData';
+import { devices as initialDevices, alerts as initialAlerts, connections as initialConnections, dependencyPaths, layerKPIs } from './data/mockData';
 import { Device, Alert, NetworkConnection } from './types/network';
 
 import VisualGuide from './components/VisualGuide';
@@ -18,6 +18,9 @@ import KPIMatrix from './components/KPIMatrix';
 import { UnifiedForensicView } from './components/forensics/unified/UnifiedForensicView'; // Updated import
 import Login from './components/Login'; // Import Login
 import BusinessROI from './components/BusinessROI'; // Import ROI Widget
+import LayerMenu from './components/LayerMenu'; // Import LayerMenu
+import LayerOverview from './components/LayerOverview'; // Import LayerOverview
+import AssetDetailPanel from './components/AssetDetailPanel'; // Import AssetDetailPanel
 import { OTHealthCard } from './components/dashboard/OTHealthCard';
 import { NetworkLoadCard } from './components/dashboard/NetworkLoadCard';
 import { CorrelationTimelineCard } from './components/dashboard/CorrelationTimelineCard';
@@ -27,7 +30,9 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore'; // Import Firestore functions
 
 function App() {
-  const [activeView, setActiveView] = useState<'3d' | 'analytics'>('3d');
+  const [activeView, setActiveView] = useState<'3d' | 'analytics' | 'layer'>('3d');
+  const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   // const [showTour, setShowTour] = useState(true); // Replaced by VisualGuide
   // const [tourStep, setTourStep] = useState(0);
   const [isBooting, setIsBooting] = useState(false);
@@ -175,6 +180,12 @@ function App() {
 
   // Interaction: Selected Device State (Syncs 3D and Data Flow)
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+
+  const handleLayerSelect = (layer: string) => {
+    setSelectedLayer(layer);
+    setActiveView('layer');
+    setIsMenuOpen(false);
+  };
 
   // Fault Injection Logic
   const handleInjectFault = (type: 'l1' | 'l7') => {
@@ -406,8 +417,26 @@ function App() {
     // setAiMessage("System Reset. Telemetry metrics normalized."); // Removed
   };
 
-  // Manual Visual Guide replaces auto tour step logic
+  const handleAddDevice = (newDevice: Device, parentId?: string) => {
+    setDevices(prev => [...prev, newDevice]);
 
+    if (parentId) {
+      const newConnection: NetworkConnection = {
+        id: `c-${Date.now()}`,
+        source: parentId,
+        target: newDevice.id,
+        status: 'healthy',
+        bandwidth: 1000, // Default 1Gbps
+        latency: 1,      // Default 1ms
+      };
+      setConnections(prev => [...prev, newConnection]);
+    }
+  };
+
+  // Manual Visual Guide replaces auto tour step logic
+  // ... (keeping existing logic if matches context, or just target handleReset end)
+
+  // ... skip to JSX ...
 
   if (!isLoggedIn) {
     return <Login onLogin={handleLogin} />;
@@ -423,6 +452,12 @@ function App() {
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 py-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-center gap-3 shrink-0">
+              <button
+                onClick={() => setIsMenuOpen(true)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
               <img src="/favicon.svg" alt="NetMonit network monitoring system logo" className="w-12 h-12" />
               <div>
                 <h1 className="text-2xl font-bold">NetMonit</h1>
@@ -509,6 +544,31 @@ function App() {
         </div>
       </header>
 
+      <LayerMenu
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        onSelectLayer={handleLayerSelect}
+        selectedLayer={selectedLayer}
+      />
+
+      {/* Global Device Detail Overlay */}
+      {selectedDeviceId && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-end animate-in fade-in duration-200">
+          {/* Click backdrop to close */}
+          <div className="absolute inset-0" onClick={() => setSelectedDeviceId(null)}></div>
+
+          <div className="w-full max-w-lg h-full bg-slate-900 border-l border-slate-700 shadow-2xl relative z-10 animate-in slide-in-from-right duration-300">
+            <AssetDetailPanel
+              device={devices.find(d => d.id === selectedDeviceId)!}
+              connections={connections}
+              devices={devices}
+              onClose={() => setSelectedDeviceId(null)}
+              onInjectFault={(id) => handleInjectFault(devices.find(d => d.id === id)?.category === 'OT' ? 'l1' : 'l7')}
+            />
+          </div>
+        </div>
+      )}
+
       {/* OVERLAYS */}
       {showMatrix && <KPIMatrix devices={devices} onClose={() => setShowMatrix(false)} />}
 
@@ -538,6 +598,15 @@ function App() {
           </button>
         </div>
 
+        {activeView === 'layer' && selectedLayer && (
+          <LayerOverview
+            selectedLayer={selectedLayer}
+            devices={devices}
+            kpis={layerKPIs} // Use renamed import or just import layerKPIs from data
+            onSelectDevice={setSelectedDeviceId}
+          />
+        )}
+
         {activeView === '3d' && (
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12">
@@ -553,6 +622,7 @@ function App() {
                 onShowControlsChange={setIsChaosOpen}
                 selectedDeviceId={selectedDeviceId}
                 onDeviceSelect={setSelectedDeviceId}
+                onAddDevice={handleAddDevice}
               />
             </div>
 
@@ -570,7 +640,7 @@ function App() {
                 connections={connections}
                 selectedDeviceId={selectedDeviceId}
                 onSelectDevice={setSelectedDeviceId}
-                onInjectFault={(id) => handleInjectFault(devices.find(d => d.id === id)?.category === 'OT' ? 'l1' : 'l7')}
+                onInjectFault={(id: string) => handleInjectFault(devices.find(d => d.id === id)?.category === 'OT' ? 'l1' : 'l7')}
               />
             </div>
             <div className="col-span-12 lg:col-span-8">

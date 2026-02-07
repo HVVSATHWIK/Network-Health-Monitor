@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { Device, NetworkConnection } from '../types/network'; // Added NetworkConnection
-import AssetDetailPanel from './AssetDetailPanel';
+// import AssetDetailPanel from './AssetDetailPanel'; // Removed - now global
 import { Server, Router, Box, Gauge, Activity, Cpu, Shield, Search } from 'lucide-react';
 
 interface DeviceStatusProps {
@@ -46,17 +46,8 @@ export default function DeviceStatus({
   const selectedDevice = devices.find(d => d.id === selectedDeviceId);
 
   if (selectedDevice && selectedDeviceId) {
-    return (
-      <div className="bg-slate-900/80 backdrop-blur-md rounded-lg border border-slate-800 shadow-2xl h-full overflow-hidden">
-        <AssetDetailPanel
-          device={selectedDevice}
-          devices={devices}
-          connections={connections}
-          onClose={() => onSelectDevice?.(null)}
-          onInjectFault={onInjectFault}
-        />
-      </div>
-    );
+    // Logic moved to global overlay in App.tsx
+    // Keep selection highlight state but do not render panel here
   }
 
   return (
