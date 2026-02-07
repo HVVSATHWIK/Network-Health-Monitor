@@ -1,4 +1,5 @@
 import { Alert, Device } from '../types/network';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // --- Types ---
 
@@ -34,46 +35,241 @@ export interface ForensicReport {
     summary: string;
 }
 
-// --- Simulations ---
+// --- Gemini Client ---
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_AI_API_KEY || "dummy_key");
+const model = genAI.getGenerativeModel(
+    { model: import.meta.env.VITE_AI_MODEL || "gemini-2.5-flash-lite" },
+    { apiVersion: "v1" }
+);
 
-function generateOTDRData() {
-    // Simulates a fiber cut at 12.4km
-    const data = [];
-    let signal = -2.4; // dBm
-    for (let km = 0; km <= 20; km += 0.5) {
-        if (km < 12.5) {
-            signal -= 0.15; // standard attenuation
-            // Connector events
-            if (km === 5 || km === 10) signal -= 0.5;
-        } else {
-            signal = -80; // Noise floor after cut
-        }
-        data.push({ distance: km, signal: parseFloat(signal.toFixed(2)) });
+// --- Real AI Logic ---
+
+async function callGeminiAPI(query: string, alerts: Alert[], devices: Device[]): Promise<string> {
+    try {
+        const prompt = `
+You are NetMonit AI, an AI assistant designed for diagnostics and root cause
+analysis in industrial IT/OT networks.
+
+Your responsibility is to help operators understand what is happening
+in the network by reasoning over telemetry visible on the UI and
+explaining issues clearly and decisively.
+
+================================================
+UI CONTEXT AWARENESS RULE
+================================================
+The system UI represents real-time telemetry and diagnostics.
+All data visible on the UI must be treated as valid input for analysis,
+including but not limited to:
+
+• KPI Matrix values (CRC errors, loss, retransmissions, jitter, latency, resets)
+• Alert panels and alert severity
+• OT health indicators (expected vs actual cycle time, missed cycles)
+• Network load and utilization widgets
+• Correlation charts and timelines
+• Topology and path relationships
+
+You must correlate information across these UI elements.
+Do NOT rely on a single widget in isolation if additional evidence is visible.
+
+================================================
+STEP 1 — USER INTENT CLASSIFICATION (DO SILENTLY)
+================================================
+Infer the user’s intent from the query:
+
+ROOT CAUSE ANALYSIS intent:
+• "Identify the root cause"
+• "What is the root cause?"
+• "Why is X happening?"
+
+IT–OT INTERFERENCE intent:
+• "Is IT traffic impacting OT?"
+• "Why did OT degrade during a time window?"
+• "Backup window", "traffic burst", "interference"
+
+HOLISTIC / STATUS intent:
+• "What is going on?"
+• "Explain the issue"
+• "Should I be worried?"
+
+GENERAL KNOWLEDGE intent:
+• Conceptual questions (CRC, OSI, PLC, SCADA)
+
+================================================
+STEP 2 — CORE INDUSTRIAL REASONING RULES
+================================================
+
+DEVICE RELEVANCE RULE:
+If KPI data exists for the affected device (e.g., Lion-M PLC Node A),
+prioritize that device’s KPI row over anomalies on adjacent devices,
+unless topology explicitly shows dependency.
+
+LAYER PRIORITY RULE:
+If Physical (L1) or Data Link (L2) KPIs show anomalies on the affected
+device or its communication path (CRC errors, loss, retransmissions,
+signal degradation), these layers are root cause candidates.
+
+INDUSTRIAL RCA SAFETY RULE:
+In industrial IT/OT networks, Transport or Application layers (L4/L7)
+MUST NOT be declared as the root cause if:
+
+• Any L1, L2, or L3 anomaly exists anywhere on the shared communication path OR
+• The only evidence at L4/L7 is latency, timeouts, or missed cycles
+
+L4/L7 may be selected as the root cause ONLY IF:
+• L1 KPIs are healthy (no CRC, loss, signal degradation)
+• L2 KPIs are healthy (no retransmissions, congestion, utilization issues)
+• L3 KPIs are healthy (no routing instability or unreachable networks)
+
+Timeouts, latency, and missed cycles are symptoms by default in OT systems,
+not independent failures.
+
+SYMPTOM VS CAUSE RULE:
+Higher-layer symptoms such as:
+• Latency
+• Connection timeouts
+• Missed cycles
+are symptoms unless L1, L2, and L3 KPIs are explicitly healthy.
+
+ROUTING QUALIFICATION RULE:
+L3 can only be a root cause if there is control-plane instability
+(route flapping, unreachable networks, routing protocol failure).
+
+OT CONTEXT RULE:
+• OT traffic is deterministic and time-sensitive
+• Small delays or packet loss cause missed cycles
+• PLC/SCADA applications rarely fail independently
+
+================================================
+STEP 3 — INTENT-SPECIFIC BEHAVIOR
+================================================
+
+A) ROOT CAUSE ANALYSIS MODE
+(Triggered only when user explicitly asks for root cause)
+
+• Provide ONE dominant root cause layer
+• Use decisive language (no "may", "could", "potential")
+• Do NOT describe contributing factors or cross-layer amplification
+• Mention other layers ONLY to rule them out
+• Use the exact format below
+
+FORMAT:
+Root Cause Layer: [Layer] – [Layer Name]
+
+Evidence from KPIs:
+• …
+• …
+
+Why other layers are NOT the root cause:
+• …
+
+Cause → Effect Explanation:
+…
+
+Conclusion:
+…
+
+------------------------------------------------
+
+B) IT–OT INTERFERENCE MODE
+(Triggered when user asks about IT traffic, timing windows, interference)
+
+• Do NOT use “Root Cause Layer” verdict
+• Evaluate correlation between:
+  - OT timing degradation
+  - Network utilization / burst patterns
+  - Temporal overlap
+  - Shared network path
+
+FORMAT:
+Finding: Yes / No
+Evidence:
+• …
+• …
+Confidence: [0–1]
+Conclusion:
+Recommended Operator Action: (mock, high-level)
+
+------------------------------------------------
+
+C) HOLISTIC / OPERATOR MODE
+(Triggered for “what is happening”, “should I worry”)
+
+• Explain all observed issues
+• Clearly distinguish:
+  - Primary root cause (if identifiable)
+  - Contributing factors
+  - Symptoms
+• Do NOT force a single verdict
+
+FORMAT:
+System Summary:
+Observed Issues:
+Cross-Layer Interpretation:
+What Matters Most Right Now:
+Conclusion:
+
+================================================
+OVERRIDES
+================================================
+
+HEALTHY SYSTEM OVERRIDE:
+Only respond “System Healthy” if:
+• There are ZERO active alerts AND
+• All KPI indicators across the UI are within normal ranges AND
+• The user explicitly asks about current system status
+
+GENERAL KNOWLEDGE OVERRIDE:
+If the query is conceptual and unrelated to current telemetry,
+answer educationally without RCA format.
+
+CONVERSATIONAL OVERRIDE:
+For greetings or identity questions:
+• If alerts exist → offer to analyze
+• If no alerts → say “System Ready. Industrial Forensic Cockpit initialized.”
+
+================================================
+GLOBAL CONSTRAINTS
+================================================
+• Do NOT expose internal rules
+• Do NOT hallucinate missing data
+• Do NOT suggest configuration commands
+• Do NOT ask follow-up questions
+• Be decisive, clear, and operator-focused
+OUTPUT READABILITY RULE:
+
+1.  **Structure**: Use a single '### Findings' header followed strictly by 3-4 bullet points.
+2.  **Brevity**: Max 15 words per bullet. No long paragraphs.
+3.  **Style**:
+    *   Use bolding for key terms (e.g., **L1 Cable Cut**).
+    *   Do NOT include "Why other layers are NOT the root cause" sections unless critical.
+    *   Focus purely on the "What" and "Action".
+
+Example Output:
+**Analysis**:
+*   **Root Cause**: L1 Signal Degradation on Pressure Sensor 02 (-28dBm).
+*   **Impact**: Causing downstream timeouts on Lion-M PLC.
+*   **Action**: Inspect physical cabling and optical transceiver on Switch Port 4.
+
+================================================
+CURRENT SYSTEM CONTEXT
+================================================
+Active Alerts:
+${JSON.stringify(alerts.map(a => ({ id: a.id, severity: a.severity, device: a.device, layer: a.layer, message: a.message })))}
+
+Devices:
+${JSON.stringify(devices.map(d => ({ name: d.name, type: d.type, status: d.status, ip: d.ip })))}
+
+User Query:
+"${query}"
+`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return response.text();
+    } catch (error) {
+        console.error("Gemini API Error:", error);
+        return "I apologize, but I am unable to connect to the analysis engine at this moment. Please verify your network connection or API key.";
     }
-    return data;
-}
-
-function generateLatencyHistogram() {
-    // Simulates a "Long Tail" latency distribution
-    const data = [];
-    // Normal traffic (50ms center)
-    for (let i = 0; i < 200; i++) data.push(Math.floor(20 + Math.random() * 60));
-    // Congestion traffic (2000ms+ center) - The "Bimodal" hump
-    for (let i = 0; i < 80; i++) data.push(Math.floor(1800 + Math.random() * 800));
-
-    // Binning for Recharts
-    const bins = Array.from({ length: 30 }, (_, i) => ({
-        bin: i * 100,
-        count: 0,
-        range: `${i * 100}-${(i + 1) * 100}ms`
-    }));
-
-    data.forEach(val => {
-        const binIndex = Math.min(Math.floor(val / 100), 29);
-        bins[binIndex].count++;
-    });
-
-    return bins;
 }
 
 // --- Main Logic ---
@@ -82,209 +278,17 @@ export async function analyzeWithMultiAgents(
     userQuery: string,
     _appName: string | null,
     activeAlerts: Alert[],
-    _devices: Device[],
-    _onAgentUpdate: (update: AgentResponse) => void // Kept for backward compat/transition
-): Promise<ForensicReport | string> { // Dual return type during migration
+    devices: Device[],
+    _onAgentUpdate: (update: AgentResponse) => void
+): Promise<ForensicReport | string> {
 
-    // 0. Intent Routing (Conversational)
-    const isConversational = /^(hi|hello|hey|greetings|help|who are you|what is this)\b/i.test(userQuery);
-    if (isConversational) {
-        // Return simple string for chat
-        if (activeAlerts.length > 0) {
-            return `Hello. I am the NetMonit Coordinator. I see ${activeAlerts.length} active alerts. Run a diagnosis to see a full forensic report.`;
-        }
-        return "System Ready. Industrial Forensic Cockpit initialized. Waiting for telemetry...";
-    }
+    // 1. Skip Simulation Signatures - Always use Real AI
+    // The previous hardcoded logic for "Cable Cut" and "App Lag" has been removed.
+    // We now pass everything to Gemini to interpret based on the context.
 
-    // 1. Check for Simulation Signatures (The "Smart Fallback" / Demo Logic)
-    // IMPORTANT: Only treat L1 as "cable sever" when the alert is severe, otherwise
-    // the demo starts in a broken state (mock data includes non-fatal L1 degradations).
-    const userWantsL1Scenario = /(cable|fiber|otdr|loss\s+of\s+signal|\blos\b|link\s+down)/i.test(userQuery);
-    const userWantsL7Scenario = /(latency|timeout|response\s*time|deadlock|thread\s*pool|\bl7\b)/i.test(userQuery);
-    const isAnalysisIntent = /(analy|diagnos|scan|investigat|root\s*cause|\brca\b|forensic)/i.test(userQuery);
-
-    const l1Alert = activeAlerts.find(
-        a => a.layer === 'L1' && (a.severity === 'critical' || a.severity === 'high')
-    );
-    const l7Alert = activeAlerts.find(a => a.layer === 'L7' && a.severity !== 'low');
-
-    // Default "Clean" Report
-    let report: ForensicReport = {
-        criticality: 'low',
-        rootCause: 'N/A',
-        summary: 'System operating within normal parameters.',
-        chainOfThought: [
-            { id: '1', timestamp: Date.now(), agent: 'Coordinator', action: 'INITIALIZE_SCAN', status: 'success', result: 'All agents ready' },
-            { id: '2', timestamp: Date.now() + 100, agent: 'Security-Bot', action: 'SCAN_LOGS', status: 'success', result: '0 Threats' },
-            { id: '3', timestamp: Date.now() + 200, agent: 'Perf-Bot', action: 'CHECK_LATENCY', status: 'success', result: 'Avg 12ms' },
-        ],
-        artifacts: [],
-        recommendations: ['Maintain standard monitoring interval.']
-    };
-
-    if (l1Alert || l7Alert || userWantsL1Scenario || userWantsL7Scenario) {
-
-        if (l1Alert || userWantsL1Scenario) {
-            // Scenario A: Cable Cut
-            report = {
-                criticality: 'extreme',
-                rootCause: 'Physical Layer Sever (L1)',
-                summary: 'Catastrophic loss of signal on Backbone Link 04. OTDR trace confirms physical cable integrity failure.',
-                chainOfThought: [
-                    { id: '1', timestamp: Date.now(), agent: 'Coordinator', action: 'DETECT_LOS', status: 'success', result: 'Signal Loss on Switch-02' },
-                    { id: '2', timestamp: Date.now() + 500, agent: 'L1-Forensic-Bot', action: 'EXECUTE_OTDR', status: 'running', result: 'Injecting test pulse...' },
-                    { id: '3', timestamp: Date.now() + 800, agent: 'L1-Forensic-Bot', action: 'ANALYZE_REFLECTION', status: 'success', result: 'Fresnel Reflection at 12.4km' },
-                    { id: '4', timestamp: Date.now() + 1200, agent: 'Coordinator', action: 'CORRELATE_TOPOLOGY', status: 'success', result: 'location: Zone B Conduit' },
-                ],
-                artifacts: [
-                    {
-                        type: 'otdr',
-                        title: 'OTDR Trace Analysis',
-                        description: 'Signal strength (dBm) vs Distance (km). Sudden drop indicates hard sever.',
-                        data: generateOTDRData()
-                    },
-                    {
-                        type: 'json_log',
-                        title: 'SFP Transceiver Dump',
-                        description: 'DOM (Digital Optical Monitoring) Register Output',
-                        data: {
-                            "interface": "Eth1/0/4",
-                            "sfp_type": "10GBASE-LR",
-                            "tx_bias": "0.00 mA (FAULT)",
-                            "tx_power": "-40.0 dBm (LOS)",
-                            "rx_power": "-40.0 dBm (LOS)",
-                            "temp": "45.2 C"
-                        }
-                    }
-                ],
-                recommendations: [
-                    'Dispatch field tech to Zone B (GPS: 34.05, -118.25).',
-                    'Inspect fiber patch panel 4 for rodent damage.',
-                    'Reroute traffic via redundant link (cost: +5ms latency).'
-                ]
-            };
-        }
-        else if (l7Alert || userWantsL7Scenario) {
-            // Scenario B: Application Lag
-            report = {
-                criticality: 'medium',
-                rootCause: 'Application Deadlock (L7)',
-                summary: 'Service "SCADA-Loop" is experiencing microburst congestion. Latency distribution shows bimodal behavior consistent with thread pool starvation.',
-                chainOfThought: [
-                    { id: '1', timestamp: Date.now(), agent: 'Coordinator', action: 'DETECT_TIMEOUT', status: 'success', result: '>5000ms response' },
-                    { id: '2', timestamp: Date.now() + 300, agent: 'L7-Forensic-Bot', action: 'INSPECT_TCP', status: 'success', result: 'Zero Window detected' },
-                    { id: '3', timestamp: Date.now() + 600, agent: 'L7-Forensic-Bot', action: 'PROFILE_HEAP', status: 'success', result: 'Memory usage 92%' },
-                ],
-                artifacts: [
-                    {
-                        type: 'latency_histogram',
-                        title: 'Response Time Distribution',
-                        description: 'Histogram showing "Long Tail" latency vs normal baseline.',
-                        data: generateLatencyHistogram()
-                    }
-                ],
-                recommendations: [
-                    'Restart scada-control-service to clear thread pool.',
-                    'Scale horizontal pods to handle burst load.',
-                    'Investigate recent code deployment for potential infinite loop.'
-                ]
-            };
-        }
-    }
-
-    // 2. Generic fallback: if the user is asking for analysis and there are alerts,
-    // produce a meaningful L1–L7 report even when it's not the special L1/L7 demo signature.
-    if (isAnalysisIntent && activeAlerts.length > 0 && report.rootCause === 'N/A') {
-        const severityRank: Record<Alert['severity'], number> = {
-            info: 0,
-            low: 1,
-            medium: 2,
-            high: 3,
-            critical: 4,
-        };
-        const mostSevere = [...activeAlerts].sort(
-            (a, b) => severityRank[b.severity] - severityRank[a.severity]
-        )[0];
-
-        const criticality: ForensicReport['criticality'] =
-            mostSevere.severity === 'critical'
-                ? 'high'
-                : mostSevere.severity === 'high'
-                    ? 'medium'
-                    : mostSevere.severity === 'medium'
-                        ? 'medium'
-                        : 'low';
-
-        const layerRootCause: Record<Alert['layer'], string> = {
-            L1: 'Physical Layer Degradation (L1)',
-            L2: 'Link-Layer Instability (L2)',
-            L3: 'Routing / Packet Loss Event (L3)',
-            L4: 'Transport Congestion / Retransmissions (L4)',
-            L5: 'Session Churn / Reset Storm (L5)',
-            L6: 'TLS / Encoding Negotiation Failures (L6)',
-            L7: 'Application Performance / Availability Issue (L7)',
-        };
-
-        const layerRecommendations: Record<Alert['layer'], string[]> = {
-            L1: [
-                'Verify cabling/connector integrity and check optical power (DOM) readings.',
-                'Inspect ports for CRC errors and validate link negotiation (speed/duplex).',
-                'Fail over to redundant physical path if available.'
-            ],
-            L2: [
-                'Check for MAC flaps, STP topology changes, or VLAN mismatches.',
-                'Validate trunk/tagging configuration and port security events.',
-                'Review switch interface counters and broadcast/multicast rates.'
-            ],
-            L3: [
-                'Check routing adjacency stability (OSPF/BGP) and recent route changes.',
-                'Review packet loss hotspots and validate MTU consistency.',
-                'Inspect ACL/firewall drops for unintended blocking.'
-            ],
-            L4: [
-                'Inspect retransmissions, SYN backlog, and socket exhaustion indicators.',
-                'Identify microburst/congestion points and validate QoS policies.',
-                'Capture a short PCAP to confirm handshake/ACK patterns.'
-            ],
-            L5: [
-                'Check for session resets, keepalive failures, or state table churn.',
-                'Validate load balancer persistence/stickiness policies.',
-                'Review timeout settings across client, proxy, and server tiers.'
-            ],
-            L6: [
-                'Check TLS handshake failures (cert expiry, cipher mismatch, SNI issues).',
-                'Validate intermediate CA chain and time sync (NTP) across endpoints.',
-                'Confirm any recent policy updates to crypto libraries or proxies.'
-            ],
-            L7: [
-                'Inspect application logs for error spikes and upstream dependency timeouts.',
-                'Check resource saturation (CPU/memory) and thread pool metrics.',
-                'Roll back recent deployments if correlated with start of incident.'
-            ],
-        };
-
-        report = {
-            criticality,
-            rootCause: layerRootCause[mostSevere.layer],
-            summary: `${mostSevere.layer} alert detected on ${mostSevere.device}: ${mostSevere.message}`,
-            chainOfThought: [
-                { id: '1', timestamp: Date.now(), agent: 'Coordinator', action: 'INGEST_ALERT', status: 'success', result: `${mostSevere.layer}/${mostSevere.severity}` },
-                { id: '2', timestamp: Date.now() + 250, agent: 'Reliability-Bot', action: 'CORRELATE_TELEMETRY', status: 'success', result: 'Correlated with recent KPI drift' },
-                { id: '3', timestamp: Date.now() + 500, agent: 'Coordinator', action: 'GENERATE_REMEDIATION', status: 'success', result: 'Action list prepared' },
-            ],
-            artifacts: [
-                {
-                    type: 'json_log',
-                    title: 'Alert Payload',
-                    description: 'Normalized alert object used for correlation.',
-                    data: mostSevere,
-                }
-            ],
-            recommendations: layerRecommendations[mostSevere.layer],
-        };
-    }
-
-    return report;
+    // ask Gemini to perform the analysis based on strict rules
+    const aiResponse = await callGeminiAPI(userQuery, activeAlerts, devices);
+    return aiResponse;
 }
 
 /**

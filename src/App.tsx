@@ -18,6 +18,9 @@ import KPIMatrix from './components/KPIMatrix';
 import { UnifiedForensicView } from './components/forensics/unified/UnifiedForensicView'; // Updated import
 import Login from './components/Login'; // Import Login
 import BusinessROI from './components/BusinessROI'; // Import ROI Widget
+import { OTHealthCard } from './components/dashboard/OTHealthCard';
+import { NetworkLoadCard } from './components/dashboard/NetworkLoadCard';
+import { CorrelationTimelineCard } from './components/dashboard/CorrelationTimelineCard';
 
 import { auth, db } from './firebase'; // Import db
 import { onAuthStateChanged } from 'firebase/auth';
@@ -314,7 +317,7 @@ function App() {
 
       setDevices(nextDevices);
       setConnections(nextConnections);
-      setAlerts([ ...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-')) ]);
+      setAlerts([...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))]);
       return;
     }
 
@@ -383,13 +386,13 @@ function App() {
           device: 'Lion-M PLC Node A',
           message: 'Transport retries increasing (client-side timeouts)',
           timestamp: new Date(),
-          aiCorrelation: 'Retries driven by slow application responses; lower layers are stable (no L1/L2 error storm).' 
+          aiCorrelation: 'Retries driven by slow application responses; lower layers are stable (no L1/L2 error storm).'
         }
       ];
 
       setDevices(nextDevices);
       setConnections(nextConnections);
-      setAlerts([ ...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-')) ]);
+      setAlerts([...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))]);
       return;
     }
     // AI Reaction
@@ -477,33 +480,33 @@ function App() {
               </div>
 
               <div className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg whitespace-nowrap">
-              <Activity className="w-5 h-5 text-blue-400" />
-              <div>
-                <div className="text-xs text-slate-400">Active Devices</div>
-                <div className="text-lg font-bold text-blue-400">{healthyDevices}/{totalDevices}</div>
+                <Activity className="w-5 h-5 text-blue-400" />
+                <div>
+                  <div className="text-xs text-slate-400">Active Devices</div>
+                  <div className="text-lg font-bold text-blue-400">{healthyDevices}/{totalDevices}</div>
+                </div>
               </div>
-            </div>
-            <button
-              id="kpi-matrix-trigger"
-              onClick={() => setShowMatrix(true)}
-              className="whitespace-nowrap flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/30 rounded-full transition-all text-sm font-medium"
-            >
-              <Activity className="w-4 h-4" />
-              <span>KPI Matrix</span>
-            </button>
+              <button
+                id="kpi-matrix-trigger"
+                onClick={() => setShowMatrix(true)}
+                className="whitespace-nowrap flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/30 rounded-full transition-all text-sm font-medium"
+              >
+                <Activity className="w-4 h-4" />
+                <span>KPI Matrix</span>
+              </button>
 
-            <div className="flex items-center">
-              <VisualGuide />
-            </div>
-            <div className="hidden xl:block w-px h-6 bg-slate-700 mx-1"></div>
-            <div className="flex items-center gap-2 text-sm text-slate-400 whitespace-nowrap max-w-[220px]">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="truncate">{userName}</span>
-              <span className="hidden xl:inline">Online</span>
+              <div className="flex items-center">
+                <VisualGuide />
+              </div>
+              <div className="hidden xl:block w-px h-6 bg-slate-700 mx-1"></div>
+              <div className="flex items-center gap-2 text-sm text-slate-400 whitespace-nowrap max-w-[220px]">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                <span className="truncate">{userName}</span>
+                <span className="hidden xl:inline">Online</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       </header>
 
       {/* OVERLAYS */}
@@ -553,12 +556,21 @@ function App() {
               />
             </div>
 
+            {/* New Analysis Cards */}
+            <div className="col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <OTHealthCard />
+              <NetworkLoadCard />
+              <CorrelationTimelineCard />
+            </div>
+
             {/* Critical Panels: Status & Alerts */}
             <div className="col-span-12 lg:col-span-4">
               <DeviceStatus
                 devices={devices}
+                connections={connections}
                 selectedDeviceId={selectedDeviceId}
                 onSelectDevice={setSelectedDeviceId}
+                onInjectFault={(id) => handleInjectFault(devices.find(d => d.id === id)?.category === 'OT' ? 'l1' : 'l7')}
               />
             </div>
             <div className="col-span-12 lg:col-span-8">
