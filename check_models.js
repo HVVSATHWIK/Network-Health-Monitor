@@ -1,6 +1,6 @@
 const https = require('https');
 
-const apiKey = '#######################';
+const apiKey = 'AIzaSyChCqpAicohrpoyQkxpBX572h_luSR9HAE';
 const url = `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`;
 
 https.get(url, (res) => {
