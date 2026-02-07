@@ -1,19 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, X, Sparkles, AlertTriangle, ShieldCheck, Zap, Server, Lock, Send, Search, Activity, CheckCircle2 } from 'lucide-react';
-import { analyzeWithMultiAgents, type AgentResponse } from '../utils/aiLogic';
+import { Bot, X, Sparkles, AlertTriangle, Send, Search, Lock, Zap } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { analyzeWithMultiAgents } from '../utils/aiLogic';
 import { Alert, Device } from '../types/network';
 
 interface Message {
     id: string;
     role: 'user' | 'ai';
     text: string;
-    // agent: 'Coordinator'; // Simplified: Chat is ONLY for Coordinator now
-}
-
-interface AgentState {
-    status: 'idle' | 'analyzing' | 'clean' | 'issue_detected';
-    findings?: string;
 }
 
 interface AICopilotProps {
@@ -36,17 +32,6 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
     ]);
     const [isProcessing, setIsProcessing] = useState(false);
     const [inputValue, setInputValue] = useState("");
-
-    // Agent Visualizer State
-    const [agents, setAgents] = useState<{
-        Security: AgentState;
-        Performance: AgentState;
-        Reliability: AgentState;
-    }>({
-        Security: { status: 'idle' },
-        Performance: { status: 'idle' },
-        Reliability: { status: 'idle' }
-    });
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const lastSystemMessageRef = useRef<string | undefined>(undefined);
@@ -87,33 +72,9 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
         // 1. User Message
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: query }]);
 
-        // 2. Reset Agents to "Analyzing" if it's an analysis query
-        // Simple heuristic: if it triggers sub-agents, we'll see updates.
-        // For now, let's reset them to idle or analyzing based on the first update.
-        // Actually, aiLogic handles the "isConversational" check. 
-        // We will reset them to 'idle' initially, and if we get an update for one, we set it.
-        // BUT, for a fresh analysis, we probably want to clear previous findings?
-        // Let's clear them IF the query suggests analysis. 
-        // For simplicity, we'll let the callback drive the state.
-
-        const handleAgentUpdate = (update: AgentResponse) => {
-            if (update.agent === 'Coordinator') {
-                // Coordinator "analyzing" status could trigger a global "Thinking..." state if we wanted
-                return;
-            }
-
-            setAgents(prev => ({
-                ...prev,
-                [update.agent]: {
-                    status: update.status,
-                    findings: update.findings
-                }
-            }));
-        };
-
         try {
             // 3. Run Analysis
-            const finalResponse = await analyzeWithMultiAgents(query, null, alerts, devices, handleAgentUpdate);
+            const finalResponse = await analyzeWithMultiAgents(query, null, alerts, devices, () => { });
 
             // 4. Final Coordinator Response
             setMessages(prev => [...prev, {
@@ -152,57 +113,6 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
 
     if (!mounted) return null;
 
-    // --- Sub-Components ---
-
-    const AgentCard = ({ name, state, icon: Icon, color }: { name: string, state: AgentState, icon: any, color: string }) => {
-        const isAnalyzing = state.status === 'analyzing';
-        const isIssue = state.status === 'issue_detected';
-        const isClean = state.status === 'clean';
-        const isIdle = state.status === 'idle';
-
-        return (
-            <div className={`
-                relative overflow-hidden rounded-xl border p-3 transition-all duration-300
-                ${isAnalyzing ? 'bg-indigo-500/10 border-indigo-500/30' :
-                    isIssue ? 'bg-red-500/10 border-red-500/50' :
-                        isClean ? 'bg-emerald-500/10 border-emerald-500/30' :
-                            'bg-slate-800/50 border-slate-700/50 opacity-60'}
-            `}>
-                <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                        <div className={`p-1.5 rounded-lg ${isAnalyzing ? 'bg-indigo-500/20' : isIssue ? 'bg-red-500/20' : isClean ? 'bg-emerald-500/20' : 'bg-slate-700'}`}>
-                            <Icon className={`w-4 h-4 ${color}`} />
-                        </div>
-                        <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">{name}</span>
-                    </div>
-                    {/* Status Icon */}
-                    {isAnalyzing && <Activity className="w-4 h-4 text-indigo-400 animate-pulse" />}
-                    {isIssue && <AlertTriangle className="w-4 h-4 text-red-400" />}
-                    {isClean && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-                </div>
-
-                {/* Content */}
-                <div className="min-h-[40px]">
-                    {isAnalyzing ? (
-                        <div className="flex items-center gap-2 text-indigo-300">
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                            </span>
-                            <span className="text-xs">Scanning network nodes...</span>
-                        </div>
-                    ) : isIdle ? (
-                        <p className="text-[10px] text-slate-500 italic">Standby</p>
-                    ) : (
-                        <p className={`text-[11px] leading-tight ${isIssue ? 'text-red-200' : 'text-slate-300'}`}>
-                            {state.findings}
-                        </p>
-                    )}
-                </div>
-            </div>
-        );
-    };
-
     const content = !isOpen ? (
         <button
             onClick={() => onOpenChange?.(true)}
@@ -228,47 +138,12 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                     </div>
                     <div>
                         <h3 className="font-bold text-white text-sm tracking-tight">NetMonit Coordinator</h3>
-                        <p className="text-[10px] text-indigo-300 font-medium">Orchestrating 3 Sub-Agents</p>
+                        <p className="text-[10px] text-indigo-300 font-medium">AI Analysis Assistant</p>
                     </div>
                 </div>
                 <button onClick={() => onOpenChange?.(false)} className="text-slate-400 hover:text-white transition-colors bg-white/5 p-1.5 rounded-lg hover:bg-white/10">
                     <X className="w-4 h-4" />
                 </button>
-            </div>
-
-            {/* 2. Command Center (Agent Visualizer) */}
-            <div className="bg-slate-900/50 p-4 border-b border-white/5 space-y-3">
-                <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <Activity className="w-3 h-3" /> Agent Command Center
-                    </h4>
-                    {isProcessing && <span className="text-[10px] text-indigo-400 animate-pulse">Live Analysis Active</span>}
-                </div>
-
-                <div className="grid grid-cols-1 gap-2">
-                    {/* We can make this a grid or a stack. Let's do a stack for more detail space, or grid for compactness. 
-                        Given user wanted "animation text in separate chart", let's give them good space. */}
-                    <div className="grid grid-cols-1 gap-2">
-                        <AgentCard
-                            name="Security"
-                            state={agents.Security}
-                            icon={ShieldCheck}
-                            color="text-emerald-400"
-                        />
-                        <AgentCard
-                            name="Performance"
-                            state={agents.Performance}
-                            icon={Zap}
-                            color="text-yellow-400"
-                        />
-                        <AgentCard
-                            name="Reliability"
-                            state={agents.Reliability}
-                            icon={Server}
-                            color="text-blue-400"
-                        />
-                    </div>
-                </div>
             </div>
 
             {/* 3. Chat Area */}
@@ -288,7 +163,25 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                                 : 'bg-slate-800 text-slate-200 border border-slate-700/50 rounded-bl-none'
                                 }`}
                         >
-                            {msg.text}
+                            {msg.role === 'user' ? (
+                                msg.text
+                            ) : (
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    components={{
+                                        ul: ({ node, ...props }) => <ul className="list-disc list-inside space-y-1 ml-1" {...props} />,
+                                        ol: ({ node, ...props }) => <ol className="list-decimal list-inside space-y-1 ml-1" {...props} />,
+                                        h1: ({ node, ...props }) => <h1 className="text-lg font-bold mt-2 mb-1 text-indigo-200" {...props} />,
+                                        h2: ({ node, ...props }) => <h2 className="text-base font-bold mt-2 mb-1 text-indigo-100" {...props} />,
+                                        h3: ({ node, ...props }) => <h3 className="text-sm font-semibold mt-2 mb-1 text-slate-200" {...props} />,
+                                        strong: ({ node, ...props }) => <strong className="font-bold text-indigo-300" {...props} />,
+                                        p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                                        code: ({ node, ...props }) => <code className="bg-slate-700/50 rounded px-1 py-0.5 text-xs font-mono text-indigo-200" {...props} />,
+                                    }}
+                                >
+                                    {msg.text}
+                                </ReactMarkdown>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -348,4 +241,3 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
 
     return createPortal(content, document.body);
 }
-

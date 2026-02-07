@@ -115,7 +115,7 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
                             <div className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-700 to-indigo-700 mb-1 flex items-center gap-2">
                               ✨ AI Root Cause Analysis
                             </div>
-                            <div className="text-sm text-slate-300 leading-relaxed font-medium border-l-2 border-purple-500/50 pl-3">
+                            <div className="text-sm text-slate-300 leading-relaxed font-medium border-l-2 border-purple-500/50 pl-3 whitespace-pre-wrap">
                               {rootCauseInsight}
                             </div>
                           </div>
