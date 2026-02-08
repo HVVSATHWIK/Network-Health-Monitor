@@ -11,6 +11,8 @@ import AICopilot from './components/AICopilot';
 
 import { devices as initialDevices, alerts as initialAlerts, connections as initialConnections, dependencyPaths, layerKPIs } from './data/mockData';
 import { Device, Alert, NetworkConnection } from './types/network';
+import SmartLogPanel from './components/SmartLogPanel'; // Import SmartLogPanel
+import { smartLogs } from './data/smartLogs'; // Import mock logs
 
 import VisualGuide from './components/VisualGuide';
 import BootSequence from './components/BootSequence';
@@ -30,7 +32,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore'; // Import Firestore functions
 
 function App() {
-  const [activeView, setActiveView] = useState<'3d' | 'analytics' | 'layer'>('3d');
+  const [activeView, setActiveView] = useState<'3d' | 'analytics' | 'layer' | 'logs'>('3d');
   const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   // const [showTour, setShowTour] = useState(true); // Replaced by VisualGuide
@@ -596,77 +598,102 @@ function App() {
           >
             Analytics
           </button>
+          <button
+            id="view-logs-trigger"
+            onClick={() => setActiveView('logs')}
+            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeView === 'logs'
+              ? 'bg-slate-700 text-white shadow-lg border border-slate-600'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+          >
+            <Terminal className="w-4 h-4" />
+            System Logs
+          </button>
         </div>
 
-        {activeView === 'layer' && selectedLayer && (
-          <LayerOverview
-            selectedLayer={selectedLayer}
-            devices={devices}
-            kpis={layerKPIs} // Use renamed import or just import layerKPIs from data
-            onSelectDevice={setSelectedDeviceId}
-          />
-        )}
+        {
+          activeView === 'layer' && selectedLayer && (
+            <LayerOverview
+              selectedLayer={selectedLayer}
+              devices={devices}
+              kpis={layerKPIs} // Use renamed import or just import layerKPIs from data
+              onSelectDevice={setSelectedDeviceId}
+            />
+          )
+        }
 
-        {activeView === '3d' && (
-          <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-12">
-              <Advanced3DTopology
-                devices={devices}
-                connections={connections}
-                alerts={alerts}
-                dependencyPaths={dependencyPaths}
-                onInjectFault={handleInjectFault}
-                onReset={handleReset}
-                // tourStep={showTour ? tourStep : -1} // Removed
-                showControls={isChaosOpen}
-                onShowControlsChange={setIsChaosOpen}
-                selectedDeviceId={selectedDeviceId}
-                onDeviceSelect={setSelectedDeviceId}
-                onAddDevice={handleAddDevice}
-              />
-            </div>
+        {
+          activeView === '3d' && (
+            <div className="grid grid-cols-12 gap-6">
+              <div className="col-span-12">
+                <Advanced3DTopology
+                  devices={devices}
+                  connections={connections}
+                  alerts={alerts}
+                  dependencyPaths={dependencyPaths}
+                  onInjectFault={handleInjectFault}
+                  onReset={handleReset}
+                  // tourStep={showTour ? tourStep : -1} // Removed
+                  showControls={isChaosOpen}
+                  onShowControlsChange={setIsChaosOpen}
+                  selectedDeviceId={selectedDeviceId}
+                  onDeviceSelect={setSelectedDeviceId}
+                  onAddDevice={handleAddDevice}
+                />
+              </div>
 
-            {/* New Analysis Cards */}
-            <div className="col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-              <OTHealthCard />
-              <NetworkLoadCard />
-              <CorrelationTimelineCard />
-            </div>
+              {/* New Analysis Cards */}
+              <div className="col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <OTHealthCard />
+                <NetworkLoadCard />
+                <CorrelationTimelineCard />
+              </div>
 
-            {/* Critical Panels: Status & Alerts */}
-            <div className="col-span-12 lg:col-span-4">
-              <DeviceStatus
-                devices={devices}
-                connections={connections}
-                selectedDeviceId={selectedDeviceId}
-                onSelectDevice={setSelectedDeviceId}
-                onInjectFault={(id: string) => handleInjectFault(devices.find(d => d.id === id)?.category === 'OT' ? 'l1' : 'l7')}
-              />
-            </div>
-            <div className="col-span-12 lg:col-span-8">
-              <AlertPanel alerts={alerts} devices={devices} />
-            </div>
+              {/* Critical Panels: Status & Alerts */}
+              <div className="col-span-12 lg:col-span-4">
+                <DeviceStatus
+                  devices={devices}
+                  connections={connections}
+                  selectedDeviceId={selectedDeviceId}
+                  onSelectDevice={setSelectedDeviceId}
+                  onInjectFault={(id: string) => handleInjectFault(devices.find(d => d.id === id)?.category === 'OT' ? 'l1' : 'l7')}
+                />
+              </div>
+              <div className="col-span-12 lg:col-span-8">
+                <AlertPanel alerts={alerts} devices={devices} />
+              </div>
 
-            <div className="col-span-12 lg:col-span-6" id="data-flow-viz">
-              <DataFlowVisualization
-                mode={visualMode}
-                // showControlsExternal={showTour && tourStep === 3} // Removed forced external control to enforce 'Active Learning' (User must click)
-                selectedDevice={devices.find(d => d.id === selectedDeviceId) ?? null}
-              />
+              <div className="col-span-12 lg:col-span-6" id="data-flow-viz">
+                <DataFlowVisualization
+                  mode={visualMode}
+                  // showControlsExternal={showTour && tourStep === 3} // Removed forced external control to enforce 'Active Learning' (User must click)
+                  selectedDevice={devices.find(d => d.id === selectedDeviceId) ?? null}
+                />
+              </div>
+              <div className="col-span-12 lg:col-span-6">
+                <NetworkHeatmap alerts={alerts} />
+              </div>
             </div>
-            <div className="col-span-12 lg:col-span-6">
-              <NetworkHeatmap alerts={alerts} />
-            </div>
-          </div>
-        )}
+          )
+        }
 
-        {activeView === 'analytics' && (
-          <div id="analytics-view" className="space-y-6">
-            {/* Business Value Dashboard (Score Booster) */}
-            <BusinessROI healthPercentage={healthPercentage} />
-            <AdvancedAnalytics />
-          </div>
-        )}
+        {
+          activeView === 'analytics' && (
+            <div id="analytics-view" className="space-y-6">
+              {/* Business Value Dashboard (Score Booster) */}
+              <BusinessROI healthPercentage={healthPercentage} />
+              <AdvancedAnalytics />
+            </div>
+          )
+        }
+
+        {
+          activeView === 'logs' && (
+            <div className="h-[calc(100vh-140px)]">
+              <SmartLogPanel logs={smartLogs} />
+            </div>
+          )
+        }
 
 
 
@@ -682,18 +709,20 @@ function App() {
         </footer>
 
         {/* Floating Chaos Control Panel moved inside 3D Topology */}
-      </main>
+      </main >
       {/* Onboarding Tour Removed Duplicate */}
 
       {/* AI Assistant Replaced by Unified Forensic Cockpit */}
-      {isCopilotOpen && (
-        <UnifiedForensicView
-          userName={userName}
-          alerts={alerts}
-          devices={devices}
-          onClose={() => setIsCopilotOpen(false)}
-        />
-      )}
+      {
+        isCopilotOpen && (
+          <UnifiedForensicView
+            userName={userName}
+            alerts={alerts}
+            devices={devices}
+            onClose={() => setIsCopilotOpen(false)}
+          />
+        )
+      }
 
       {/* NetMonitAI Assistant (floating button + chat panel) */}
       <AICopilot
@@ -705,16 +734,18 @@ function App() {
       />
 
       {/* Diagnostic Scan Forensic Console (only mounted when open to avoid extra launcher UI) */}
-      {isForensicOpen && (
-        <ForensicCockpit
-          userName={userName}
-          alerts={alerts}
-          devices={devices}
-          isOpen={isForensicOpen}
-          onOpenChange={setIsForensicOpen}
-          systemMessage={forensicSystemMessage}
-        />
-      )}
+      {
+        isForensicOpen && (
+          <ForensicCockpit
+            userName={userName}
+            alerts={alerts}
+            devices={devices}
+            isOpen={isForensicOpen}
+            onOpenChange={setIsForensicOpen}
+            systemMessage={forensicSystemMessage}
+          />
+        )
+      }
     </div >
   );
 }

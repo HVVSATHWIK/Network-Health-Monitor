@@ -88,3 +88,78 @@ export interface DependencyPath {
   criticality: 'low' | 'medium' | 'high' | 'mission-critical';
   path: string[]; // Array of Device IDs involved in this workflow
 }
+
+export interface SmartFailureEvent {
+  id: string;
+  // WHAT
+  failureType: string;
+  osiLayer: 'L1' | 'L2' | 'L3' | 'L4' | 'L7';
+
+  // WHERE
+  originDeviceId: string;
+  originDeviceName: string; // e.g., "Hirschmann BOBCAT"
+  originPort?: string;      // e.g., "Port 4"
+
+  // TL;DR Summary
+  summary: string; // concise narrative ("Bad fiber caused X...")
+
+  // WHEN
+  startTime: string; // ISO String
+  endTime?: string;   // ISO String
+
+  // FAILURE CHAIN (The "One Root" Rule)
+  failureChain: {
+    rootCause: {
+      layer: string;
+      device: string;
+      description: string;
+    };
+    propagation: {
+      layer: string;
+      device: string;
+      description: string;
+    }[];
+    symptoms: {
+      layer: string;
+      device: string;
+      description: string;
+    }[];
+  };
+
+  // WHY & DIAGNOSIS
+  rootCauseExplanation: string;
+  ruledOutCauses: string[]; // List of dismissed hypotheses
+
+  // CONFIDENCE
+  confidenceScore: number; // 0–1
+  confidenceBreakdown: {
+    temporal: number;
+    layerConsistency: number;
+    metricStrength: number;
+    topology: number;
+    noisePenalty: number;
+  };
+
+  // TIMELINE (Micro-events)
+  timeline: {
+    timestamp: string;
+    message: string;
+    type: 'info' | 'critical' | 'completion';
+  }[];
+
+  // IMPACT
+  impact: {
+    technical: string[];   // e.g., "High Packet Loss"
+    operational: string[]; // e.g., "Production Halted"
+    impactedDeviceIds: string[];
+  };
+
+  // ACTION
+  recommendedActions: string[];
+
+  // EVIDENCE (Legacy metrics for compatibility)
+  evidence: {
+    alertCount: number;
+    keyMetrics: Record<string, number>;
+  };
+}
