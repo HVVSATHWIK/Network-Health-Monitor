@@ -26,6 +26,7 @@ import AssetDetailPanel from './components/AssetDetailPanel'; // Import AssetDet
 import { OTHealthCard } from './components/dashboard/OTHealthCard';
 import { NetworkLoadCard } from './components/dashboard/NetworkLoadCard';
 import { CorrelationTimelineCard } from './components/dashboard/CorrelationTimelineCard';
+import { TimeRangeSelector, TimeRange, PRESETS } from './components/dashboard/TimeRangeSelector';
 
 import { auth, db } from './firebase'; // Import db
 import { onAuthStateChanged } from 'firebase/auth';
@@ -49,6 +50,9 @@ function App() {
   const [isForensicOpen, setIsForensicOpen] = useState(false);
   const [forensicSystemMessage, setForensicSystemMessage] = useState<string | undefined>(undefined);
   const [isNetMonitAIOpen, setIsNetMonitAIOpen] = useState(false);
+
+  // Time Range State
+  const [timeRange, setTimeRange] = useState<TimeRange>(PRESETS[0]);
 
   // Persistent Auth Listener
   useEffect(() => {
@@ -111,6 +115,35 @@ function App() {
   const healthyDevices = devices.filter(d => d.status === 'healthy').length;
   const totalDevices = devices.length;
   const healthPercentage = Math.round((healthyDevices / totalDevices) * 100);
+
+  // Filter Alerts based on Time Range
+  const filteredAlerts = alerts.filter(alert => {
+    const alertTime = new Date(alert.timestamp).getTime();
+    if (timeRange.value === 'custom' && timeRange.start && timeRange.end) {
+      return alertTime >= timeRange.start.getTime() && alertTime <= timeRange.end.getTime();
+    }
+
+    // Relative times
+    const now = Date.now();
+    let cutoff = 0;
+
+    switch (timeRange.value) {
+      case '10m': cutoff = now - 10 * 60 * 1000; break;
+      case '30m': cutoff = now - 30 * 60 * 1000; break;
+      case '1h': cutoff = now - 60 * 60 * 1000; break;
+      case '3h': cutoff = now - 3 * 60 * 60 * 1000; break;
+      case '6h': cutoff = now - 6 * 60 * 60 * 1000; break;
+      case '12h': cutoff = now - 12 * 60 * 60 * 1000; break;
+      case '24h': cutoff = now - 24 * 60 * 60 * 1000; break;
+      case '2d': cutoff = now - 2 * 24 * 60 * 60 * 1000; break;
+      case '3d': cutoff = now - 3 * 24 * 60 * 60 * 1000; break;
+      case '1w': cutoff = now - 7 * 24 * 60 * 60 * 1000; break;
+      case '1mo': cutoff = now - 30 * 24 * 60 * 60 * 1000; break;
+      default: cutoff = 0; // Show all if unknown (or maybe specific default)
+    }
+
+    return alertTime >= cutoff;
+  });
 
   const handleLogin = (user: string, _org: string) => {
     setUserName(user);
@@ -468,6 +501,8 @@ function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 xl:justify-end">
+              <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+
               {/* Simulation Trigger */}
               <button
                 id="diagnostic-scan-trigger"
@@ -629,7 +664,7 @@ function App() {
                 <Advanced3DTopology
                   devices={devices}
                   connections={connections}
-                  alerts={alerts}
+                  alerts={filteredAlerts}
                   dependencyPaths={dependencyPaths}
                   onInjectFault={handleInjectFault}
                   onReset={handleReset}
@@ -644,8 +679,8 @@ function App() {
 
               {/* New Analysis Cards */}
               <div className="col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-                <OTHealthCard />
-                <NetworkLoadCard />
+                <OTHealthCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} />
+                <NetworkLoadCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} />
                 <CorrelationTimelineCard />
               </div>
 
@@ -660,7 +695,7 @@ function App() {
                 />
               </div>
               <div className="col-span-12 lg:col-span-8">
-                <AlertPanel alerts={alerts} devices={devices} />
+                <AlertPanel alerts={filteredAlerts} devices={devices} />
               </div>
 
               <div className="col-span-12 lg:col-span-6" id="data-flow-viz">
@@ -671,7 +706,7 @@ function App() {
                 />
               </div>
               <div className="col-span-12 lg:col-span-6">
-                <NetworkHeatmap alerts={alerts} />
+                <NetworkHeatmap alerts={filteredAlerts} />
               </div>
             </div>
           )
@@ -717,7 +752,7 @@ function App() {
         isCopilotOpen && (
           <UnifiedForensicView
             userName={userName}
-            alerts={alerts}
+            alerts={filteredAlerts}
             devices={devices}
             onClose={() => setIsCopilotOpen(false)}
           />
@@ -727,7 +762,7 @@ function App() {
       {/* NetMonitAI Assistant (floating button + chat panel) */}
       <AICopilot
         userName={userName}
-        alerts={alerts}
+        alerts={filteredAlerts}
         devices={devices}
         isOpen={isNetMonitAIOpen}
         onOpenChange={setIsNetMonitAIOpen}
@@ -738,7 +773,7 @@ function App() {
         isForensicOpen && (
           <ForensicCockpit
             userName={userName}
-            alerts={alerts}
+            alerts={filteredAlerts}
             devices={devices}
             isOpen={isForensicOpen}
             onOpenChange={setIsForensicOpen}
