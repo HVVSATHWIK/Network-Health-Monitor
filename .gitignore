@@ -9,6 +9,8 @@ lerna-debug.log*
 
 # Local build/debug capture artifacts
 build-output*.txt
+tmp_track1*.txt
+tsc_out*.txt
 node_modules
 dist
 dist-ssr
