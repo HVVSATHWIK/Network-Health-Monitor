@@ -11,6 +11,7 @@ import AICopilot from './components/AICopilot';
 
 import { Device, NetworkConnection } from './types/network';
 import SmartLogPanel from './components/SmartLogPanel'; // Import SmartLogPanel
+import type { AIMonitoringEvent } from './components/SmartLogPanel';
 import { smartLogs } from './data/smartLogs'; // Import mock logs
 import { useNetworkStore } from './store/useNetworkStore';
 import { NetworkSimulation } from './services/SimulationService';
@@ -31,6 +32,12 @@ import { TimeRangeSelector } from './components/dashboard/TimeRangeSelector';
 import { TIME_RANGE_PRESETS, type TimeRange } from './components/dashboard/timeRangePresets';
 import { DataImporter } from './components/DataImporter';
 import RealTimeKPIPage from './components/kpi/RealTimeKPIPage';
+import {
+  analyzeWithMultiAgents,
+  buildAIMonitoringSnapshot,
+  getAIQuotaStatus,
+  type AIQuotaStatus,
+} from './utils/aiLogic';
 
 import { auth, db } from './firebase'; // Import db
 import { onAuthStateChanged } from 'firebase/auth';
@@ -103,13 +110,98 @@ function App() {
   const dependencyPaths = useNetworkStore((state) => state.dependencyPaths);
   const addDevice = useNetworkStore((state) => state.addDevice);
   const addConnection = useNetworkStore((state) => state.addConnection);
+  const setAlerts = useNetworkStore((state) => state.setAlerts);
   const resetSystem = useNetworkStore((state) => state.resetSystem);
   const injectFault = useNetworkStore((state) => state.injectFault);
+  const [aiQuotaStatus, setAiQuotaStatus] = useState<AIQuotaStatus>(() => getAIQuotaStatus());
+  const [aiMonitoringTimeline, setAiMonitoringTimeline] = useState<AIMonitoringEvent[]>([]);
+  const aiEnrichmentInFlight = useRef(false);
 
 
   const healthyDevices = devices.filter(d => d.status === 'healthy').length;
   const totalDevices = devices.length;
   const healthPercentage = Math.round((healthyDevices / totalDevices) * 100);
+  const aiMonitoringSnapshot = buildAIMonitoringSnapshot(alerts, devices, connections, layerKPIs, dependencyPaths);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setAiQuotaStatus(getAIQuotaStatus());
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (aiEnrichmentInFlight.current) return;
+
+    const nextAlert = alerts.find((alert) => !alert.aiCorrelation || alert.aiCorrelation.trim().length === 0);
+    if (!nextAlert) return;
+
+    aiEnrichmentInFlight.current = true;
+
+    void (async () => {
+      try {
+        const result = await analyzeWithMultiAgents(
+          `Analyze root cause and impact for ${nextAlert.device}: ${nextAlert.message}`,
+          null,
+          alerts,
+          devices,
+          connections,
+          dependencyPaths,
+          () => { }
+        );
+
+        const summary = typeof result === 'string' ? result : result.summary;
+        const normalizedSummary = summary.replace(/\s+/g, ' ').trim();
+
+        if (!normalizedSummary) return;
+
+        const status: AIMonitoringEvent['status'] = normalizedSummary.toLowerCase().includes('quota reached')
+          ? 'quota_limited'
+          : 'success';
+
+        setAiMonitoringTimeline((prev) => {
+          const next: AIMonitoringEvent[] = [
+            ...prev,
+            {
+              id: `ai-${nextAlert.id}-${Date.now()}`,
+              timestamp: Date.now(),
+              status,
+              layer: nextAlert.layer,
+              device: nextAlert.device,
+              detail: normalizedSummary,
+            },
+          ];
+          return next.slice(-50);
+        });
+
+        setAlerts(
+          alerts.map((alert) =>
+            alert.id === nextAlert.id
+              ? { ...alert, aiCorrelation: normalizedSummary }
+              : alert
+          )
+        );
+      } catch (error) {
+        console.error('AI enrichment failed:', error);
+        setAiMonitoringTimeline((prev) => {
+          const next: AIMonitoringEvent[] = [
+            ...prev,
+            {
+              id: `ai-error-${nextAlert.id}-${Date.now()}`,
+              timestamp: Date.now(),
+              status: 'error',
+              layer: nextAlert.layer,
+              device: nextAlert.device,
+              detail: 'AI enrichment failed for this alert. Review connectivity or quota state.',
+            },
+          ];
+          return next.slice(-50);
+        });
+      } finally {
+        aiEnrichmentInFlight.current = false;
+      }
+    })();
+  }, [alerts, devices, connections, dependencyPaths, setAlerts]);
 
   // Filter Alerts based on Time Range
   const filteredAlerts = alerts.filter(alert => {
@@ -325,6 +417,26 @@ function App() {
                 </div>
               </div>
 
+              <div id="ai-monitor-badge" className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg whitespace-nowrap border border-slate-700">
+                <Bot className="w-5 h-5 text-indigo-400" />
+                <div>
+                  <div className="text-xs text-slate-400">AI Coverage</div>
+                  <div className="text-sm font-bold text-indigo-300">
+                    {aiMonitoringSnapshot.monitoredLayers.length}/7 layers · {aiMonitoringSnapshot.monitoredDevices} assets
+                  </div>
+                </div>
+              </div>
+
+              <div id="ai-quota-badge" className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg whitespace-nowrap border border-slate-700">
+                <Signal className={`w-4 h-4 ${aiQuotaStatus.remainingThisMinute <= 2 || aiQuotaStatus.remainingToday <= 100 ? 'text-amber-400' : 'text-emerald-400'}`} />
+                <div>
+                  <div className="text-xs text-slate-400">AI Quota</div>
+                  <div className="text-[11px] font-mono text-slate-200">
+                    {aiQuotaStatus.remainingThisMinute}/{aiQuotaStatus.perMinuteLimit} min · {aiQuotaStatus.remainingToday}/{aiQuotaStatus.dailyLimit} day
+                  </div>
+                </div>
+              </div>
+
               {/* Network Status Badge (de-emphasized + only on wide screens) */}
               <div className="hidden 2xl:flex items-center gap-2 bg-purple-900/20 border border-purple-500/30 px-4 py-2 rounded-lg whitespace-nowrap">
                 <Signal className="w-4 h-4 text-purple-400" />
@@ -527,7 +639,7 @@ function App() {
         {
           activeView === 'logs' && (
             <div className="h-[calc(100vh-140px)]">
-              <SmartLogPanel logs={smartLogs} />
+              <SmartLogPanel logs={smartLogs} aiTimeline={aiMonitoringTimeline} />
             </div>
           )
         }

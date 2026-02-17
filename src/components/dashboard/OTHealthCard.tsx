@@ -26,7 +26,7 @@ export function OTHealthCard({ timeRangeLabel = "Last 10 min", timeRangeValue = 
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
                     <Activity className="w-4 h-4 text-purple-400" />
-                    OT Health — Lion-M PLC Node A
+                    OT Health: Lion-M PLC Node A
                 </h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">DEGRADED</span>
             </div>

@@ -90,8 +90,13 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
 
     // RENDERERS
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x000000, 0);
     renderer.setSize(width, height);
     renderer.shadowMap.enabled = true;
+    renderer.domElement.style.position = 'absolute';
+    renderer.domElement.style.top = '0px';
+    renderer.domElement.style.left = '0px';
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -99,6 +104,9 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
     labelRenderer.setSize(width, height);
     labelRenderer.domElement.style.position = 'absolute';
     labelRenderer.domElement.style.top = '0px';
+    labelRenderer.domElement.style.left = '0px';
+    labelRenderer.domElement.style.width = '100%';
+    labelRenderer.domElement.style.height = '100%';
     labelRenderer.domElement.style.pointerEvents = 'none';
     container.appendChild(labelRenderer.domElement);
     labelRendererRef.current = labelRenderer;
@@ -249,6 +257,8 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
         }
       }
 
+      // Explicit clear to prevent any frame-buffer accumulation/ghosting
+      renderer.clear(true, true, true);
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
     };
@@ -288,6 +298,11 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
   // Re-build scene objects when data changes, without killing renderer
   useEffect(() => {
     if (!deviceGroupRef.current || !lineGroupRef.current || !packetGroupRef.current) return;
+
+    // Defensive: avoid any stale CSS2D DOM elements accumulating across rebuilds
+    if (labelRendererRef.current) {
+      labelRendererRef.current.domElement.innerHTML = '';
+    }
 
     // Clear Groups
     deviceGroupRef.current.clear();
@@ -396,7 +411,7 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
         div.className = 'flex flex-col items-center pointer-events-none';
         div.innerHTML = `
            <div style="height: 40px; width: 1px; background: linear-gradient(to top, ${hexColor}, transparent);"></div>
-           <div class="px-3 py-2 bg-slate-900/40 backdrop-blur-sm border-l-2 mt-1 ${glitchClass}" style="border-left-color: ${hexColor}; box-shadow: 0 0 15px ${hexColor}40;">
+           <div class="px-3 py-2 bg-slate-900/60 border-l-2 mt-1 ${glitchClass}" style="border-left-color: ${hexColor}; box-shadow: 0 0 15px ${hexColor}40;">
              <div class="text-[10px] uppercase tracking-widest font-mono mb-0.5" style="color: ${hexColor};">ID: ${device.id.toUpperCase()}</div>
              <div class="text-xs font-bold text-white whitespace-nowrap flex items-center gap-2">
                <span style="width: 6px; height: 6px; background-color: ${hexColor}; box-shadow: 0 0 8px ${hexColor};"></span>

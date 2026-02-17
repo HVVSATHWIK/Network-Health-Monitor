@@ -30,22 +30,22 @@ export const ForensicTerminal = ({ streamUrl: _streamUrl, text, filterPattern }:
     // Use the streamUrl prop to silence linter, or default to mock
     // const _url = streamUrl || "mock";
 
-    const demoLogs = `[14:02:01.233] KERNEL: Initializing forensic logic probe...
-[14:02:01.450] NET: Interface eth0 promiscuous mode ENABLED
-[14:02:01.452] FW: ALERT - Outbound connection to 192.168.1.55 blocked (Policy: DENY_ALL)
-[14:02:02.100] AGENT: Scanning process table for signature match [trojan.win32.emotet]
-[14:02:02.344] MEM: Heap analysis started at 0x40000000
-[14:02:02.500] MEM: Warning: High allocation rate detected in pid 442 (svchost.exe)
-[14:02:03.112] NET: TCP Zero Window detected on flow 10.0.0.5:443 -> 10.0.0.9:56622
-[14:02:03.115] NET: Retransmission RTO=1.2s
-[14:02:03.550] DISK: I/O Wait exceeded 500ms on /dev/sda1
-[14:02:04.000] AGENT: Correlation confidence: 94%
-[14:02:04.100] KERNEL: Segfault in module [scada_driver.sys] at address 0xdeadbeef
-[14:02:04.220] CRITICAL: Service "PLC-Control-Loop" transitioned to STATE_FAILED
-[14:02:05.000] RECOVERY: Attempting auto-restart of service...
-[14:02:05.500] RECOVERY: Checksum verification failed. Aborting start.
-[14:02:06.000] AUDIT: User 'admin' requested detailed report.
-[14:02:06.111] -- END OF LIVE STREAM --
+    const demoLogs = `[14:02:01.233] SYSTEM  INFO  Forensic analysis module initialized.
+[14:02:01.450] NETWORK INFO  Interface eth0 set to monitoring mode.
+[14:02:01.452] FIREWALL WARN  Outbound connection to 192.168.1.55 blocked (Policy: DENY_ALL).
+[14:02:02.100] AGENT   INFO  Process table scan started for known indicators.
+[14:02:02.344] MEMORY  INFO  Heap analysis started at 0x40000000.
+[14:02:02.500] MEMORY  WARN  High allocation rate detected in pid 442 (svchost.exe).
+[14:02:03.112] NETWORK WARN  TCP Zero Window detected on flow 10.0.0.5:443 -> 10.0.0.9:56622.
+[14:02:03.115] NETWORK WARN  Retransmission event observed (RTO=1.2s).
+[14:02:03.550] STORAGE WARN  I/O wait exceeded 500ms on /dev/sda1.
+[14:02:04.000] AGENT   INFO  Correlation confidence: 94%.
+[14:02:04.100] SYSTEM  ERROR Fault detected in module scada_driver.sys at 0xdeadbeef.
+[14:02:04.220] SERVICE ERROR Service "PLC-Control-Loop" transitioned to FAILED.
+[14:02:05.000] RECOVERY INFO  Automatic restart initiated.
+[14:02:05.500] RECOVERY WARN  Checksum verification failed; restart aborted.
+[14:02:06.000] AUDIT   INFO  User "admin" requested a detailed report.
+[14:02:06.111] SYSTEM  INFO  End of stream.
     `;
 
     const baseText = text?.trim() ? text : demoLogs;
@@ -59,11 +59,11 @@ export const ForensicTerminal = ({ streamUrl: _streamUrl, text, filterPattern }:
             const lines = raw.split(/\r?\n/);
             const matched = lines.filter((line) => re.test(line));
             if (matched.length === 0) {
-                return `-- 0 matches for /${p}/ (showing unfiltered log) --\n\n${raw}`;
+                return `[FILTER] 0 matches for /${p}/. Displaying full log output.\n\n${raw}`;
             }
             return matched.join('\n');
         } catch {
-            return `-- invalid regex: ${p} (showing unfiltered log) --\n\n${raw}`;
+            return `[FILTER] Invalid regex pattern: ${p}. Displaying full log output.\n\n${raw}`;
         }
     };
 

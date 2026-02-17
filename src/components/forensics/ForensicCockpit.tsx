@@ -41,19 +41,21 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
     const [query, setQuery] = useState("");
     const [report, setReport] = useState<ForensicReport | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisText, setAnalysisText] = useState<string | null>(null);
 
     const handleScan = useCallback(async (prompt: string) => {
         if (isAnalyzing) return;
         setQuery(prompt);
         setIsAnalyzing(true);
         setReport(null); // Clear previous
+        setAnalysisText(null);
 
         try {
             const result = await analyzeWithMultiAgents(prompt, null, alerts, devices, () => { });
 
             if (typeof result === 'string') {
-                // Handle chat response (not forensic)
-                // For now, we ignore purely chat responses in this view or show a toast
+                setAnalysisText(result);
+                setIsAnalyzing(false);
             } else {
                 // Simulate "Streaming" of the Chain of Thought
                 // We will "Reveal" the report steps one by one to mimic real-time processing
@@ -238,6 +240,15 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
                                     </div>
                                 )}
                             </>
+                        )}
+                        {!report && !isAnalyzing && analysisText && (
+                            <div className="border-l-4 p-4 bg-[#45A29E]/10 border-[#45A29E]">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <ShieldAlert className="w-5 h-5 text-[#45A29E]" />
+                                    <h3 className="text-[#C5C6C7] font-bold text-sm tracking-wide uppercase">Analysis Output</h3>
+                                </div>
+                                <p className="text-[#C5C6C7] text-xs leading-relaxed font-mono whitespace-pre-wrap">{analysisText}</p>
+                            </div>
                         )}
                         {!report && !isAnalyzing && (
                             <div className="h-full flex flex-col items-center justify-center text-[#1F2833]">

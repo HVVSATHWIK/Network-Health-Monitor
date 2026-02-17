@@ -89,7 +89,7 @@
 // You must correlate information across these elements.
 
 // ================================================
-// STEP 1 — USER INTENT CLASSIFICATION (DO SILENTLY)
+// STEP 1 - USER INTENT CLASSIFICATION (DO SILENTLY)
 // ================================================
 // Infer the user’s intent from the query:
 
@@ -107,7 +107,7 @@
 // • Conceptual questions (CRC, OSI, PLC) -> ANSWER NORMALLY.
 
 // ================================================
-// STEP 2 — CORE INDUSTRIAL REASONING RULES (STRICT)
+// STEP 2 - CORE INDUSTRIAL REASONING RULES (STRICT)
 // ================================================
 
 // DEVICE RELEVANCE RULE:
@@ -121,7 +121,7 @@
 // • Timeouts and Latency are usually SYMPTOMS of lower-layer issues.
 
 // ================================================
-// STEP 3 — OUTPUT FORMAT (MANDATORY)
+// STEP 3 - OUTPUT FORMAT (MANDATORY)
 // ================================================
 // If the user asks for analysis, status, or root cause, YOU MUST USE THIS FORMAT:
 
@@ -196,7 +196,7 @@
 //     if (typeof res === 'string') return res;
 //     return res.summary;
 // }
-import { Alert, Device, NetworkConnection, DependencyPath, CausalChain } from '../types/network';
+import { Alert, Device, NetworkConnection, DependencyPath, CausalChain, LayerKPI } from '../types/network';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { analyzeRelationships } from './relationshipEngine';
 
@@ -235,6 +235,135 @@ export interface ForensicReport {
 }
 
 export type AnalysisResult = string | ForensicReport;
+
+export interface AIQuotaStatus {
+    perMinuteLimit: number;
+    dailyLimit: number;
+    usedLastMinute: number;
+    usedToday: number;
+    remainingThisMinute: number;
+    remainingToday: number;
+}
+
+export interface AIMonitoringSnapshot {
+    monitoredDevices: number;
+    monitoredConnections: number;
+    monitoredAlerts: number;
+    monitoredWorkflows: number;
+    monitoredLayers: string[];
+    coverageRatio: number;
+    summary: string;
+}
+
+const AI_PER_MINUTE_LIMIT = 15;
+const AI_DAILY_LIMIT = 1000;
+const AI_QUOTA_STORAGE_KEY = 'netmonit_ai_quota_v1';
+
+type StoredQuota = {
+    dayKey: string;
+    usedToday: number;
+    minuteRequests: number[];
+};
+
+const getDayKey = (date = new Date()) =>
+    `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+
+const loadQuota = (): StoredQuota => {
+    const fallback: StoredQuota = { dayKey: getDayKey(), usedToday: 0, minuteRequests: [] };
+
+    if (typeof window === 'undefined') return fallback;
+
+    try {
+        const raw = window.localStorage.getItem(AI_QUOTA_STORAGE_KEY);
+        if (!raw) return fallback;
+        const parsed = JSON.parse(raw) as Partial<StoredQuota>;
+        return {
+            dayKey: typeof parsed.dayKey === 'string' ? parsed.dayKey : fallback.dayKey,
+            usedToday: typeof parsed.usedToday === 'number' ? parsed.usedToday : 0,
+            minuteRequests: Array.isArray(parsed.minuteRequests)
+                ? parsed.minuteRequests.filter((t): t is number => typeof t === 'number')
+                : [],
+        };
+    } catch {
+        return fallback;
+    }
+};
+
+const saveQuota = (quota: StoredQuota) => {
+    if (typeof window === 'undefined') return;
+    try {
+        window.localStorage.setItem(AI_QUOTA_STORAGE_KEY, JSON.stringify(quota));
+    } catch {
+        // ignore storage failures
+    }
+};
+
+const normalizeQuota = (): StoredQuota => {
+    const now = Date.now();
+    const minuteAgo = now - 60_000;
+    const todayKey = getDayKey();
+    const quota = loadQuota();
+
+    if (quota.dayKey !== todayKey) {
+        quota.dayKey = todayKey;
+        quota.usedToday = 0;
+    }
+
+    quota.minuteRequests = quota.minuteRequests.filter((ts) => ts >= minuteAgo);
+    saveQuota(quota);
+    return quota;
+};
+
+export function getAIQuotaStatus(): AIQuotaStatus {
+    const quota = normalizeQuota();
+    const usedLastMinute = quota.minuteRequests.length;
+    const usedToday = quota.usedToday;
+    return {
+        perMinuteLimit: AI_PER_MINUTE_LIMIT,
+        dailyLimit: AI_DAILY_LIMIT,
+        usedLastMinute,
+        usedToday,
+        remainingThisMinute: Math.max(0, AI_PER_MINUTE_LIMIT - usedLastMinute),
+        remainingToday: Math.max(0, AI_DAILY_LIMIT - usedToday),
+    };
+}
+
+function tryConsumeAIRequest(): { ok: true; status: AIQuotaStatus } | { ok: false; status: AIQuotaStatus } {
+    const quota = normalizeQuota();
+    const status = getAIQuotaStatus();
+
+    if (status.remainingThisMinute <= 0 || status.remainingToday <= 0) {
+        return { ok: false, status };
+    }
+
+    quota.minuteRequests.push(Date.now());
+    quota.usedToday += 1;
+    saveQuota(quota);
+
+    return { ok: true, status: getAIQuotaStatus() };
+}
+
+export function buildAIMonitoringSnapshot(
+    alerts: Alert[],
+    devices: Device[],
+    connections: NetworkConnection[],
+    layerKPIs: LayerKPI[],
+    dependencies: DependencyPath[]
+): AIMonitoringSnapshot {
+    const monitoredLayers = Array.from(new Set(layerKPIs.map((kpi) => kpi.layer))).sort();
+    const coverageRatio = Math.min(1, monitoredLayers.length / 7);
+    const coveragePercent = Math.round(coverageRatio * 100);
+
+    return {
+        monitoredDevices: devices.length,
+        monitoredConnections: connections.length,
+        monitoredAlerts: alerts.length,
+        monitoredWorkflows: dependencies.length,
+        monitoredLayers,
+        coverageRatio,
+        summary: `Monitoring ${devices.length} devices, ${connections.length} links, ${alerts.length} active alerts, ${dependencies.length} workflow paths. Layer coverage ${coveragePercent}% (${monitoredLayers.join(', ') || 'none'}).`,
+    };
+}
 
 // ---------------- GEMINI CLIENT ----------------
 
@@ -278,7 +407,7 @@ function buildPrompt(
     }));
 
     return `
-You are NetMonit AI — an industrial IT/OT observability intelligence engine.
+You are NetMonit AI, an industrial IT/OT observability intelligence engine.
 
 ================================================
 STEP 1: CLASSIFY INTENT
@@ -354,6 +483,10 @@ async function callGeminiAPI(
     dependencies: DependencyPath[]
 ): Promise<string> {
     try {
+        const quota = tryConsumeAIRequest();
+        if (!quota.ok) {
+            return `AI request quota reached. Remaining this minute: ${quota.status.remainingThisMinute}/${quota.status.perMinuteLimit}, remaining today: ${quota.status.remainingToday}/${quota.status.dailyLimit}. Use diagnostic or status commands for deterministic analysis.`;
+        }
 
         const prompt = buildPrompt(query, alerts, devices, connections, dependencies);
 
@@ -393,6 +526,9 @@ function classifyIntent(query: string): Intent {
     const diagnosticHints = [
         'root cause',
         'rca',
+        'diagnostic',
+        'diagnostic scan',
+        'telemetry scan',
         'diagnose',
         'analyze',
         'why',

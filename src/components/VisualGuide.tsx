@@ -34,7 +34,7 @@ export default function VisualGuide() {
         {
             id: 'welcome',
             title: 'Welcome',
-            description: 'This interactive dashboard monitors network health in real-time across OSI Layers L1–L7. Click "Next" to learn how to navigate.',
+            description: 'This dashboard monitors network health across OSI Layers L1-L7 with shared AI context across views. Click "Next" to see key controls.',
             targetId: null,
             icon: <Info className="w-6 h-6 text-blue-400" />
         },
@@ -80,6 +80,20 @@ export default function VisualGuide() {
             description: 'Monitor the overall system health score here. It updates in real-time based on active alerts.',
             targetId: 'network-health-badge',
             icon: <Activity className="w-6 h-6 text-red-400" />
+        },
+        {
+            id: 'aiCoverage',
+            title: 'AI Coverage',
+            description: 'This badge confirms AI monitoring scope (layers and assets). It reflects the same live dataset used by topology, alerts, and KPI views.',
+            targetId: 'ai-monitor-badge',
+            icon: <Zap className="w-6 h-6 text-indigo-300" />
+        },
+        {
+            id: 'aiQuota',
+            title: 'AI Quota Guardrails',
+            description: 'Track AI request budget here. Limits are enforced at 15 requests/minute and 1000 requests/day to keep monitoring stable.',
+            targetId: 'ai-quota-badge',
+            icon: <Activity className="w-6 h-6 text-amber-300" />
         },
         {
             id: 'select',
@@ -143,6 +157,14 @@ export default function VisualGuide() {
             icon: <Terminal className="w-6 h-6 text-slate-200" />
         },
         {
+            id: 'aiTimelineLogs',
+            title: 'AI Monitoring Timeline',
+            description: 'In System Logs, this timeline shows each automated AI enrichment action with status, layer, and device scope.',
+            targetId: 'ai-monitoring-timeline',
+            icon: <Activity className="w-6 h-6 text-indigo-300" />,
+            ensureView: 'logs'
+        },
+        {
             id: 'forensics',
             title: 'Forensic Cockpit',
             description: 'Open the Forensic Cockpit to analyze alert streams. Hidden power tools: press Ctrl/Cmd+K for the command palette, and use regex filtering in the terminal view (e.g. error|refused|fail).',
@@ -152,7 +174,7 @@ export default function VisualGuide() {
         {
             id: 'assistant',
             title: 'NetMonitAI Assistant',
-            description: 'Use NetMonitAI for conversational help and quick summaries. It’s separate from the Forensic Cockpit so it won’t interrupt workflows.',
+            description: 'Use NetMonit AI for conversational help and summaries. It shares the same network telemetry model as the forensic and KPI workflows.',
             targetId: 'netmonit-ai-trigger',
             icon: <Zap className="w-6 h-6 text-indigo-300" />
         },

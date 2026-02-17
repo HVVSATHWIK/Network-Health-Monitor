@@ -6,11 +6,11 @@ import TrendAnalysisGraph from './TrendAnalysisGraph';
 
 const RealTimeKPIPage = () => {
     return (
-        <div className="h-full w-full p-6 bg-slate-950 overflow-y-auto custom-scrollbar">
+        <div className="h-full w-full p-6 pb-24 bg-gunmetal-950 text-gunmetal-100 overflow-y-auto custom-scrollbar">
             {/* Page Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white mb-2">Real-Time KPI & Escalation Intelligence</h1>
-                <p className="text-slate-400">Live telemetry analysis, root cause propagation, and predictive escalation risk.</p>
+                <h1 className="text-3xl font-sans font-bold text-gunmetal-100 mb-2 tracking-tight">NetMonit AI: KPI Intelligence</h1>
+                <p className="text-gunmetal-400">Live telemetry, propagation mapping, and predictive escalation risk.</p>
             </div>
 
             {/* Top Section: Global Metrics */}

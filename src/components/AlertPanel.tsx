@@ -111,7 +111,7 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
                           </div>
                           <div>
                             <div className="text-sm font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-700 to-indigo-700 mb-1 flex items-center gap-2">
-                              ✨ AI Root Cause Analysis
+                              AI Root Cause Analysis
                             </div>
                             <div className="text-sm text-slate-300 leading-relaxed font-medium border-l-2 border-purple-500/50 pl-3 whitespace-pre-wrap">
                               {rootCauseInsight}
@@ -132,12 +132,12 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
                           {analyzingIds.has(alert.id) ? (
                             <>
                               <BrainCircuit className="w-4 h-4 text-purple-400 animate-spin" />
-                              <span className="text-xs font-bold text-purple-300">ANALYZING SIGNALS...</span>
+                              <span className="text-xs font-bold text-purple-300">Analyzing telemetry...</span>
                             </>
                           ) : (
                             <>
                               <Sparkles className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
-                              <span className="text-xs font-bold text-slate-300 group-hover:text-purple-300 transition-colors">RUN AI ROOT CAUSE ANALYSIS</span>
+                              <span className="text-xs font-bold text-slate-300 group-hover:text-purple-300 transition-colors">Run Root Cause Analysis</span>
                             </>
                           )}
                         </div>

@@ -163,7 +163,7 @@ export const useNetworkStore = create<NetworkState>((set) => ({
                     severity: 'critical',
                     layer: 'L1',
                     device: 'Hirschmann BOBCAT Switch',
-                    message: 'Fiber link down on Port 4 (Optical RX < -30 dBm) — physical disconnect suspected',
+                    message: 'Fiber link down on Port 4 (Optical RX < -30 dBm); physical disconnect suspected',
                     timestamp: new Date(),
                     aiCorrelation: 'Primary fault likely at L1. Expect secondary symptoms at L3 (loss) and L4 (timeouts) across OT cells.'
                 },
@@ -172,7 +172,7 @@ export const useNetworkStore = create<NetworkState>((set) => ({
                     severity: 'high',
                     layer: 'L2',
                     device: 'Hirschmann BOBCAT Switch',
-                    message: 'CRC error storm + MAC flapping detected — unstable physical medium',
+                    message: 'CRC error storm and MAC flapping detected; unstable physical medium',
                     timestamp: new Date(),
                     aiCorrelation: 'L2 anomalies coincide with L1 optical power drop; treat L3 alarms as downstream effects.'
                 },
@@ -190,7 +190,7 @@ export const useNetworkStore = create<NetworkState>((set) => ({
                     severity: 'high',
                     layer: 'L4',
                     device: 'Lion-M PLC Node A',
-                    message: 'TCP retransmissions/timeouts rising — control loop reliability degraded',
+                    message: 'TCP retransmissions and timeouts rising; control-loop reliability degraded',
                     timestamp: new Date(),
                     aiCorrelation: 'Transport reliability degradation aligns with L1/L2 faults upstream of the PLC segment.'
                 },

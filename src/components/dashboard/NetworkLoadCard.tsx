@@ -25,7 +25,7 @@ export function NetworkLoadCard({ timeRangeLabel = "Last 10 min", timeRangeValue
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-2">
                     <Server className="w-4 h-4 text-blue-400" />
-                    Network Load — Hirschmann BOBCAT (Port 4)
+                    Network Load: Hirschmann BOBCAT (Port 4)
                 </h3>
             </div>
 

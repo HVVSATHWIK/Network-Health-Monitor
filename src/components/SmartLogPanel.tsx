@@ -13,11 +13,22 @@ import {
     Database,
     Layers,
     Search,     // Added for Evidence
-    FileText    // Added for Narrative
+    FileText,
+    Bot
 } from 'lucide-react';
+
+export interface AIMonitoringEvent {
+    id: string;
+    timestamp: number;
+    status: 'success' | 'quota_limited' | 'error';
+    layer: string;
+    device: string;
+    detail: string;
+}
 
 interface SmartLogPanelProps {
     logs: SmartFailureEvent[];
+    aiTimeline?: AIMonitoringEvent[];
 }
 
 // Helper functions (extracted for reuse)
@@ -323,7 +334,7 @@ const LogCard = ({ log, isExpanded, onToggle }: { log: SmartFailureEvent, isExpa
     );
 };
 
-export default function SmartLogPanel({ logs }: SmartLogPanelProps) {
+export default function SmartLogPanel({ logs, aiTimeline = [] }: SmartLogPanelProps) {
     const [expandedId, setExpandedId] = useState<string | null>(logs[0]?.id || null);
 
     const toggleExpand = (id: string) => {
@@ -343,6 +354,39 @@ export default function SmartLogPanel({ logs }: SmartLogPanelProps) {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+                {aiTimeline.length > 0 && (
+                    <div id="ai-monitoring-timeline" className="bg-slate-950/40 border border-slate-800 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <Bot className="w-4 h-4 text-indigo-400" />
+                                <h3 className="text-sm font-semibold text-slate-200">AI Monitoring Timeline</h3>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-500">Entries: {aiTimeline.length}</span>
+                        </div>
+
+                        <div className="space-y-2 max-h-40 overflow-y-auto pr-1 scrollbar-thin">
+                            {[...aiTimeline].reverse().map((event) => {
+                                const statusStyle = event.status === 'success'
+                                    ? 'text-emerald-300 border-emerald-800/40 bg-emerald-900/10'
+                                    : event.status === 'quota_limited'
+                                        ? 'text-amber-300 border-amber-800/40 bg-amber-900/10'
+                                        : 'text-red-300 border-red-800/40 bg-red-900/10';
+
+                                return (
+                                    <div key={event.id} className={`rounded border px-3 py-2 ${statusStyle}`}>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span className="text-[10px] font-mono uppercase tracking-widest">{event.status.replace('_', ' ')}</span>
+                                            <span className="text-[10px] font-mono text-slate-400">{new Date(event.timestamp).toLocaleTimeString()}</span>
+                                        </div>
+                                        <div className="mt-1 text-xs text-slate-200">{event.layer} · {event.device}</div>
+                                        <div className="mt-1 text-[11px] text-slate-400 leading-relaxed">{event.detail}</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {logs.map((log) => (
                     <LogCard
                         key={log.id}
