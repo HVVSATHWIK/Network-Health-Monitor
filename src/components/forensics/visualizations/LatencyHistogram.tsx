@@ -2,7 +2,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import ForensicGraphCard from '../ForensicGraphCard';
 
 interface LatencyHistogramProps {
-    data: any[];
+    data: Array<{ range: string; count: number; bin: number }>;
     title?: string;
     description?: string;
 }
@@ -28,7 +28,7 @@ export default function LatencyHistogram({ data, title = "Latency Distribution",
                         itemStyle={{ color: '#66FCF1' }}
                     />
                     <Bar dataKey="count" fill="#45A29E">
-                        {data.map((entry: any, index: number) => (
+                        {data.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.bin > 1000 ? '#FF2E2E' : (entry.bin > 200 ? '#FFA700' : '#45A29E')} />
                         ))}
                     </Bar>

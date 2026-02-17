@@ -2,13 +2,13 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceL
 import ForensicGraphCard from '../ForensicGraphCard';
 
 interface OTDRTraceProps {
-    data: any[];
+    data: Array<{ distance: number; signal: number }>;
     title?: string;
     description?: string;
 }
 
 export default function OTDRTrace({ data, title = "Optical Time-Domain Reflectometry", description }: OTDRTraceProps) {
-    const breakPoint = data.find((d: any) => d.signal <= -70);
+    const breakPoint = data.find((d) => d.signal <= -70);
 
     return (
         <ForensicGraphCard title={title} description={description || "Signal strength (dBm) vs Distance (km)"}>

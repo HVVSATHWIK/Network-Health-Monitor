@@ -2,28 +2,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Clock, ChevronDown, Calendar, X } from 'lucide-react';
 
-export type TimeRangeValue = '10m' | '30m' | '1h' | '3h' | '6h' | '12h' | '24h' | '2d' | '3d' | '1w' | '1mo' | 'custom';
+import { TIME_RANGE_PRESETS, type TimeRange } from './timeRangePresets';
 
-export interface TimeRange {
-    value: TimeRangeValue;
-    label: string;
-    start?: Date;
-    end?: Date;
-}
-
-export const PRESETS: { value: TimeRangeValue; label: string }[] = [
-    { value: '10m', label: 'Last 10 minutes' },
-    { value: '30m', label: 'Last 30 minutes' },
-    { value: '1h', label: 'Last 1 hour' },
-    { value: '3h', label: 'Last 3 hours' },
-    { value: '6h', label: 'Last 6 hours' },
-    { value: '12h', label: 'Last 12 hours' },
-    { value: '24h', label: 'Last 24 hours' },
-    { value: '2d', label: 'Last 2 days' },
-    { value: '3d', label: 'Last 3 days' },
-    { value: '1w', label: 'Last 1 week' },
-    { value: '1mo', label: 'Last 1 month' },
-];
 
 interface TimeRangeSelectorProps {
     value: TimeRange;
@@ -48,7 +28,7 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const handlePresetSelect = (preset: typeof PRESETS[0]) => {
+    const handlePresetSelect = (preset: (typeof TIME_RANGE_PRESETS)[0]) => {
         onChange({ value: preset.value, label: preset.label });
         setIsOpen(false);
     };
@@ -69,6 +49,7 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
     return (
         <div className="relative" ref={containerRef}>
             <button
+                id="time-range-trigger"
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition-all text-sm font-medium"
             >
@@ -96,7 +77,7 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
                                     />
                                 </div>
 
-                                {PRESETS.map((preset) => (
+                                {TIME_RANGE_PRESETS.map((preset) => (
                                     <button
                                         key={preset.value}
                                         onClick={() => handlePresetSelect(preset)}

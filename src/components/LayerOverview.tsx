@@ -1,5 +1,6 @@
 import { Device, LayerKPI } from '../types/network';
 import { Activity, AlertTriangle, CheckCircle, Server, Router, Cpu, Box, Shield, Gauge, ArrowRight } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface LayerOverviewProps {
   kpis: LayerKPI[];
@@ -8,7 +9,7 @@ interface LayerOverviewProps {
   onSelectDevice: (deviceId: string) => void;
 }
 
-export default function LayerOverview({ kpis, selectedLayer, devices, onSelectDevice }: LayerOverviewProps) {
+export default function LayerOverview({ selectedLayer, devices, onSelectDevice }: LayerOverviewProps) {
 
   const layerDescriptions: Record<string, string> = {
     'L1': 'Physical Layer - Cables, Signals, Connectivity',
@@ -20,7 +21,7 @@ export default function LayerOverview({ kpis, selectedLayer, devices, onSelectDe
     'L7': 'Application Layer - Protocols, Services'
   };
 
-  const deviceIcons: Record<string, any> = {
+  const deviceIcons: Partial<Record<Device['type'], LucideIcon>> = {
     switch: Router,
     router: Router,
     plc: Cpu,
@@ -36,8 +37,8 @@ export default function LayerOverview({ kpis, selectedLayer, devices, onSelectDe
   // Ideally, you'd filter: devices.filter(d => d.layers.includes(selectedLayer))
 
   const metricsForLayer = (device: Device) => {
-    // @ts-ignore - dynamic access to layer metrics
-    return device.metrics[selectedLayer.toLowerCase()];
+    const key = selectedLayer.toLowerCase() as keyof Device['metrics'];
+    return key in device.metrics ? device.metrics[key] : device.metrics.l1;
   };
 
   return (

@@ -32,12 +32,12 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
 
 
 
-  const severityConfig = {
+  const severityConfig: Record<Alert['severity'], { icon: typeof AlertCircle; color: string; bg: string; border: string }> = {
     critical: { icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-950/30', border: 'border-red-500/30' },
     high: { icon: AlertCircle, color: 'text-orange-400', bg: 'bg-orange-950/30', border: 'border-orange-500/30' },
     medium: { icon: AlertTriangle, color: 'text-yellow-400', bg: 'bg-yellow-950/30', border: 'border-yellow-500/30' },
     low: { icon: Info, color: 'text-blue-400', bg: 'bg-blue-950/30', border: 'border-blue-500/30' },
-    info: { icon: Info, color: 'text-blue-400', bg: 'bg-blue-950/30', border: 'border-blue-500/30' } // Added info fallback
+    info: { icon: Info, color: 'text-blue-400', bg: 'bg-blue-950/30', border: 'border-blue-500/30' },
   };
 
   const formatTime = (date: Date) => {
@@ -59,9 +59,7 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
 
       <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
         {alerts.map((alert) => {
-          // Use type assertion or fallback to avoid implicit any error
-          // @ts-ignore - Valid severity check handled by fallback
-          const config = severityConfig[alert.severity] || severityConfig.medium;
+          const config = severityConfig[alert.severity];
           const Icon = config.icon;
           const rootCauseInsight = insights[alert.id];
 

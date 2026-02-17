@@ -1,4 +1,5 @@
 import { LazyLog, ScrollFollow } from '@melloware/react-logviewer';
+import type { CSSProperties } from 'react';
 
 // Custom theme mapping to our Tailwind 'gunmetal' variables
 const terminalTheme = {
@@ -25,6 +26,7 @@ interface ForensicTerminalProps {
 }
 
 export const ForensicTerminal = ({ streamUrl: _streamUrl, text, filterPattern }: ForensicTerminalProps) => {
+    void _streamUrl;
     // Use the streamUrl prop to silence linter, or default to mock
     // const _url = streamUrl || "mock";
 
@@ -77,8 +79,7 @@ export const ForensicTerminal = ({ streamUrl: _streamUrl, text, filterPattern }:
                         stream={true}
                         follow={follow}
                         onScroll={onScroll}
-                        // @ts-ignore - style prop type mismatch in some versions
-                        style={terminalTheme}
+                        style={terminalTheme as unknown as CSSProperties}
                         selectableLines={true}
                         // highlight prop removed to prevent regex type errors. 
                         // The library's typing for highlight seems inconsistent in this version.

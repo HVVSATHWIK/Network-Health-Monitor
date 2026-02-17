@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Network, Lock, ChevronRight, Server, Activity, AlertCircle, UserPlus } from 'lucide-react';
 import { auth, googleProvider, db } from '../firebase';
 import {
@@ -14,6 +14,13 @@ import { doc, setDoc } from 'firebase/firestore';
 interface LoginProps {
     onLogin: (user: string, org: string) => void;
 }
+
+const getErrorCode = (err: unknown): string | undefined => {
+    if (!err || typeof err !== 'object') return undefined;
+    const rec = err as Record<string, unknown>;
+    const code = rec.code;
+    return typeof code === 'string' ? code : code != null ? String(code) : undefined;
+};
 
 export default function Login({ onLogin }: LoginProps) {
     const [isLoading, setIsLoading] = useState(false);
@@ -61,10 +68,11 @@ export default function Login({ onLogin }: LoginProps) {
                     setError("");
                     await upsertGoogleProfileAndContinue(result.user);
                 }
-            } catch (err: any) {
+            } catch (err: unknown) {
                 if (cancelled) return;
                 console.error("Google Redirect Login Failed:", err);
-                if (err?.code === 'auth/unauthorized-domain') {
+                const code = getErrorCode(err);
+                if (code === 'auth/unauthorized-domain') {
                     setError("This URL isn't authorized for Firebase Auth. Use the deployed site (Firebase Hosting) or add this domain in Firebase Console → Authentication → Settings → Authorized domains.");
                 } else {
                     setError("SSO Authorization failed.");
@@ -107,12 +115,13 @@ export default function Login({ onLogin }: LoginProps) {
                 onLogin(userCredential.user.email || "Authenticated User", org);
             }
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Auth Failed:", err);
+            const code = getErrorCode(err);
             // Better error messages
-            if (err.code === 'auth/email-already-in-use') setError("Email already registered.");
-            else if (err.code === 'auth/weak-password') setError("Password should be at least 6 chars.");
-            else if (err.code === 'auth/invalid-credential') setError("Invalid credentials.");
+            if (code === 'auth/email-already-in-use') setError("Email already registered.");
+            else if (code === 'auth/weak-password') setError("Password should be at least 6 chars.");
+            else if (code === 'auth/invalid-credential') setError("Invalid credentials.");
             else setError("Authentication failed. Please try again.");
         } finally {
             setIsLoading(false);
@@ -131,11 +140,12 @@ export default function Login({ onLogin }: LoginProps) {
 
             const result = await signInWithPopup(auth, googleProvider);
             await upsertGoogleProfileAndContinue(result.user);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Google Login Failed:", err);
-            if (err?.code === 'auth/unauthorized-domain') {
+            const code = getErrorCode(err);
+            if (code === 'auth/unauthorized-domain') {
                 setError("This URL isn't authorized for Firebase Auth. Use the deployed site (Firebase Hosting) or add this domain in Firebase Console → Authentication → Settings → Authorized domains.");
-            } else if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/popup-closed-by-user') {
+            } else if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user') {
                 // Give a seamless fallback when a popup is blocked.
                 try {
                     await signInWithRedirect(auth, googleProvider);

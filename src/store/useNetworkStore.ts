@@ -1,0 +1,288 @@
+import { create } from 'zustand';
+import { Device, Alert, NetworkConnection, LayerKPI, DependencyPath } from '../types/network';
+import { devices as initialDevices, alerts as initialAlerts, connections as initialConnections, layerKPIs as initialKPIs, dependencyPaths as initialDependencyPaths } from '../data/mockData';
+
+interface NetworkState {
+    devices: Device[];
+    alerts: Alert[];
+    connections: NetworkConnection[];
+    layerKPIs: LayerKPI[];
+    dependencyPaths: DependencyPath[];
+
+    // Actions
+    setDevices: (devices: Device[]) => void;
+    updateDevice: (id: string, updates: Partial<Device>) => void;
+    setAlerts: (alerts: Alert[]) => void;
+    addAlert: (alert: Alert) => void;
+    setConnections: (connections: NetworkConnection[]) => void;
+    addDevice: (device: Device) => void;
+    addConnection: (connection: NetworkConnection) => void;
+    resetSystem: () => void;
+    injectFault: (type: 'l1' | 'l7') => void;
+}
+
+// Helper to clone avoiding mutation in simulated scenarios
+const cloneDevices = (source: Device[]) => source.map(d => ({
+    ...d,
+    metrics: {
+        ...d.metrics,
+        l1: { ...d.metrics.l1 },
+        l2: { ...d.metrics.l2 },
+        l3: { ...d.metrics.l3 },
+        l4: { ...d.metrics.l4 },
+        l5: { ...d.metrics.l5 },
+        l6: { ...d.metrics.l6 },
+        l7: { ...d.metrics.l7 },
+    }
+}));
+
+const cloneAlerts = (source: Alert[]) => source.map(a => ({
+    ...a,
+    timestamp: new Date(a.timestamp)
+}));
+
+const cloneConnections = (source: NetworkConnection[]) => source.map(c => ({ ...c }));
+
+export const useNetworkStore = create<NetworkState>((set) => ({
+    devices: cloneDevices(initialDevices),
+    alerts: cloneAlerts(initialAlerts),
+    connections: cloneConnections(initialConnections),
+    layerKPIs: [...initialKPIs],
+    dependencyPaths: [...initialDependencyPaths],
+
+    setDevices: (devices) => set({ devices }),
+    updateDevice: (id, updates) => set((state) => ({
+        devices: state.devices.map((d) => (d.id === id ? { ...d, ...updates } : d)),
+    })),
+    setAlerts: (alerts) => set({ alerts }),
+    addAlert: (alert) => set((state) => ({ alerts: [...state.alerts, alert] })),
+    setConnections: (connections) => set({ connections }),
+    addDevice: (device) => set((state) => ({ devices: [...state.devices, device] })),
+    addConnection: (connection) => set((state) => ({ connections: [...state.connections, connection] })),
+
+    resetSystem: () => {
+        set({
+            devices: cloneDevices(initialDevices),
+            alerts: cloneAlerts(initialAlerts),
+            connections: cloneConnections(initialConnections),
+            layerKPIs: [...initialKPIs],
+        });
+    },
+
+    injectFault: (type: 'l1' | 'l7') => {
+        // Replicate App.tsx logic: Reset to initial then apply fault.
+        const baseDevices = cloneDevices(initialDevices);
+        const baseAlerts = cloneAlerts(initialAlerts);
+        const baseConnections = cloneConnections(initialConnections);
+        const now = Date.now();
+
+        if (type === 'l1') {
+            const nextDevices = baseDevices.map((d): Device => {
+                if (d.id === 'd10') {
+                    return {
+                        ...d,
+                        status: 'critical',
+                        metrics: {
+                            ...d.metrics,
+                            l1: { ...d.metrics.l1, temperature: 78, opticalRxPower: -32 },
+                            l2: { ...d.metrics.l2, crcErrors: 980, linkUtilization: 0, macFlapping: true },
+                            l3: { ...d.metrics.l3, packetLoss: 18.5 },
+                            l4: { ...d.metrics.l4, tcpRetransmissions: 0.12, jitter: 85 },
+                            l5: { ...d.metrics.l5, sessionResets: 28, sessionStability: 82.1 },
+                            l7: { ...d.metrics.l7, appLatency: 1200, protocolAnomaly: true }
+                        }
+                    };
+                }
+
+                if (d.id === 'd5') {
+                    return {
+                        ...d,
+                        status: 'warning',
+                        metrics: {
+                            ...d.metrics,
+                            l3: { ...d.metrics.l3, packetLoss: 3.6 },
+                            l4: { ...d.metrics.l4, tcpRetransmissions: 0.08, jitter: 42 },
+                            l5: { ...d.metrics.l5, sessionResets: 7, sessionStability: 94.1 },
+                            l7: { ...d.metrics.l7, appLatency: 1400, protocolAnomaly: true }
+                        }
+                    };
+                }
+
+                if (d.id === 'd3') {
+                    return {
+                        ...d,
+                        status: 'critical',
+                        metrics: {
+                            ...d.metrics,
+                            l3: { ...d.metrics.l3, packetLoss: 9.2 },
+                            l4: { ...d.metrics.l4, tcpRetransmissions: 0.14, jitter: 65 },
+                            l5: { ...d.metrics.l5, sessionResets: 16, sessionStability: 78.4 },
+                            l7: { ...d.metrics.l7, appLatency: 3200, protocolAnomaly: true }
+                        }
+                    };
+                }
+
+                if (d.id === 'd6' || d.id === 'd7') {
+                    return {
+                        ...d,
+                        status: 'warning',
+                        metrics: {
+                            ...d.metrics,
+                            l2: { ...d.metrics.l2, crcErrors: Math.max(d.metrics.l2.crcErrors, 12) },
+                            l3: { ...d.metrics.l3, packetLoss: Math.max(d.metrics.l3.packetLoss, 4.8) },
+                            l7: { ...d.metrics.l7, appLatency: Math.max(d.metrics.l7.appLatency, 220), protocolAnomaly: true }
+                        }
+                    };
+                }
+
+                if (d.id === 'd1') {
+                    return {
+                        ...d,
+                        status: 'warning',
+                        metrics: {
+                            ...d.metrics,
+                            l3: { ...d.metrics.l3, packetLoss: 2.4, routingTableSize: d.metrics.l3.routingTableSize + 40 },
+                            l4: { ...d.metrics.l4, tcpRetransmissions: 0.04, jitter: 18 },
+                        }
+                    };
+                }
+
+                return d;
+            });
+
+            const nextConnections = baseConnections.map((c): NetworkConnection => {
+                if (c.id === 'c2') return { ...c, status: 'down', latency: 0, bandwidth: 0 };
+                if (c.id === 'c7' || c.id === 'c8' || c.id === 'c9') return { ...c, status: 'down', latency: 0, bandwidth: 0 };
+                if (c.id === 'c3') return { ...c, status: 'degraded', latency: 14, bandwidth: Math.max(120, Math.round(c.bandwidth * 0.6)) };
+                return c;
+            });
+
+            const simAlerts: Alert[] = [
+                {
+                    id: `sim-l1-${now}-a`,
+                    severity: 'critical',
+                    layer: 'L1',
+                    device: 'Hirschmann BOBCAT Switch',
+                    message: 'Fiber link down on Port 4 (Optical RX < -30 dBm) — physical disconnect suspected',
+                    timestamp: new Date(),
+                    aiCorrelation: 'Primary fault likely at L1. Expect secondary symptoms at L3 (loss) and L4 (timeouts) across OT cells.'
+                },
+                {
+                    id: `sim-l1-${now}-b`,
+                    severity: 'high',
+                    layer: 'L2',
+                    device: 'Hirschmann BOBCAT Switch',
+                    message: 'CRC error storm + MAC flapping detected — unstable physical medium',
+                    timestamp: new Date(),
+                    aiCorrelation: 'L2 anomalies coincide with L1 optical power drop; treat L3 alarms as downstream effects.'
+                },
+                {
+                    id: `sim-l1-${now}-c`,
+                    severity: 'high',
+                    layer: 'L3',
+                    device: 'Hirschmann DRAGON MACH4x00',
+                    message: 'Packet loss spike and route churn observed for Zone A/Zone B subnets',
+                    timestamp: new Date(),
+                    aiCorrelation: 'This can look like routing/firewall issues, but correlation points back to edge physical instability.'
+                },
+                {
+                    id: `sim-l1-${now}-d`,
+                    severity: 'high',
+                    layer: 'L4',
+                    device: 'Lion-M PLC Node A',
+                    message: 'TCP retransmissions/timeouts rising — control loop reliability degraded',
+                    timestamp: new Date(),
+                    aiCorrelation: 'Transport reliability degradation aligns with L1/L2 faults upstream of the PLC segment.'
+                },
+                {
+                    id: `sim-l1-${now}-e`,
+                    severity: 'high',
+                    layer: 'L7',
+                    device: 'SCADA Control Loop',
+                    message: 'SCADA command latency elevated; intermittent protocol anomalies',
+                    timestamp: new Date(),
+                    aiCorrelation: 'Application symptoms are secondary. Mitigate by restoring physical link and validating switch port optics.'
+                }
+            ];
+
+            set({
+                devices: nextDevices,
+                connections: nextConnections,
+                alerts: [...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))]
+            });
+
+        } else if (type === 'l7') {
+            const nextDevices = baseDevices.map((d): Device => {
+                if (d.id === 'd5') {
+                    return {
+                        ...d,
+                        status: 'warning',
+                        metrics: {
+                            ...d.metrics,
+                            l4: { ...d.metrics.l4, tcpRetransmissions: 0.06, jitter: 12 },
+                            l5: { ...d.metrics.l5, sessionResets: 12, sessionStability: 93.8 },
+                            l6: { ...d.metrics.l6, tlsHandshakeFailures: 6, encryptionOverheadMs: 7 },
+                            l7: { ...d.metrics.l7, appLatency: 5200, protocolAnomaly: true },
+                        }
+                    };
+                }
+
+                if (d.id === 'd3' || d.id === 'd4') {
+                    return {
+                        ...d,
+                        status: 'warning',
+                        metrics: {
+                            ...d.metrics,
+                            l4: { ...d.metrics.l4, tcpRetransmissions: Math.max(d.metrics.l4.tcpRetransmissions, 0.05), jitter: Math.max(d.metrics.l4.jitter, 22) },
+                            l5: { ...d.metrics.l5, sessionResets: Math.max(d.metrics.l5.sessionResets, 5), sessionStability: Math.min(d.metrics.l5.sessionStability, 95.5) },
+                            l7: { ...d.metrics.l7, appLatency: Math.max(d.metrics.l7.appLatency, 900) }
+                        }
+                    };
+                }
+
+                return d;
+            });
+
+            const nextConnections = baseConnections.map((c): NetworkConnection => {
+                if (c.id === 'c7') return { ...c, status: 'degraded', latency: 120, bandwidth: Math.max(80, Math.round(c.bandwidth * 0.4)) };
+                return c;
+            });
+
+            const simAlerts: Alert[] = [
+                {
+                    id: `sim-l7-${now}-a`,
+                    severity: 'high',
+                    layer: 'L7',
+                    device: 'SCADA Control Loop',
+                    message: 'Response time > 5000ms; command acknowledgements delayed',
+                    timestamp: new Date(),
+                    aiCorrelation: 'L1–L3 telemetry remains nominal; likely application/service-side contention or overloaded control runtime.'
+                },
+                {
+                    id: `sim-l7-${now}-b`,
+                    severity: 'medium',
+                    layer: 'L5',
+                    device: 'SCADA Control Loop',
+                    message: 'Session instability: frequent reconnects observed',
+                    timestamp: new Date(),
+                    aiCorrelation: 'Sessions reset due to delayed responses rather than transport loss. Validate SCADA service health and thread saturation.'
+                },
+                {
+                    id: `sim-l7-${now}-c`,
+                    severity: 'medium',
+                    layer: 'L4',
+                    device: 'Lion-M PLC Node A',
+                    message: 'Transport retries increasing (client-side timeouts)',
+                    timestamp: new Date(),
+                    aiCorrelation: 'Retries driven by slow application responses; lower layers are stable (no L1/L2 error storm).'
+                }
+            ];
+
+            set({
+                devices: nextDevices,
+                connections: nextConnections,
+                alerts: [...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))]
+            });
+        }
+    }
+}));

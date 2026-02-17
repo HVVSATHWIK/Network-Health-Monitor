@@ -2,6 +2,30 @@ import { useRef, useEffect, useState } from 'react';
 import { Activity, ScanLine } from 'lucide-react';
 import { Device } from '../types/network';
 
+const getFocusNodeIndexForType = (type: Device['type'] | undefined) => {
+  if (!type) return undefined;
+
+  // Map real devices to the conceptual flow nodes.
+  switch (type) {
+    case 'sensor':
+      return 0;
+    case 'switch':
+      return 1;
+    case 'plc':
+      return 3;
+    case 'gateway':
+    case 'router':
+    case 'firewall':
+      return 4;
+    case 'scada':
+      return 5;
+    case 'server':
+      return 6;
+    default:
+      return undefined;
+  }
+};
+
 interface DataFlowVisualizationProps {
   mode: 'default' | 'scan';
   // showControlsExternal?: boolean; // Removed
@@ -41,31 +65,7 @@ export default function DataFlowVisualization({
       size: number;
     }> = [];
 
-    const getFocusNodeIndex = (device: Device | null | undefined) => {
-      if (!device) return undefined;
-
-      // Map real devices to the conceptual flow nodes.
-      switch (device.type) {
-        case 'sensor':
-          return 0;
-        case 'switch':
-          return 1;
-        case 'plc':
-          return 3;
-        case 'gateway':
-        case 'router':
-        case 'firewall':
-          return 4;
-        case 'scada':
-          return 5;
-        case 'server':
-          return 6;
-        default:
-          return undefined;
-      }
-    };
-
-    const focusNodeIndex = getFocusNodeIndex(selectedDevice);
+    const focusNodeIndex = getFocusNodeIndexForType(selectedDevice?.type);
 
     // Vertical Tiered Layout (Bottom -> Up)
     const nodes = [
@@ -261,7 +261,7 @@ export default function DataFlowVisualization({
       cancelAnimationFrame(animationFrameId);
       scanIntervals.forEach((id) => window.clearTimeout(id));
     };
-  }, [transform, mode, selectedDevice?.id]); // Re-bind on transform/mode/selection change
+  }, [transform, mode, selectedDevice?.type]); // Re-bind on transform/mode/selection change
 
   // Mouse Handlers for Pan/Zoom
   const handleWheel = (e: React.WheelEvent) => {
@@ -307,7 +307,10 @@ export default function DataFlowVisualization({
           : 'Live IT/OT packet-path visualization across tiers'}
       </p>
 
-      <div className={`relative w-full h-80 overflow-hidden rounded-lg border shadow-inner cursor-move transition-colors duration-500 ${mode === 'scan' ? 'border-purple-500/50 bg-purple-900/10' : 'border-slate-700/50 bg-slate-950'}`}>
+      <div
+        id="data-flow-pan-zoom"
+        className={`relative w-full h-80 overflow-hidden rounded-lg border shadow-inner cursor-move transition-colors duration-500 ${mode === 'scan' ? 'border-purple-500/50 bg-purple-900/10' : 'border-slate-700/50 bg-slate-950'}`}
+      >
         <canvas
           ref={canvasRef}
           className="w-full h-full block"

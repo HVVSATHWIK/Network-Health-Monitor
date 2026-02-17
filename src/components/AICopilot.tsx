@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, X, Sparkles, AlertTriangle, Send, Search, Lock, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -19,9 +19,11 @@ interface AICopilotProps {
     isOpen?: boolean;
     alerts: Alert[];
     devices: Device[];
+    connections: import('../types/network').NetworkConnection[];
+    dependencyPaths: import('../types/network').DependencyPath[];
 }
 
-export default function AICopilot({ userName = "User", systemMessage, onOpenChange, isOpen = false, alerts, devices }: AICopilotProps) {
+export default function AICopilot({ userName = "User", systemMessage, onOpenChange, isOpen = false, alerts, devices, connections, dependencyPaths }: AICopilotProps) {
     // Chat State
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -58,14 +60,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
         scrollToBottom();
     }, [messages, isOpen]);
 
-    const handleSubmit = () => {
-        if (!inputValue.trim() || isProcessing) return;
-        const query = inputValue;
-        setInputValue("");
-        handleAnalysis(query);
-    };
-
-    const handleAnalysis = async (query: string) => {
+    const handleAnalysis = useCallback(async (query: string) => {
         if (isProcessing) return;
         setIsProcessing(true);
 
@@ -74,7 +69,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
 
         try {
             // 3. Run Analysis
-            const finalResponse = await analyzeWithMultiAgents(query, null, alerts, devices, () => { });
+            const finalResponse = await analyzeWithMultiAgents(query, null, alerts, devices, connections, dependencyPaths, () => { });
 
             // 4. Final Coordinator Response
             setMessages(prev => [...prev, {
@@ -82,7 +77,8 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                 role: 'ai',
                 text: typeof finalResponse === 'string' ? finalResponse : finalResponse.summary
             }]);
-        } catch (error) {
+        } catch (error: unknown) {
+            console.error(error);
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'ai',
@@ -91,7 +87,14 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
         }
 
         setIsProcessing(false);
-    };
+    }, [alerts, connections, dependencyPaths, devices, isProcessing]);
+
+    const handleSubmit = useCallback(() => {
+        if (!inputValue.trim() || isProcessing) return;
+        const query = inputValue;
+        setInputValue("");
+        handleAnalysis(query);
+    }, [handleAnalysis, inputValue, isProcessing]);
 
     // System Message Trigger
     useEffect(() => {
@@ -100,7 +103,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
             if (!isOpen && onOpenChange) onOpenChange(true);
             handleAnalysis(systemMessage);
         }
-    }, [systemMessage, isOpen, onOpenChange]);
+    }, [systemMessage, isOpen, onOpenChange, handleAnalysis]);
 
     const prompts = [
         { label: "Root Cause Check", icon: <Zap className="w-3 h-3 text-yellow-400" />, query: "Why did Line A stop at 10:00 AM?" },
@@ -169,14 +172,14 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                                 <ReactMarkdown
                                     remarkPlugins={[remarkGfm]}
                                     components={{
-                                        ul: ({ node, ...props }) => <ul className="list-disc list-inside space-y-1 ml-1" {...props} />,
-                                        ol: ({ node, ...props }) => <ol className="list-decimal list-inside space-y-1 ml-1" {...props} />,
-                                        h1: ({ node, ...props }) => <h1 className="text-lg font-bold mt-2 mb-1 text-indigo-200" {...props} />,
-                                        h2: ({ node, ...props }) => <h2 className="text-base font-bold mt-2 mb-1 text-indigo-100" {...props} />,
-                                        h3: ({ node, ...props }) => <h3 className="text-sm font-semibold mt-2 mb-1 text-slate-200" {...props} />,
-                                        strong: ({ node, ...props }) => <strong className="font-bold text-indigo-300" {...props} />,
-                                        p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
-                                        code: ({ node, ...props }) => <code className="bg-slate-700/50 rounded px-1 py-0.5 text-xs font-mono text-indigo-200" {...props} />,
+                                        ul: ({ node, ...props }) => { void node; return <ul className="list-disc list-inside space-y-1 ml-1" {...props} />; },
+                                        ol: ({ node, ...props }) => { void node; return <ol className="list-decimal list-inside space-y-1 ml-1" {...props} />; },
+                                        h1: ({ node, ...props }) => { void node; return <h1 className="text-lg font-bold mt-2 mb-1 text-indigo-200" {...props} />; },
+                                        h2: ({ node, ...props }) => { void node; return <h2 className="text-base font-bold mt-2 mb-1 text-indigo-100" {...props} />; },
+                                        h3: ({ node, ...props }) => { void node; return <h3 className="text-sm font-semibold mt-2 mb-1 text-slate-200" {...props} />; },
+                                        strong: ({ node, ...props }) => { void node; return <strong className="font-bold text-indigo-300" {...props} />; },
+                                        p: ({ node, ...props }) => { void node; return <p className="mb-2 last:mb-0" {...props} />; },
+                                        code: ({ node, ...props }) => { void node; return <code className="bg-slate-700/50 rounded px-1 py-0.5 text-xs font-mono text-indigo-200" {...props} />; },
                                     }}
                                 >
                                     {msg.text}

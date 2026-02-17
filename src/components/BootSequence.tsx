@@ -22,7 +22,7 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
                 { text: "ESTABLISHING SECURE CONNECTION (TLS 1.3)...", delay: 3000 },
             ];
 
-            let timeouts: NodeJS.Timeout[] = [];
+            const timeouts: Array<ReturnType<typeof window.setTimeout>> = [];
 
             // Log Sequence
             sequence.forEach((item) => {
@@ -72,7 +72,7 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
                 { text: "SYSTEM READY.", delay: 3000 }
             ];
 
-            let timeouts: NodeJS.Timeout[] = [];
+            const timeouts: Array<ReturnType<typeof window.setTimeout>> = [];
 
             sequence.forEach((item) => {
                 const t = setTimeout(() => {

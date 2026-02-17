@@ -1,7 +1,7 @@
-import { useRef, useEffect } from 'react';
 import { Device, NetworkConnection } from '../types/network'; // Added NetworkConnection
 // import AssetDetailPanel from './AssetDetailPanel'; // Removed - now global
 import { Server, Router, Box, Gauge, Activity, Cpu, Shield, Search } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface DeviceStatusProps {
   devices: Device[];
@@ -13,12 +13,10 @@ interface DeviceStatusProps {
 
 export default function DeviceStatus({
   devices,
-  connections = [],
   selectedDeviceId,
-  onSelectDevice,
-  onInjectFault
+  onSelectDevice
 }: DeviceStatusProps) {
-  const deviceIcons: Record<string, any> = {
+  const deviceIcons: Partial<Record<Device['type'], LucideIcon>> = {
     switch: Router,
     router: Router,
     plc: Cpu,
@@ -51,7 +49,7 @@ export default function DeviceStatus({
   }
 
   return (
-    <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-2xl h-full flex flex-col transition-all duration-300">
+    <div id="asset-status-panel" className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-2xl h-full flex flex-col transition-all duration-300">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-white tracking-wide">Asset Status</h2>
         <div className="p-2 bg-slate-800 rounded-full text-slate-400">

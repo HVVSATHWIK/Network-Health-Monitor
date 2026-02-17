@@ -10,6 +10,7 @@ import {
     Search,
     Zap,
     BarChart3,
+    Terminal,
     CheckCircle,
     Info
 } from 'lucide-react';
@@ -21,7 +22,7 @@ interface GuideStep {
     description: string;
     targetId: string | null;
     icon: React.ReactNode;
-    ensureView?: '3d' | 'analytics';
+    ensureView?: '3d' | 'analytics' | 'kpi' | 'logs';
 }
 
 export default function VisualGuide() {
@@ -36,6 +37,20 @@ export default function VisualGuide() {
             description: 'This interactive dashboard monitors network health in real-time across OSI Layers L1–L7. Click "Next" to learn how to navigate.',
             targetId: null,
             icon: <Info className="w-6 h-6 text-blue-400" />
+        },
+        {
+            id: 'timeRange',
+            title: 'Time Range',
+            description: 'Use this to filter alerts and health context to a recent window (or choose a custom absolute range).',
+            targetId: 'time-range-trigger',
+            icon: <Activity className="w-6 h-6 text-slate-200" />
+        },
+        {
+            id: 'import',
+            title: 'Import Telemetry',
+            description: 'Import a JSON telemetry batch to update device metrics via the ingestion pipeline (Device ID/IP/MAC supported).',
+            targetId: 'data-import-trigger',
+            icon: <Search className="w-6 h-6 text-slate-200" />
         },
         {
             id: 'controls',
@@ -53,6 +68,13 @@ export default function VisualGuide() {
             icon: <Play className="w-6 h-6 text-green-400" />
         },
         {
+            id: 'layerMenu',
+            title: 'Layer Menu',
+            description: 'Open the OSI Layer menu to jump into a layer-focused view (L1–L7) and drill down to affected assets.',
+            targetId: 'layer-menu-trigger',
+            icon: <Zap className="w-6 h-6 text-purple-300" />
+        },
+        {
             id: 'health',
             title: 'Network Health',
             description: 'Monitor the overall system health score here. It updates in real-time based on active alerts.',
@@ -68,11 +90,35 @@ export default function VisualGuide() {
             ensureView: '3d'
         },
         {
+            id: 'assetDetail',
+            title: 'Asset Detail Panel (Hidden)',
+            description: 'After you select an asset, a slide-in detail panel opens on the right with deep metrics and actions. Click the dark backdrop to close it.',
+            targetId: 'asset-detail-panel',
+            icon: <ChevronRight className="w-6 h-6 text-blue-300" />,
+            ensureView: '3d'
+        },
+        {
+            id: 'assets',
+            title: 'Asset Status',
+            description: 'Use this list to find critical/warning assets quickly and open the Asset Detail panel for actions and context.',
+            targetId: 'asset-status-panel',
+            icon: <Activity className="w-6 h-6 text-emerald-400" />,
+            ensureView: '3d'
+        },
+        {
             id: 'flow',
             title: 'Real-Time Data Flow',
             description: 'This panel visualizes packet flow across tiers. Selecting an asset focuses the flow to make the connection obvious.',
             targetId: 'data-flow-viz',
             icon: <Activity className="w-6 h-6 text-emerald-400" />,
+            ensureView: '3d'
+        },
+        {
+            id: 'flowPanZoom',
+            title: 'Pan + Zoom (Hidden)',
+            description: 'Inside the Data Flow canvas: drag to pan, use mouse-wheel/trackpad to zoom, and use Reset View if you lose the frame.',
+            targetId: 'data-flow-pan-zoom',
+            icon: <MousePointer2 className="w-6 h-6 text-slate-200" />,
             ensureView: '3d'
         },
         {
@@ -83,9 +129,23 @@ export default function VisualGuide() {
             icon: <BarChart3 className="w-6 h-6 text-yellow-400" />
         },
         {
+            id: 'kpiView',
+            title: 'KPI Intelligence',
+            description: 'Switch to KPI Intelligence for real-time KPI monitoring and deeper layer-aware metrics.',
+            targetId: 'view-kpi-trigger',
+            icon: <BarChart3 className="w-6 h-6 text-orange-400" />
+        },
+        {
+            id: 'logsView',
+            title: 'System Logs',
+            description: 'Switch to System Logs to view smart log streams and quickly search for error patterns.',
+            targetId: 'view-logs-trigger',
+            icon: <Terminal className="w-6 h-6 text-slate-200" />
+        },
+        {
             id: 'forensics',
             title: 'Forensic Cockpit',
-            description: 'Open the Forensic Cockpit to analyze alert streams, run root-cause investigation, and filter terminal logs (regex supported).',
+            description: 'Open the Forensic Cockpit to analyze alert streams. Hidden power tools: press Ctrl/Cmd+K for the command palette, and use regex filtering in the terminal view (e.g. error|refused|fail).',
             targetId: 'forensic-cockpit-trigger',
             icon: <Search className="w-6 h-6 text-blue-400" />
         },
@@ -133,7 +193,20 @@ export default function VisualGuide() {
             if (currentStep.ensureView) {
                 const targetExists = currentStep.targetId ? document.getElementById(currentStep.targetId) : true;
                 if (!targetExists) {
-                    const triggerId = currentStep.ensureView === '3d' ? 'view-3d-trigger' : 'view-analytics-trigger';
+                    const triggerId = (() => {
+                        switch (currentStep.ensureView) {
+                            case '3d':
+                                return 'view-3d-trigger';
+                            case 'analytics':
+                                return 'view-analytics-trigger';
+                            case 'kpi':
+                                return 'view-kpi-trigger';
+                            case 'logs':
+                                return 'view-logs-trigger';
+                            default:
+                                return 'view-3d-trigger';
+                        }
+                    })();
                     document.getElementById(triggerId)?.click();
                 }
             }
@@ -166,7 +239,7 @@ export default function VisualGuide() {
             window.removeEventListener('resize', updatePosition);
             window.removeEventListener('scroll', updatePosition);
         };
-    }, [currentStepIndex, isOpen, currentStep.targetId]);
+    }, [currentStepIndex, isOpen, currentStep.targetId, currentStep.ensureView]);
 
     const handleNext = () => {
         if (currentStepIndex < steps.length - 1) {

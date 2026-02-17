@@ -10,12 +10,12 @@ import {
     Wifi,
     ArrowRightLeft,
     AlertTriangle,
-    CheckCircle,
     Server,
     Router,
     Box,
     Share2
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface AssetDetailPanelProps {
     device: Device;
@@ -77,7 +77,7 @@ export default function AssetDetailPanel({
     }[device.status];
 
     // Helper for metrics rendering
-    const MetricCard = ({ icon: Icon, label, value, unit, trend }: any) => (
+    const MetricCard = ({ icon: Icon, label, value, unit, trend }: { icon: LucideIcon; label: string; value: string | number; unit: string; trend?: number }) => (
         <div className="bg-slate-900/50 border border-slate-700/50 p-3 rounded-xl flex flex-col gap-1 backdrop-blur-sm hover:border-slate-600 transition-colors">
             <div className="flex items-center gap-2 text-slate-400 mb-1">
                 <Icon className="w-4 h-4" />

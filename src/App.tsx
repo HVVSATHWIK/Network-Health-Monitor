@@ -9,10 +9,11 @@ import DataFlowVisualization from './components/DataFlowVisualization';
 import ForensicCockpit from './components/forensics/ForensicCockpit';
 import AICopilot from './components/AICopilot';
 
-import { devices as initialDevices, alerts as initialAlerts, connections as initialConnections, dependencyPaths, layerKPIs } from './data/mockData';
-import { Device, Alert, NetworkConnection } from './types/network';
+import { Device, NetworkConnection } from './types/network';
 import SmartLogPanel from './components/SmartLogPanel'; // Import SmartLogPanel
 import { smartLogs } from './data/smartLogs'; // Import mock logs
+import { useNetworkStore } from './store/useNetworkStore';
+import { NetworkSimulation } from './services/SimulationService';
 
 import VisualGuide from './components/VisualGuide';
 import BootSequence from './components/BootSequence';
@@ -26,14 +27,17 @@ import AssetDetailPanel from './components/AssetDetailPanel'; // Import AssetDet
 import { OTHealthCard } from './components/dashboard/OTHealthCard';
 import { NetworkLoadCard } from './components/dashboard/NetworkLoadCard';
 import { CorrelationTimelineCard } from './components/dashboard/CorrelationTimelineCard';
-import { TimeRangeSelector, TimeRange, PRESETS } from './components/dashboard/TimeRangeSelector';
+import { TimeRangeSelector } from './components/dashboard/TimeRangeSelector';
+import { TIME_RANGE_PRESETS, type TimeRange } from './components/dashboard/timeRangePresets';
+import { DataImporter } from './components/DataImporter';
+import RealTimeKPIPage from './components/kpi/RealTimeKPIPage';
 
 import { auth, db } from './firebase'; // Import db
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore'; // Import Firestore functions
 
 function App() {
-  const [activeView, setActiveView] = useState<'3d' | 'analytics' | 'layer' | 'logs'>('3d');
+  const [activeView, setActiveView] = useState<'3d' | 'analytics' | 'layer' | 'logs' | 'kpi'>('3d');
   const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   // const [showTour, setShowTour] = useState(true); // Replaced by VisualGuide
@@ -52,7 +56,7 @@ function App() {
   const [isNetMonitAIOpen, setIsNetMonitAIOpen] = useState(false);
 
   // Time Range State
-  const [timeRange, setTimeRange] = useState<TimeRange>(PRESETS[0]);
+  const [timeRange, setTimeRange] = useState<TimeRange>({ ...TIME_RANGE_PRESETS[0] });
 
   // Persistent Auth Listener
   useEffect(() => {
@@ -85,31 +89,22 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  const cloneDevices = (source: Device[]) => source.map(d => ({
-    ...d,
-    metrics: {
-      ...d.metrics,
-      l1: { ...d.metrics.l1 },
-      l2: { ...d.metrics.l2 },
-      l3: { ...d.metrics.l3 },
-      l4: { ...d.metrics.l4 },
-      l5: { ...d.metrics.l5 },
-      l6: { ...d.metrics.l6 },
-      l7: { ...d.metrics.l7 },
-    }
-  }));
+  // Lifecycle: Start/Stop Simulation
+  useEffect(() => {
+    NetworkSimulation.startSimulation(3000); // Update every 3 seconds
+    return () => NetworkSimulation.stopSimulation();
+  }, []);
 
-  const cloneAlerts = (source: Alert[]) => source.map(a => ({
-    ...a,
-    timestamp: new Date(a.timestamp)
-  }));
-
-  const cloneConnections = (source: NetworkConnection[]) => source.map(c => ({ ...c }));
-
-  // Dynamic State for Simulation
-  const [devices, setDevices] = useState<Device[]>(() => cloneDevices(initialDevices));
-  const [alerts, setAlerts] = useState<Alert[]>(() => cloneAlerts(initialAlerts));
-  const [connections, setConnections] = useState<NetworkConnection[]>(() => cloneConnections(initialConnections));
+  // Dynamic State for Simulation - MIGRATED TO ZUSTAND
+  const devices = useNetworkStore((state) => state.devices);
+  const alerts = useNetworkStore((state) => state.alerts);
+  const connections = useNetworkStore((state) => state.connections);
+  const layerKPIs = useNetworkStore((state) => state.layerKPIs);
+  const dependencyPaths = useNetworkStore((state) => state.dependencyPaths);
+  const addDevice = useNetworkStore((state) => state.addDevice);
+  const addConnection = useNetworkStore((state) => state.addConnection);
+  const resetSystem = useNetworkStore((state) => state.resetSystem);
+  const injectFault = useNetworkStore((state) => state.injectFault);
 
 
   const healthyDevices = devices.filter(d => d.status === 'healthy').length;
@@ -146,6 +141,7 @@ function App() {
   });
 
   const handleLogin = (user: string, _org: string) => {
+    void _org;
     setUserName(user);
     // setOrganization(org); // Removed
     setIsLoggedIn(true);
@@ -224,236 +220,19 @@ function App() {
 
   // Fault Injection Logic
   const handleInjectFault = (type: 'l1' | 'l7') => {
-    const baseDevices = cloneDevices(initialDevices);
-    const baseAlerts = cloneAlerts(initialAlerts);
-    const baseConnections = cloneConnections(initialConnections);
-    const now = Date.now();
+    injectFault(type);
 
-    if (type === 'l1') {
-      // Scenario: L1 physical failure on Access Switch (BOBCAT) that manifests as L3/L4/L7 symptoms.
-      const nextDevices: Device[] = baseDevices.map((d): Device => {
-        if (d.id === 'd10') {
-          return {
-            ...d,
-            status: 'critical',
-            metrics: {
-              ...d.metrics,
-              l1: { ...d.metrics.l1, temperature: 78, opticalRxPower: -32 },
-              l2: { ...d.metrics.l2, crcErrors: 980, linkUtilization: 0, macFlapping: true },
-              l3: { ...d.metrics.l3, packetLoss: 18.5 },
-              l4: { ...d.metrics.l4, tcpRetransmissions: 0.12, jitter: 85 },
-              l5: { ...d.metrics.l5, sessionResets: 28, sessionStability: 82.1 },
-              l7: { ...d.metrics.l7, appLatency: 1200, protocolAnomaly: true }
-            }
-          };
-        }
-
-        // Downstream production impact
-        if (d.id === 'd5') {
-          return {
-            ...d,
-            status: 'warning',
-            metrics: {
-              ...d.metrics,
-              l3: { ...d.metrics.l3, packetLoss: 3.6 },
-              l4: { ...d.metrics.l4, tcpRetransmissions: 0.08, jitter: 42 },
-              l5: { ...d.metrics.l5, sessionResets: 7, sessionStability: 94.1 },
-              l7: { ...d.metrics.l7, appLatency: 1400, protocolAnomaly: true }
-            }
-          };
-        }
-
-        if (d.id === 'd3') {
-          return {
-            ...d,
-            status: 'critical',
-            metrics: {
-              ...d.metrics,
-              l3: { ...d.metrics.l3, packetLoss: 9.2 },
-              l4: { ...d.metrics.l4, tcpRetransmissions: 0.14, jitter: 65 },
-              l5: { ...d.metrics.l5, sessionResets: 16, sessionStability: 78.4 },
-              l7: { ...d.metrics.l7, appLatency: 3200, protocolAnomaly: true }
-            }
-          };
-        }
-
-        if (d.id === 'd6' || d.id === 'd7') {
-          return {
-            ...d,
-            status: 'warning',
-            metrics: {
-              ...d.metrics,
-              l2: { ...d.metrics.l2, crcErrors: Math.max(d.metrics.l2.crcErrors, 12) },
-              l3: { ...d.metrics.l3, packetLoss: Math.max(d.metrics.l3.packetLoss, 4.8) },
-              l7: { ...d.metrics.l7, appLatency: Math.max(d.metrics.l7.appLatency, 220), protocolAnomaly: true }
-            }
-          };
-        }
-
-        if (d.id === 'd1') {
-          // Core switch shows routing/transport symptoms even though root cause is L1 edge.
-          return {
-            ...d,
-            status: 'warning',
-            metrics: {
-              ...d.metrics,
-              l3: { ...d.metrics.l3, packetLoss: 2.4, routingTableSize: d.metrics.l3.routingTableSize + 40 },
-              l4: { ...d.metrics.l4, tcpRetransmissions: 0.04, jitter: 18 },
-            }
-          };
-        }
-
-        return d;
-      });
-
-      const nextConnections: NetworkConnection[] = baseConnections.map((c): NetworkConnection => {
-        if (c.id === 'c2') return { ...c, status: 'down', latency: 0, bandwidth: 0 };
-        if (c.id === 'c7' || c.id === 'c8' || c.id === 'c9') return { ...c, status: 'down', latency: 0, bandwidth: 0 };
-        if (c.id === 'c3') return { ...c, status: 'degraded', latency: 14, bandwidth: Math.max(120, Math.round(c.bandwidth * 0.6)) };
-        return c;
-      });
-
-      const simAlerts: Alert[] = [
-        {
-          id: `sim-l1-${now}-a`,
-          severity: 'critical',
-          layer: 'L1',
-          device: 'Hirschmann BOBCAT Switch',
-          message: 'Fiber link down on Port 4 (Optical RX < -30 dBm) — physical disconnect suspected',
-          timestamp: new Date(),
-          aiCorrelation: 'Primary fault likely at L1. Expect secondary symptoms at L3 (loss) and L4 (timeouts) across OT cells.'
-        },
-        {
-          id: `sim-l1-${now}-b`,
-          severity: 'high',
-          layer: 'L2',
-          device: 'Hirschmann BOBCAT Switch',
-          message: 'CRC error storm + MAC flapping detected — unstable physical medium',
-          timestamp: new Date(),
-          aiCorrelation: 'L2 anomalies coincide with L1 optical power drop; treat L3 alarms as downstream effects.'
-        },
-        {
-          id: `sim-l1-${now}-c`,
-          severity: 'high',
-          layer: 'L3',
-          device: 'Hirschmann DRAGON MACH4x00',
-          message: 'Packet loss spike and route churn observed for Zone A/Zone B subnets',
-          timestamp: new Date(),
-          aiCorrelation: 'This can look like routing/firewall issues, but correlation points back to edge physical instability.'
-        },
-        {
-          id: `sim-l1-${now}-d`,
-          severity: 'high',
-          layer: 'L4',
-          device: 'Lion-M PLC Node A',
-          message: 'TCP retransmissions/timeouts rising — control loop reliability degraded',
-          timestamp: new Date(),
-          aiCorrelation: 'Transport reliability degradation aligns with L1/L2 faults upstream of the PLC segment.'
-        },
-        {
-          id: `sim-l1-${now}-e`,
-          severity: 'high',
-          layer: 'L7',
-          device: 'SCADA Control Loop',
-          message: 'SCADA command latency elevated; intermittent protocol anomalies',
-          timestamp: new Date(),
-          aiCorrelation: 'Application symptoms are secondary. Mitigate by restoring physical link and validating switch port optics.'
-        }
-      ];
-
-      setDevices(nextDevices);
-      setConnections(nextConnections);
-      setAlerts([...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))]);
-      return;
-    }
-
-    if (type === 'l7') {
-      // Scenario: L7 server-side latency/timeout with clean lower layers.
-      const nextDevices: Device[] = baseDevices.map((d): Device => {
-        if (d.id === 'd5') {
-          return {
-            ...d,
-            status: 'warning',
-            metrics: {
-              ...d.metrics,
-              l4: { ...d.metrics.l4, tcpRetransmissions: 0.06, jitter: 12 },
-              l5: { ...d.metrics.l5, sessionResets: 12, sessionStability: 93.8 },
-              l6: { ...d.metrics.l6, tlsHandshakeFailures: 6, encryptionOverheadMs: 7 },
-              l7: { ...d.metrics.l7, appLatency: 5200, protocolAnomaly: true },
-            }
-          };
-        }
-
-        if (d.id === 'd3' || d.id === 'd4') {
-          // Controllers perceive lag but physical layer stays healthy.
-          return {
-            ...d,
-            status: 'warning',
-            metrics: {
-              ...d.metrics,
-              l4: { ...d.metrics.l4, tcpRetransmissions: Math.max(d.metrics.l4.tcpRetransmissions, 0.05), jitter: Math.max(d.metrics.l4.jitter, 22) },
-              l5: { ...d.metrics.l5, sessionResets: Math.max(d.metrics.l5.sessionResets, 5), sessionStability: Math.min(d.metrics.l5.sessionStability, 95.5) },
-              l7: { ...d.metrics.l7, appLatency: Math.max(d.metrics.l7.appLatency, 900) }
-            }
-          };
-        }
-
-        return d;
-      });
-
-      const nextConnections: NetworkConnection[] = baseConnections.map((c): NetworkConnection => {
-        if (c.id === 'c7') return { ...c, status: 'degraded', latency: 120, bandwidth: Math.max(80, Math.round(c.bandwidth * 0.4)) };
-        return c;
-      });
-
-      const simAlerts: Alert[] = [
-        {
-          id: `sim-l7-${now}-a`,
-          severity: 'high',
-          layer: 'L7',
-          device: 'SCADA Control Loop',
-          message: 'Response time > 5000ms; command acknowledgements delayed',
-          timestamp: new Date(),
-          aiCorrelation: 'L1–L3 telemetry remains nominal; likely application/service-side contention or overloaded control runtime.'
-        },
-        {
-          id: `sim-l7-${now}-b`,
-          severity: 'medium',
-          layer: 'L5',
-          device: 'SCADA Control Loop',
-          message: 'Session instability: frequent reconnects observed',
-          timestamp: new Date(),
-          aiCorrelation: 'Sessions reset due to delayed responses rather than transport loss. Validate SCADA service health and thread saturation.'
-        },
-        {
-          id: `sim-l7-${now}-c`,
-          severity: 'medium',
-          layer: 'L4',
-          device: 'Lion-M PLC Node A',
-          message: 'Transport retries increasing (client-side timeouts)',
-          timestamp: new Date(),
-          aiCorrelation: 'Retries driven by slow application responses; lower layers are stable (no L1/L2 error storm).'
-        }
-      ];
-
-      setDevices(nextDevices);
-      setConnections(nextConnections);
-      setAlerts([...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))]);
-      return;
-    }
-    // AI Reaction
+    // AI Reaction - Legacy
     // setAiMessage(`Alert Detected: ${type.toUpperCase()} Anomaly. Analyzing root cause...`); // Removed
   };
 
   const handleReset = () => {
-    setDevices(cloneDevices(initialDevices));
-    setAlerts(cloneAlerts(initialAlerts));
-    setConnections(cloneConnections(initialConnections));
+    resetSystem();
     // setAiMessage("System Reset. Telemetry metrics normalized."); // Removed
   };
 
   const handleAddDevice = (newDevice: Device, parentId?: string) => {
-    setDevices(prev => [...prev, newDevice]);
+    addDevice(newDevice);
 
     if (parentId) {
       const newConnection: NetworkConnection = {
@@ -464,7 +243,7 @@ function App() {
         bandwidth: 1000, // Default 1Gbps
         latency: 1,      // Default 1ms
       };
-      setConnections(prev => [...prev, newConnection]);
+      addConnection(newConnection);
     }
   };
 
@@ -488,6 +267,7 @@ function App() {
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-center gap-3 shrink-0">
               <button
+                id="layer-menu-trigger"
                 onClick={() => setIsMenuOpen(true)}
                 className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
               >
@@ -502,6 +282,9 @@ function App() {
 
             <div className="flex flex-wrap items-center gap-3 xl:justify-end">
               <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+
+              {/* Data Import */}
+              <DataImporter />
 
               {/* Simulation Trigger */}
               <button
@@ -590,11 +373,11 @@ function App() {
 
       {/* Global Device Detail Overlay */}
       {selectedDeviceId && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-end animate-in fade-in duration-200">
+        <div id="asset-detail-overlay" className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-end animate-in fade-in duration-200">
           {/* Click backdrop to close */}
           <div className="absolute inset-0" onClick={() => setSelectedDeviceId(null)}></div>
 
-          <div className="w-full max-w-lg h-full bg-slate-900 border-l border-slate-700 shadow-2xl relative z-10 animate-in slide-in-from-right duration-300">
+          <div id="asset-detail-panel" className="w-full max-w-lg h-full bg-slate-900 border-l border-slate-700 shadow-2xl relative z-10 animate-in slide-in-from-right duration-300">
             <AssetDetailPanel
               device={devices.find(d => d.id === selectedDeviceId)!}
               connections={connections}
@@ -632,6 +415,17 @@ function App() {
               }`}
           >
             Analytics
+          </button>
+          <button
+            id="view-kpi-trigger"
+            onClick={() => setActiveView('kpi')}
+            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeView === 'kpi'
+              ? 'bg-orange-600 text-white shadow-lg'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+          >
+            <Activity className="w-4 h-4" />
+            KPI Intelligence
           </button>
           <button
             id="view-logs-trigger"
@@ -723,6 +517,14 @@ function App() {
         }
 
         {
+          activeView === 'kpi' && (
+            <div className="h-[calc(100vh-140px)]">
+              <RealTimeKPIPage />
+            </div>
+          )
+        }
+
+        {
           activeView === 'logs' && (
             <div className="h-[calc(100vh-140px)]">
               <SmartLogPanel logs={smartLogs} />
@@ -764,6 +566,8 @@ function App() {
         userName={userName}
         alerts={filteredAlerts}
         devices={devices}
+        connections={connections}
+        dependencyPaths={dependencyPaths}
         isOpen={isNetMonitAIOpen}
         onOpenChange={setIsNetMonitAIOpen}
       />

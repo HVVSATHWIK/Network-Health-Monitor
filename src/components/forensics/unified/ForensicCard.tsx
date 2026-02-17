@@ -36,7 +36,7 @@ export const ForensicCard: React.FC<ForensicCardProps> = ({ alert, device, devic
                 } else {
                     setReport(res);
                 }
-            } catch (e) {
+            } catch {
                 if (cancelled) return;
                 setAnalysisText('Analysis failed to run.');
             } finally {
@@ -48,7 +48,7 @@ export const ForensicCard: React.FC<ForensicCardProps> = ({ alert, device, devic
         return () => {
             cancelled = true;
         };
-    }, [alert.id, alert.layer, alert.message, devices]);
+    }, [alert, devices]);
 
     const severityBadge = useMemo(() => {
         switch (report?.criticality ?? 'low') {
@@ -107,7 +107,7 @@ export const ForensicCard: React.FC<ForensicCardProps> = ({ alert, device, devic
         });
         lines.push(`[${new Date().toLocaleTimeString()}] ${report.criticality === 'extreme' || report.criticality === 'high' ? 'ERROR' : 'INFO'}: SUMMARY ${report.summary}`);
         return lines.join('\n') + '\n';
-    }, [alert.device, alert.id, alert.layer, alert.severity, analysisText, isAnalyzing, report]);
+    }, [alert.device, alert.id, alert.layer, alert.message, alert.severity, analysisText, isAnalyzing, report]);
 
     return (
         <div className="w-full overflow-hidden rounded-xl border border-gunmetal-600 bg-gunmetal-800 shadow-2xl ring-1 ring-white/5 animate-in fade-in zoom-in-95 duration-300 my-8">

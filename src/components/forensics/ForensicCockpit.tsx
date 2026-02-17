@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, ShieldAlert, Terminal, Activity, Play } from 'lucide-react';
 import { analyzeWithMultiAgents, ForensicReport } from '../../utils/aiLogic';
@@ -6,6 +6,27 @@ import { Alert, Device } from '../../types/network';
 import OTDRTrace from './visualizations/OTDRTrace';
 import LatencyHistogram from './visualizations/LatencyHistogram';
 import InvestigationStream from './InvestigationStream';
+
+type OTDRPoint = { distance: number; signal: number };
+type LatencyHistogramBin = { range: string; count: number; bin: number };
+
+const isOTDRData = (data: unknown): data is OTDRPoint[] => {
+    if (!Array.isArray(data)) return false;
+    return data.every((item) => {
+        if (typeof item !== 'object' || item === null) return false;
+        const rec = item as Record<string, unknown>;
+        return typeof rec.distance === 'number' && typeof rec.signal === 'number';
+    });
+};
+
+const isLatencyHistogramData = (data: unknown): data is LatencyHistogramBin[] => {
+    if (!Array.isArray(data)) return false;
+    return data.every((item) => {
+        if (typeof item !== 'object' || item === null) return false;
+        const rec = item as Record<string, unknown>;
+        return typeof rec.range === 'string' && typeof rec.count === 'number' && typeof rec.bin === 'number';
+    });
+};
 
 interface ForensicCockpitProps {
     alerts: Alert[];
@@ -21,14 +42,7 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
     const [report, setReport] = useState<ForensicReport | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-    // Auto-trigger analysis if system message implies it
-    useEffect(() => {
-        if (systemMessage && isOpen) {
-            handleScan(systemMessage);
-        }
-    }, [systemMessage, isOpen]);
-
-    const handleScan = async (prompt: string) => {
+    const handleScan = useCallback(async (prompt: string) => {
         if (isAnalyzing) return;
         setQuery(prompt);
         setIsAnalyzing(true);
@@ -69,7 +83,14 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
             console.error(e);
             setIsAnalyzing(false);
         }
-    };
+    }, [alerts, devices, isAnalyzing]);
+
+    // Auto-trigger analysis if system message implies it
+    useEffect(() => {
+        if (systemMessage && isOpen) {
+            void handleScan(systemMessage);
+        }
+    }, [handleScan, systemMessage, isOpen]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') handleScan(query);
@@ -179,8 +200,20 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
                                 <div className="flex flex-col gap-6">
                                     {report.artifacts.map((artifact, i) => (
                                         <div key={i} className="animate-in slide-in-from-bottom-5 fade-in duration-500 delay-100">
-                                            {artifact.type === 'otdr' && <OTDRTrace data={artifact.data} title={artifact.title} description={artifact.description} />}
-                                            {artifact.type === 'latency_histogram' && <LatencyHistogram data={artifact.data} title={artifact.title} description={artifact.description} />}
+                                            {artifact.type === 'otdr' && (
+                                                <OTDRTrace
+                                                    data={isOTDRData(artifact.data) ? artifact.data : []}
+                                                    title={artifact.title}
+                                                    description={artifact.description}
+                                                />
+                                            )}
+                                            {artifact.type === 'latency_histogram' && (
+                                                <LatencyHistogram
+                                                    data={isLatencyHistogramData(artifact.data) ? artifact.data : []}
+                                                    title={artifact.title}
+                                                    description={artifact.description}
+                                                />
+                                            )}
                                             {artifact.type === 'json_log' && (
                                                 <div className="font-mono text-[10px] bg-[#0B0C10] border border-[#1F2833] p-4 text-[#C5C6C7]">
                                                     <pre>{JSON.stringify(artifact.data, null, 2)}</pre>

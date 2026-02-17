@@ -41,6 +41,7 @@ export interface Device {
     };
   };
   ip: string;
+  mac?: string;
   location: string;
   manufacturer?: string;
 }
@@ -162,4 +163,49 @@ export interface SmartFailureEvent {
     alertCount: number;
     keyMetrics: Record<string, number>;
   };
+}
+
+// --- AI Relationship Engine Types ---
+
+export interface EvidencePack {
+  triggeringAlertId: string;
+  rootLayer: string;
+  affectedMetrics: string[];
+  timestampWindow: {
+    firstAnomaly: number;
+    lastEscalation: number;
+  };
+  logSnippets?: string[]; // Optional for real logs
+}
+
+export interface ImpactAnalysis {
+  technical: string[];
+  operational: string[];
+  impactedDeviceIds: string[];
+  affectedWorkflows: string[];
+}
+
+export interface CausalChain {
+  id: string;
+  confidenceScore: number;
+  confidenceReason: string;
+  diagnosisType: 'RootCause' | 'Ambiguous' | 'Isolated';
+
+  primaryFault: {
+    device: string;
+    layer: string;
+    reason: string;
+  };
+
+  propagation: {
+    upstreamDevice: string;
+    downstreamDevice: string;
+    depth: number;
+  }[];
+
+  impact: ImpactAnalysis;
+  evidence: EvidencePack;
+
+  possibleCauses?: string[]; // For ambiguous cases
+  summary: string; // NLP-ready summary
 }

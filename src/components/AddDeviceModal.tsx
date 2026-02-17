@@ -95,7 +95,7 @@ export default function AddDeviceModal({ onClose, onAdd, devices }: AddDeviceMod
                                     <button
                                         key={t.value}
                                         type="button"
-                                        onClick={() => setType(t.value as any)}
+                                        onClick={() => setType(t.value as Device['type'])}
                                         className={`flex items-center gap-2 p-2 rounded-lg text-sm border transition-all ${type === t.value
                                             ? 'bg-blue-600/20 border-blue-500 text-blue-200'
                                             : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
