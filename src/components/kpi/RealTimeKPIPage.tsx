@@ -6,7 +6,7 @@ import TrendAnalysisGraph from './TrendAnalysisGraph';
 
 const RealTimeKPIPage = () => {
     return (
-        <div className="h-full w-full p-6 pb-24 bg-gunmetal-950 text-gunmetal-100 overflow-y-auto custom-scrollbar">
+        <div className="h-full w-full p-6 lg:pr-28 pb-28 bg-gunmetal-950 text-gunmetal-100 overflow-y-auto custom-scrollbar">
             {/* Page Header */}
             <div className="mb-8">
                 <h1 className="text-3xl font-sans font-bold text-gunmetal-100 mb-2 tracking-tight">NetMonit AI: KPI Intelligence</h1>
