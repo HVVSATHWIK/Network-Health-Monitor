@@ -43,6 +43,13 @@ import { auth, db } from './firebase'; // Import db
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore'; // Import Firestore functions
 
+const getFirebaseErrorCode = (error: unknown): string | undefined => {
+  if (!error || typeof error !== 'object') return undefined;
+  const record = error as Record<string, unknown>;
+  const code = record.code;
+  return typeof code === 'string' ? code : undefined;
+};
+
 function App() {
   const [activeView, setActiveView] = useState<'3d' | 'analytics' | 'layer' | 'logs' | 'kpi'>('3d');
   const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
@@ -71,6 +78,7 @@ function App() {
       if (user) {
         // User is signed in
         setIsLoggedIn(true);
+        setUserName(user.displayName || user.email || 'Authenticated User');
 
         // Try to fetch user profile from Firestore
         try {
@@ -81,7 +89,12 @@ function App() {
             if (data.name) setUserName(data.name);
           }
         } catch (error) {
-          console.error("Error fetching user profile:", error);
+          const code = getFirebaseErrorCode(error);
+          if (code === 'permission-denied') {
+            console.warn('Firestore users profile read denied by security rules. Using auth profile fallback.');
+          } else {
+            console.error("Error fetching user profile:", error);
+          }
         }
 
         // If it's a fresh login (no profile yet), we might rely on handleLogin to set defaults/write content
@@ -250,7 +263,12 @@ function App() {
             name: name
           }, { merge: true });
         } catch (e) {
-          console.error("Error saving terminal name:", e);
+          const code = getFirebaseErrorCode(e);
+          if (code === 'permission-denied') {
+            console.warn('Firestore users profile write denied by security rules.');
+          } else {
+            console.error("Error saving terminal name:", e);
+          }
         }
       }
     }

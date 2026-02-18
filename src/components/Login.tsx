@@ -22,6 +22,12 @@ const getErrorCode = (err: unknown): string | undefined => {
     return typeof code === 'string' ? code : code != null ? String(code) : undefined;
 };
 
+const buildUnauthorizedDomainError = () => {
+    const currentHost = typeof window !== 'undefined' ? window.location.host : 'unknown-host';
+    const configuredAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'not-configured';
+    return `This URL isn't authorized for Firebase Auth. Current host: ${currentHost}. Configured auth domain: ${configuredAuthDomain}. Add \"${currentHost}\" in Firebase Console -> Authentication -> Settings -> Authorized domains, then hard refresh and retry.`;
+};
+
 export default function Login({ onLogin }: LoginProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [isRegistering, setIsRegistering] = useState(false); // Toggle state
@@ -73,7 +79,7 @@ export default function Login({ onLogin }: LoginProps) {
                 console.error("Google Redirect Login Failed:", err);
                 const code = getErrorCode(err);
                 if (code === 'auth/unauthorized-domain') {
-                    setError("This URL isn't authorized for Firebase Auth. Use the deployed site (Firebase Hosting) or add this domain in Firebase Console → Authentication → Settings → Authorized domains.");
+                    setError(buildUnauthorizedDomainError());
                 } else {
                     setError("SSO Authorization failed.");
                 }
@@ -144,7 +150,7 @@ export default function Login({ onLogin }: LoginProps) {
             console.error("Google Login Failed:", err);
             const code = getErrorCode(err);
             if (code === 'auth/unauthorized-domain') {
-                setError("This URL isn't authorized for Firebase Auth. Use the deployed site (Firebase Hosting) or add this domain in Firebase Console → Authentication → Settings → Authorized domains.");
+                setError(buildUnauthorizedDomainError());
             } else if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user') {
                 // Give a seamless fallback when a popup is blocked.
                 try {
