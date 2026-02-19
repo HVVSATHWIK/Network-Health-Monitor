@@ -1,4 +1,4 @@
-import { Activity, Shield, Play, Signal, Terminal, Bot, Menu, Boxes, LineChart, Gauge } from 'lucide-react';
+import { Activity, Shield, Play, Terminal, Bot, Menu, Boxes, LineChart, Gauge } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import AlertPanel from './components/AlertPanel';
 import DeviceStatus from './components/DeviceStatus';
@@ -35,8 +35,6 @@ import RealTimeKPIPage from './components/kpi/RealTimeKPIPage';
 import {
   analyzeWithMultiAgents,
   buildAIMonitoringSnapshot,
-  getAIQuotaStatus,
-  type AIQuotaStatus,
 } from './utils/aiLogic';
 
 import { auth, db } from './firebase'; // Import db
@@ -126,7 +124,6 @@ function App() {
   const setAlerts = useNetworkStore((state) => state.setAlerts);
   const resetSystem = useNetworkStore((state) => state.resetSystem);
   const injectFault = useNetworkStore((state) => state.injectFault);
-  const [aiQuotaStatus, setAiQuotaStatus] = useState<AIQuotaStatus>(() => getAIQuotaStatus());
   const [aiMonitoringTimeline, setAiMonitoringTimeline] = useState<AIMonitoringEvent[]>([]);
   const aiEnrichmentInFlight = useRef(false);
 
@@ -135,13 +132,6 @@ function App() {
   const totalDevices = devices.length;
   const healthPercentage = Math.round((healthyDevices / totalDevices) * 100);
   const aiMonitoringSnapshot = buildAIMonitoringSnapshot(alerts, devices, connections, layerKPIs, dependencyPaths);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setAiQuotaStatus(getAIQuotaStatus());
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     if (aiEnrichmentInFlight.current) return;
@@ -372,27 +362,25 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30 overflow-x-hidden">
-      <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 shadow-2xl">
+      <header className="sticky top-0 z-50 bg-slate-950/82 backdrop-blur-xl border-b border-slate-800/90">
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 py-3">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <div className="flex items-center gap-3 shrink-0">
               <button
                 id="layer-menu-trigger"
                 onClick={() => setIsMenuOpen(true)}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                className="h-10 w-10 inline-flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-lg transition-colors border border-transparent hover:border-slate-700"
               >
-                <Menu className="w-6 h-6" />
+                <Menu className="w-5 h-5" />
               </button>
-              <img src="/favicon.svg" alt="NetMonit network monitoring system logo" className="w-12 h-12" />
+              <img src="/favicon.svg" alt="NetMonit network monitoring system logo" className="w-11 h-11" />
               <div>
-                <h1 className="text-2xl font-bold">NetMonit</h1>
-                <p className="text-sm text-slate-300">Network Monitoring System</p>
+                <h1 className="text-[1.55rem] font-semibold tracking-tight text-slate-100">NetMonit</h1>
+                <p className="text-xs text-slate-400 font-medium tracking-wide">Network Monitoring System</p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 xl:justify-end">
-              <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
-
+            <div className="flex flex-wrap items-center gap-2 2xl:justify-end">
               {/* Data Import */}
               <DataImporter />
 
@@ -400,9 +388,9 @@ function App() {
               <button
                 id="diagnostic-scan-trigger"
                 onClick={runSimulation}
-                className={`whitespace-nowrap flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full shadow-lg transition-all text-sm font-bold ${visualMode === 'scan'
-                  ? 'opacity-90'
-                  : 'hover:from-purple-500 hover:to-blue-500'
+                className={`h-10 whitespace-nowrap inline-flex items-center gap-2 px-4 bg-indigo-600 text-white rounded-lg shadow-sm border border-indigo-500/60 transition-all text-sm font-semibold ${visualMode === 'scan'
+                  ? 'opacity-95'
+                  : 'hover:bg-indigo-500'
                   }`}
               >
                 <Play className={`w-4 h-4 fill-current ${visualMode === 'scan' ? 'animate-pulse' : ''}`} />
@@ -412,7 +400,7 @@ function App() {
               <button
                 id="forensic-cockpit-trigger"
                 onClick={() => setIsCopilotOpen(true)}
-                className="whitespace-nowrap flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full shadow-lg transition-all text-sm font-semibold"
+                className="h-10 whitespace-nowrap inline-flex items-center gap-2 px-3.5 bg-slate-900/70 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-lg transition-all text-sm font-medium"
               >
                 <Terminal className="w-4 h-4" />
                 <span>Forensic Cockpit</span>
@@ -421,70 +409,43 @@ function App() {
               <button
                 id="netmonit-ai-trigger"
                 onClick={() => setIsNetMonitAIOpen(true)}
-                className="whitespace-nowrap flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-full shadow-lg transition-all text-sm font-semibold"
+                className="h-10 whitespace-nowrap inline-flex items-center gap-2 px-3.5 bg-slate-900/70 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-lg transition-all text-sm font-medium"
               >
                 <Bot className="w-4 h-4" />
                 <span>NetMonit AI</span>
               </button>
 
-              <div id="network-health-badge" className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg whitespace-nowrap">
-                <Shield className="w-5 h-5 text-green-400" />
+              <div id="network-health-badge" className="hidden md:flex items-center gap-2 bg-slate-900/70 border border-slate-700 px-3 py-1.5 rounded-lg whitespace-nowrap">
+                <Shield className="w-4 h-4 text-green-400" />
                 <div>
-                  <div className="text-xs text-slate-400">Network Health</div>
-                  <div className={`text-lg font-bold ${healthPercentage < 90 ? 'text-red-400' : 'text-green-400'}`}>{healthPercentage}%</div>
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wider">Health</div>
+                  <div className={`text-sm font-bold ${healthPercentage < 90 ? 'text-red-400' : 'text-green-400'}`}>{healthPercentage}%</div>
                 </div>
               </div>
 
-              <div id="ai-monitor-badge" className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg whitespace-nowrap border border-slate-700">
-                <Bot className="w-5 h-5 text-indigo-400" />
+              <div id="ai-monitor-badge" className="hidden xl:flex items-center gap-2 bg-slate-900/70 px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
+                <Bot className="w-4 h-4 text-indigo-400" />
                 <div>
-                  <div className="text-xs text-slate-400">AI Coverage</div>
-                  <div className="text-sm font-bold text-indigo-300">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wider">AI Coverage</div>
+                  <div className="text-xs font-semibold text-indigo-300">
                     {aiMonitoringSnapshot.monitoredLayers.length}/7 layers · {aiMonitoringSnapshot.monitoredDevices} assets
                   </div>
                 </div>
               </div>
 
-              <div id="ai-quota-badge" className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg whitespace-nowrap border border-slate-700">
-                <Signal className={`w-4 h-4 ${aiQuotaStatus.remainingThisMinute <= 2 || aiQuotaStatus.remainingToday <= 100 ? 'text-amber-400' : 'text-emerald-400'}`} />
+              <div className="hidden xl:flex items-center gap-2 bg-slate-900/70 px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
+                <Activity className="w-4 h-4 text-blue-400" />
                 <div>
-                  <div className="text-xs text-slate-400">AI Quota</div>
-                  <div className="text-[11px] font-mono text-slate-200">
-                    {aiQuotaStatus.remainingThisMinute}/{aiQuotaStatus.perMinuteLimit} min · {aiQuotaStatus.remainingToday}/{aiQuotaStatus.dailyLimit} day
-                  </div>
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wider">Assets</div>
+                  <div className="text-xs font-semibold text-blue-300">{healthyDevices}/{totalDevices}</div>
                 </div>
               </div>
-
-              {/* Network Status Badge (de-emphasized + only on wide screens) */}
-              <div className="hidden 2xl:flex items-center gap-2 bg-purple-900/20 border border-purple-500/30 px-4 py-2 rounded-lg whitespace-nowrap">
-                <Signal className="w-4 h-4 text-purple-400" />
-                <div>
-                  <div className="text-[10px] text-purple-300 uppercase font-bold tracking-wider">Network Status</div>
-                  <div className="text-sm font-bold text-white leading-none">Live Monitoring</div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 bg-slate-800 px-4 py-2 rounded-lg whitespace-nowrap">
-                <Activity className="w-5 h-5 text-blue-400" />
-                <div>
-                  <div className="text-xs text-slate-400">Active Devices</div>
-                  <div className="text-lg font-bold text-blue-400">{healthyDevices}/{totalDevices}</div>
-                </div>
-              </div>
-              <button
-                id="kpi-matrix-trigger"
-                onClick={() => setShowMatrix(true)}
-                className="whitespace-nowrap flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/30 rounded-full transition-all text-sm font-medium"
-              >
-                <Activity className="w-4 h-4" />
-                <span>KPI Matrix</span>
-              </button>
 
               <div className="flex items-center">
                 <VisualGuide />
               </div>
               <div className="hidden xl:block w-px h-6 bg-slate-700 mx-1"></div>
-              <div className="flex items-center gap-2 text-sm text-slate-400 whitespace-nowrap max-w-[220px]">
+              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-400 whitespace-nowrap max-w-[220px]">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                 <span className="truncate">{userName}</span>
                 <span className="hidden xl:inline">Online</span>
@@ -524,13 +485,13 @@ function App() {
 
       {/* Visual Guide Overlay (Manual Trigger) */}
       <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6">
-        <div className="flex gap-2 mb-6 bg-slate-900/50 border border-slate-800 rounded-lg p-1.5 backdrop-blur-sm w-fit shadow-lg">
+        <div className="mb-6 inline-flex flex-wrap gap-1 rounded-xl border border-slate-800 bg-slate-900/55 p-1.5 backdrop-blur-sm">
           <button
             id="view-3d-trigger"
             onClick={() => setActiveView('3d')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeView === '3d'
-              ? 'bg-purple-600 text-white shadow-lg'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === '3d'
+              ? 'bg-slate-100 text-slate-950'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
               }`}
           >
             <Boxes className="w-4 h-4" />
@@ -539,9 +500,9 @@ function App() {
           <button
             id="view-analytics-trigger"
             onClick={() => setActiveView('analytics')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeView === 'analytics'
-              ? 'bg-green-600 text-white shadow-lg'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === 'analytics'
+              ? 'bg-slate-100 text-slate-950'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
               }`}
           >
             <LineChart className="w-4 h-4" />
@@ -550,9 +511,9 @@ function App() {
           <button
             id="view-kpi-trigger"
             onClick={() => setActiveView('kpi')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeView === 'kpi'
-              ? 'bg-orange-600 text-white shadow-lg'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === 'kpi'
+              ? 'bg-slate-100 text-slate-950'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
               }`}
           >
             <Gauge className="w-4 h-4" />
@@ -561,9 +522,9 @@ function App() {
           <button
             id="view-logs-trigger"
             onClick={() => setActiveView('logs')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeView === 'logs'
-              ? 'bg-slate-700 text-white shadow-lg border border-slate-600'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === 'logs'
+              ? 'bg-slate-100 text-slate-950'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
               }`}
           >
             <Terminal className="w-4 h-4" />
@@ -640,6 +601,18 @@ function App() {
         {
           activeView === 'analytics' && (
             <div id="analytics-view" className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
+                <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+                <button
+                  id="kpi-matrix-trigger"
+                  onClick={() => setShowMatrix(true)}
+                  className="h-9 whitespace-nowrap inline-flex items-center gap-2 px-3 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 rounded-lg transition-all text-sm font-medium"
+                >
+                  <Activity className="w-4 h-4" />
+                  <span>KPI Matrix</span>
+                </button>
+              </div>
+
               {/* Business Value Dashboard (Score Booster) */}
               <BusinessROI healthPercentage={healthPercentage} />
               <AdvancedAnalytics
@@ -657,16 +630,29 @@ function App() {
 
         {
           activeView === 'kpi' && (
-            <div className="h-[calc(100vh-140px)]">
-              <RealTimeKPIPage
-                devices={devices}
-                alerts={filteredAlerts}
-                connections={connections}
-                timeRangeLabel={timeRange.label}
-                timeRangeValue={timeRange.value}
-                timeRangeStart={timeRange.start}
-                timeRangeEnd={timeRange.end}
-              />
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
+                <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+                <button
+                  onClick={() => setShowMatrix(true)}
+                  className="h-9 whitespace-nowrap inline-flex items-center gap-2 px-3 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 rounded-lg transition-all text-sm font-medium"
+                >
+                  <Activity className="w-4 h-4" />
+                  <span>KPI Matrix</span>
+                </button>
+              </div>
+
+              <div className="h-[calc(100vh-210px)]">
+                <RealTimeKPIPage
+                  devices={devices}
+                  alerts={filteredAlerts}
+                  connections={connections}
+                  timeRangeLabel={timeRange.label}
+                  timeRangeValue={timeRange.value}
+                  timeRangeStart={timeRange.start}
+                  timeRangeEnd={timeRange.end}
+                />
+              </div>
             </div>
           )
         }

@@ -51,37 +51,28 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
             <button
                 id="time-range-trigger"
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition-all text-sm font-medium"
+                className="h-9 inline-flex items-center gap-2 px-3 bg-slate-900/75 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-lg transition-all text-sm font-medium"
             >
                 <Clock className="w-4 h-4 text-slate-400" />
                 <span>{value.label}</span>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50 overflow-hidden flex flex-col">
+                <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col">
                     {/* Header */}
                     <div className="p-3 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm">
-                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Select Time Range</div>
+                        <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Select Time Range</div>
                     </div>
 
                     {!showCustomPicker ? (
                         <>
                             <div className="max-h-64 overflow-y-auto py-1 custom-scrollbar">
-                                {/* Quick Search Placeholder */}
-                                <div className="px-3 py-2 sticky top-0 bg-slate-900 z-10">
-                                    <input
-                                        type="text"
-                                        placeholder="Search quick ranges"
-                                        className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm text-slate-300 focus:outline-none focus:border-blue-500 placeholder:text-slate-600"
-                                    />
-                                </div>
-
                                 {TIME_RANGE_PRESETS.map((preset) => (
                                     <button
                                         key={preset.value}
                                         onClick={() => handlePresetSelect(preset)}
-                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-800 transition-colors flex items-center justify-between ${value.value === preset.value ? 'text-blue-400 bg-slate-800/50 border-l-2 border-blue-500' : 'text-slate-300'
+                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-800 transition-colors flex items-center justify-between ${value.value === preset.value ? 'text-blue-300 bg-slate-800/60 border-l-2 border-blue-500' : 'text-slate-300'
                                             }`}
                                     >
                                         <span>{preset.label}</span>
@@ -91,7 +82,7 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
                             <div className="border-t border-slate-800 p-2 bg-slate-900/50">
                                 <button
                                     onClick={() => setShowCustomPicker(true)}
-                                    className="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm transition-colors"
+                                    className="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors"
                                 >
                                     <Calendar className="w-3 h-3" />
                                     Custom Time Range
@@ -127,7 +118,7 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
                                 </div>
                                 <button
                                     onClick={handleCustomApply}
-                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded py-1.5 text-sm font-medium transition-colors mt-2"
+                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-lg py-1.5 text-sm font-medium transition-colors mt-2"
                                 >
                                     Apply time range
                                 </button>

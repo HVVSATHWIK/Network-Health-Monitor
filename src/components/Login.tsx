@@ -25,7 +25,7 @@ const getErrorCode = (err: unknown): string | undefined => {
 const buildUnauthorizedDomainError = () => {
     const currentHost = typeof window !== 'undefined' ? window.location.host : 'unknown-host';
     const configuredAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'not-configured';
-    return `This URL isn't authorized for Firebase Auth. Current host: ${currentHost}. Configured auth domain: ${configuredAuthDomain}. Add \"${currentHost}\" in Firebase Console -> Authentication -> Settings -> Authorized domains, then hard refresh and retry.`;
+    return `This URL isn't authorized for Firebase Auth. Current host: ${currentHost}. Configured auth domain: ${configuredAuthDomain}. Add "${currentHost}" in Firebase Console -> Authentication -> Settings -> Authorized domains, then hard refresh and retry.`;
 };
 
 export default function Login({ onLogin }: LoginProps) {
