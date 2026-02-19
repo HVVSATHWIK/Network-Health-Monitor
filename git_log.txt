@@ -1,5 +1,0 @@
-b6ef353 timestamp feature added
-88acd65 feat(ui): enhance SmartLogPanel with progressive disclosure and streamlined analysis
-3501919 Merge pull request #8 from Mohammedrasheed1453/main
-fbea068 hamburger update
-d4c4ddd Merge pull request #7 from Mohammedrasheed1453/main
