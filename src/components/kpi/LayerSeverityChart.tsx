@@ -1,6 +1,10 @@
-import { layerSeverityData } from '../../data/kpiMockData';
+import { layerSeverityData, type LayerSeverity } from '../../data/kpiMockData';
 
-const LayerSeverityChart = () => {
+interface LayerSeverityChartProps {
+    data?: LayerSeverity[];
+}
+
+const LayerSeverityChart = ({ data = layerSeverityData }: LayerSeverityChartProps) => {
     const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
     const severityTone = (severity: string) => {
@@ -99,7 +103,7 @@ const LayerSeverityChart = () => {
 
             <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
                 <div className="space-y-3">
-                    {layerSeverityData.map((layer, idx) => {
+                    {data.map((layer, idx) => {
                         const tone = severityTone(layer.severity);
                         const health = clamp(100 - layer.score, 0, 100);
                         const crcPerMin = Math.round(clamp((layer.score / 100) * 420 + (idx * 7), 0, 999));

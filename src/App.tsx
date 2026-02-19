@@ -1,4 +1,4 @@
-import { Activity, Shield, Zap, Play, Signal, Terminal, Bot, Menu } from 'lucide-react';
+import { Activity, Shield, Play, Signal, Terminal, Bot, Menu, Boxes, LineChart, Gauge } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import AlertPanel from './components/AlertPanel';
 import DeviceStatus from './components/DeviceStatus';
@@ -533,17 +533,18 @@ function App() {
               : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
           >
-            <Zap className="w-4 h-4" />
+            <Boxes className="w-4 h-4" />
             3D Topology
           </button>
           <button
             id="view-analytics-trigger"
             onClick={() => setActiveView('analytics')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all ${activeView === 'analytics'
+            className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${activeView === 'analytics'
               ? 'bg-green-600 text-white shadow-lg'
               : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
           >
+            <LineChart className="w-4 h-4" />
             Analytics
           </button>
           <button
@@ -554,7 +555,7 @@ function App() {
               : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
           >
-            <Activity className="w-4 h-4" />
+            <Gauge className="w-4 h-4" />
             KPI Intelligence
           </button>
           <button
@@ -641,7 +642,15 @@ function App() {
             <div id="analytics-view" className="space-y-6">
               {/* Business Value Dashboard (Score Booster) */}
               <BusinessROI healthPercentage={healthPercentage} />
-              <AdvancedAnalytics />
+              <AdvancedAnalytics
+                devices={devices}
+                alerts={filteredAlerts}
+                connections={connections}
+                timeRangeLabel={timeRange.label}
+                timeRangeValue={timeRange.value}
+                timeRangeStart={timeRange.start}
+                timeRangeEnd={timeRange.end}
+              />
             </div>
           )
         }
@@ -649,7 +658,15 @@ function App() {
         {
           activeView === 'kpi' && (
             <div className="h-[calc(100vh-140px)]">
-              <RealTimeKPIPage />
+              <RealTimeKPIPage
+                devices={devices}
+                alerts={filteredAlerts}
+                connections={connections}
+                timeRangeLabel={timeRange.label}
+                timeRangeValue={timeRange.value}
+                timeRangeStart={timeRange.start}
+                timeRangeEnd={timeRange.end}
+              />
             </div>
           )
         }
@@ -698,6 +715,14 @@ function App() {
         devices={devices}
         connections={connections}
         dependencyPaths={dependencyPaths}
+        systemContext={{
+          activeView,
+          selectedLayer,
+          selectedDeviceId,
+          healthPercentage,
+          timeRangeLabel: timeRange.label,
+          aiCoverageSummary: aiMonitoringSnapshot.summary,
+        }}
         isOpen={isNetMonitAIOpen}
         onOpenChange={setIsNetMonitAIOpen}
       />

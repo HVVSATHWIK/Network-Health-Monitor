@@ -10,7 +10,7 @@ import AddDeviceModal from './AddDeviceModal';
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
-import { Settings, Zap, Activity, RefreshCw, X, Plus } from 'lucide-react';
+import { Settings, Zap, Activity, RefreshCw, X, Plus, Info, Network, RotateCcw } from 'lucide-react';
 // import { analyzeRootCause } from '../utils/aiLogic'; // Removed
 
 interface Advanced3DTopologyProps {
@@ -43,6 +43,13 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
   } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAddDeviceOpen, setIsAddDeviceOpen] = useState(false); // New State for Modal
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isTouchLikely = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
+    if (isTouchLikely) setIsGuideOpen(true);
+  }, []);
 
   // AI State Removed
   // const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -60,6 +67,15 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const labelRendererRef = useRef<CSS2DRenderer | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+
+  const resetCameraView = () => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+    controls.target.set(0, 40, 0);
+    camera.position.set(120, 80, 160);
+    controls.update();
+  };
 
   // Groups for updating content
   const deviceGroupRef = useRef<THREE.Group | null>(null);
@@ -118,7 +134,155 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
     controls.minDistance = 50;
     controls.maxDistance = 500;
     controls.maxPolarAngle = Math.PI / 2;
+    controls.target.set(0, 40, 0);
+    controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+    controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
+    controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+    controls.touches.ONE = THREE.TOUCH.ROTATE;
+    controls.touches.TWO = THREE.TOUCH.PAN;
+    controls.update();
     controlsRef.current = controls;
+
+    // Custom two-finger gesture separation for touch devices:
+    // - midpoint movement => pan
+    // - distance change => zoom
+    const touchState = {
+      isTwoFinger: false,
+      prevDistance: 0,
+      prevMidX: 0,
+      prevMidY: 0,
+      prevT1X: 0,
+      prevT1Y: 0,
+      prevT2X: 0,
+      prevT2Y: 0,
+      mode: 'none' as 'none' | 'pan' | 'pinch',
+      modeLockFrames: 0,
+    };
+
+    const getTouchMetrics = (touches: TouchList) => {
+      if (touches.length < 2) return null;
+      const t1 = touches[0];
+      const t2 = touches[1];
+      const dx = t2.clientX - t1.clientX;
+      const dy = t2.clientY - t1.clientY;
+      const distance = Math.hypot(dx, dy);
+      const midX = (t1.clientX + t2.clientX) / 2;
+      const midY = (t1.clientY + t2.clientY) / 2;
+      return { distance, midX, midY };
+    };
+
+    const beginTwoFingerGesture = (touches: TouchList) => {
+      const metrics = getTouchMetrics(touches);
+      if (!metrics) return;
+      touchState.isTwoFinger = true;
+      touchState.prevDistance = metrics.distance;
+      touchState.prevMidX = metrics.midX;
+      touchState.prevMidY = metrics.midY;
+      touchState.prevT1X = touches[0].clientX;
+      touchState.prevT1Y = touches[0].clientY;
+      touchState.prevT2X = touches[1].clientX;
+      touchState.prevT2Y = touches[1].clientY;
+      touchState.mode = 'none';
+      touchState.modeLockFrames = 0;
+      controls.enabled = false;
+    };
+
+    const endTwoFingerGesture = () => {
+      touchState.isTwoFinger = false;
+      touchState.mode = 'none';
+      touchState.modeLockFrames = 0;
+      controls.enabled = true;
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (event.touches.length === 2) {
+        beginTwoFingerGesture(event.touches);
+      }
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!touchState.isTwoFinger || event.touches.length !== 2) return;
+
+      const metrics = getTouchMetrics(event.touches);
+      if (!metrics) return;
+
+      event.preventDefault();
+
+      const distDelta = metrics.distance - touchState.prevDistance;
+      const midDeltaX = metrics.midX - touchState.prevMidX;
+      const midDeltaY = metrics.midY - touchState.prevMidY;
+      const pinchStrength = Math.abs(distDelta);
+      const panStrength = Math.hypot(midDeltaX, midDeltaY);
+
+      const t1 = event.touches[0];
+      const t2 = event.touches[1];
+      const t1dx = t1.clientX - touchState.prevT1X;
+      const t1dy = t1.clientY - touchState.prevT1Y;
+      const t2dx = t2.clientX - touchState.prevT2X;
+      const t2dy = t2.clientY - touchState.prevT2Y;
+      const oppositeMotion = (t1dx * t2dx + t1dy * t2dy) < -0.15;
+
+      const relativeDistanceChange = pinchStrength / Math.max(metrics.distance, 1);
+      const pinchEnterThreshold = 0.016;
+      const pinchExitThreshold = 0.008;
+      const panMovementThreshold = 0.35;
+
+      if (touchState.mode === 'pinch') {
+        if (relativeDistanceChange < pinchExitThreshold && panStrength > panMovementThreshold) {
+          touchState.mode = 'pan';
+        }
+      } else {
+        // Default to pan for two-finger drag.
+        // Enter pinch only when scale change is clear and fingers move in opposite directions.
+        touchState.mode = (relativeDistanceChange > pinchEnterThreshold && oppositeMotion) ? 'pinch' : 'pan';
+      }
+
+      if (touchState.mode === 'pinch') {
+        const zoomScale = Math.exp(-distDelta * 0.0026);
+        const offset = camera.position.clone().sub(controls.target);
+        offset.multiplyScalar(zoomScale);
+        const touchMinDistance = Math.max(controls.minDistance, 52);
+        const touchMaxDistance = Math.min(controls.maxDistance, 300);
+        const clampedDistance = Math.max(touchMinDistance, Math.min(touchMaxDistance, offset.length()));
+        offset.setLength(clampedDistance);
+        camera.position.copy(controls.target.clone().add(offset));
+      } else if (touchState.mode === 'pan') {
+        const offset = camera.position.clone().sub(controls.target);
+        const targetDistance = offset.length() * Math.tan((camera.fov / 2) * (Math.PI / 180));
+        const panX = (2 * midDeltaX * targetDistance) / height * 1.05;
+        const panY = (2 * midDeltaY * targetDistance) / height * 1.05;
+
+        const pan = new THREE.Vector3();
+        const elementMatrix = camera.matrix.elements;
+        const xAxis = new THREE.Vector3(elementMatrix[0], elementMatrix[1], elementMatrix[2]);
+        const yAxis = new THREE.Vector3(elementMatrix[4], elementMatrix[5], elementMatrix[6]);
+
+        pan.add(xAxis.multiplyScalar(-panX));
+        pan.add(yAxis.multiplyScalar(panY));
+
+        camera.position.add(pan);
+        controls.target.add(pan);
+      }
+
+      touchState.prevDistance = metrics.distance;
+      touchState.prevMidX = metrics.midX;
+      touchState.prevMidY = metrics.midY;
+      touchState.prevT1X = t1.clientX;
+      touchState.prevT1Y = t1.clientY;
+      touchState.prevT2X = t2.clientX;
+      touchState.prevT2Y = t2.clientY;
+    };
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      if (event.touches.length < 2) {
+        endTwoFingerGesture();
+      }
+    };
+
+    renderer.domElement.addEventListener('touchstart', handleTouchStart, { passive: true });
+    renderer.domElement.addEventListener('touchmove', handleTouchMove, { passive: false });
+    renderer.domElement.addEventListener('touchend', handleTouchEnd, { passive: true });
+    renderer.domElement.addEventListener('touchcancel', handleTouchEnd, { passive: true });
 
     controls.addEventListener('start', () => {
       isTransitioning.current = false;
@@ -288,6 +452,10 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
       cancelAnimationFrame(animationId);
       container.innerHTML = '';
       container.removeEventListener('mousemove', onPointerMove);
+      renderer.domElement.removeEventListener('touchstart', handleTouchStart);
+      renderer.domElement.removeEventListener('touchmove', handleTouchMove);
+      renderer.domElement.removeEventListener('touchend', handleTouchEnd);
+      renderer.domElement.removeEventListener('touchcancel', handleTouchEnd);
       renderer.dispose();
       // Dispose Geometries if tracked...
     };
@@ -502,46 +670,203 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
     return () => container.removeEventListener('click', handleClick);
   }, [onDeviceSelect]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const camera = cameraRef.current;
+      const controls = controlsRef.current;
+      if (!camera || !controls) return;
+
+      const targetElement = event.target as HTMLElement | null;
+      const isTyping = targetElement && (targetElement.tagName === 'INPUT' || targetElement.tagName === 'TEXTAREA' || targetElement.isContentEditable);
+      if (isTyping) return;
+
+      const offset = camera.position.clone().sub(controls.target);
+      const distance = offset.length();
+      const panStep = Math.max(distance * 0.03, 1.5);
+
+      const panVector = new THREE.Vector3();
+      const elementMatrix = camera.matrix.elements;
+      const xAxis = new THREE.Vector3(elementMatrix[0], elementMatrix[1], elementMatrix[2]);
+      const yAxis = new THREE.Vector3(elementMatrix[4], elementMatrix[5], elementMatrix[6]);
+
+      if (event.key === 'r' || event.key === 'R') {
+        event.preventDefault();
+        resetCameraView();
+        return;
+      }
+
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault();
+        const next = offset.clone().multiplyScalar(0.92);
+        if (next.length() >= controls.minDistance) {
+          camera.position.copy(controls.target.clone().add(next));
+          controls.update();
+        }
+        return;
+      }
+
+      if (event.key === '-') {
+        event.preventDefault();
+        const next = offset.clone().multiplyScalar(1.08);
+        if (next.length() <= controls.maxDistance) {
+          camera.position.copy(controls.target.clone().add(next));
+          controls.update();
+        }
+        return;
+      }
+
+      if (event.key === 'ArrowLeft') panVector.add(xAxis.multiplyScalar(panStep));
+      if (event.key === 'ArrowRight') panVector.add(xAxis.multiplyScalar(-panStep));
+      if (event.key === 'ArrowUp') panVector.add(yAxis.multiplyScalar(-panStep));
+      if (event.key === 'ArrowDown') panVector.add(yAxis.multiplyScalar(panStep));
+
+      if (panVector.lengthSq() > 0) {
+        event.preventDefault();
+        camera.position.add(panVector);
+        controls.target.add(panVector);
+        controls.update();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
 
   return (
     <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 relative border border-slate-800 shadow-2xl">
       <div className="absolute top-6 left-6 z-10 pointer-events-none">
-        <div className="flex items-center gap-3 mb-4">
-          <Activity className="w-6 h-6 text-purple-400" />
-          <h2 className="text-xl font-bold text-white tracking-wide">3D Network Topology</h2>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="h-10 w-10 rounded-xl bg-blue-600 border border-blue-400/60 shadow-lg shadow-blue-500/25 flex items-center justify-center">
+            <Network className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white tracking-tight">3D Network Topology</h2>
+            <p className="text-xs text-blue-300/90 font-mono uppercase tracking-widest">NetMonit Digital Twin</p>
+          </div>
         </div>
-        <p className="text-sm text-slate-400 max-w-xs">Interactive Digital Twin</p>
+        <p className="text-sm text-slate-400 max-w-xs">Interactive operational map with instant gesture guidance for mouse and touch users.</p>
       </div>
 
       <div id="canvas-container" ref={containerRef} style={{ width: '100%', height: '600px', background: 'radial-gradient(circle at center, #0f172a 0%, #020617 100%)' }} className="rounded-lg overflow-hidden relative" />
 
-      {/* Controls Hint */}
-      <div className="absolute top-20 right-8 bg-white/10 backdrop-blur-md border border-white/20 p-3 rounded-lg text-xs text-white z-20 shadow-xl pointer-events-none transition-all">
-        <h3 className="font-bold mb-2 text-blue-300">Controls</h3>
-        <ul className="space-y-1 text-gray-200 border-b border-white/10 pb-2 mb-2">
-          <li className="flex items-center gap-2"><span>Left Click | Rotate</span></li>
-          <li className="flex items-center gap-2"><span>Right Click | Pan</span></li>
-          <li className="flex items-center gap-2"><span>Scroll | Zoom</span></li>
-        </ul>
-        <h3 className="font-bold mb-2 text-blue-300">Legend</h3>
-        <ul className="space-y-1 text-gray-200">
-          <li className="flex items-center gap-2"><span className="w-3 h-1 bg-slate-500 rounded-full"></span><span>Standard Link</span></li>
-          <li className="flex items-center gap-2"><span className="w-3 h-1 bg-red-500 rounded-full shadow-[0_0_5px_red]"></span><span>Critical / Error</span></li>
-          <li className="flex items-center gap-2"><span className="w-3 h-1 bg-[#38bdf8] rounded-full shadow-[0_0_5px_#38bdf8]"></span><span>Active Data</span></li>
-        </ul>
-      </div>
+      <div className="absolute top-6 right-8 z-[70] flex items-center gap-2">
+        <button
+          type="button"
+          onClick={resetCameraView}
+          aria-label="Reset camera view"
+          className="h-10 w-10 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-100 border border-slate-600 shadow-lg flex items-center justify-center transition-colors"
+        >
+          <RotateCcw className="w-5 h-5" />
+        </button>
 
-      {onAddDevice && (
-        <div className="absolute top-6 right-8 z-30">
+        <button
+          type="button"
+          onClick={() => setIsGuideOpen((prev) => !prev)}
+          aria-label="Show topology controls and legend"
+          className="h-10 w-10 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-100 border border-slate-600 shadow-lg flex items-center justify-center transition-colors"
+        >
+          <Info className="w-5 h-5" />
+        </button>
+
+        {onAddDevice && (
           <button onClick={() => setIsAddDeviceOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-full shadow-lg transition-all border border-blue-400/50">
             <Plus className="w-4 h-4" /><span>Add Device</span>
           </button>
+        )}
+      </div>
+
+      {isGuideOpen && (
+        <div className="absolute top-20 right-8 bg-slate-900/95 backdrop-blur-md border border-slate-700 p-3 rounded-xl text-[11px] text-slate-200 z-[80] shadow-2xl w-64 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-blue-300 tracking-wide">Navigation Guide</h3>
+            <button
+              type="button"
+              onClick={() => setIsGuideOpen(false)}
+              aria-label="Close navigation guide"
+              className="text-slate-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="border-b border-slate-700 pb-2 mb-2">
+            <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-2">Mouse Controls</div>
+            <ul className="space-y-1.5">
+              <li className="flex justify-between gap-3"><span className="text-slate-300">Rotate</span><span className="text-slate-100 font-medium">Left Drag</span></li>
+              <li className="flex justify-between gap-3"><span className="text-slate-300">Pan</span><span className="text-slate-100 font-medium">Middle Drag / Right Drag</span></li>
+              <li className="flex justify-between gap-3"><span className="text-slate-300">Zoom</span><span className="text-slate-100 font-medium">Mouse Wheel</span></li>
+            </ul>
+          </div>
+
+          <div className="border-b border-slate-700 pb-2 mb-2">
+            <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-2">Touch Controls</div>
+            <div className="space-y-2">
+              <div className="rounded-lg border border-blue-500/25 bg-blue-500/5 p-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-10 rounded-md border border-blue-400/40 bg-slate-900/60 relative overflow-hidden">
+                    <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-300 animate-[pulse_1.2s_ease-in-out_infinite]" />
+                    <div className="absolute left-[30%] top-1/2 h-[1px] w-4 bg-blue-300/60 animate-[wiggle_1s_ease-in-out_infinite]" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-blue-300">Rotate</div>
+                    <div className="text-[11px] text-slate-200">One finger drag</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-purple-500/25 bg-purple-500/5 p-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-10 rounded-md border border-purple-400/40 bg-slate-900/60 relative overflow-hidden">
+                    <div className="absolute left-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-purple-300 animate-[pinchLeft_1.4s_ease-in-out_infinite]" />
+                    <div className="absolute right-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-purple-300 animate-[pinchRight_1.4s_ease-in-out_infinite]" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-purple-300">Zoom</div>
+                    <div className="text-[11px] text-slate-200">Pinch in / out</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-cyan-500/25 bg-cyan-500/5 p-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-10 rounded-md border border-cyan-400/40 bg-slate-900/60 relative overflow-hidden">
+                    <div className="absolute left-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-cyan-300 animate-[panLeft_1.3s_ease-in-out_infinite]" />
+                    <div className="absolute right-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-cyan-300 animate-[panRight_1.3s_ease-in-out_infinite]" />
+                    <div className="absolute left-2 right-2 top-1/2 h-[1px] -translate-y-1/2 bg-cyan-300/40" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-cyan-300">Pan</div>
+                    <div className="text-[11px] text-slate-200">Two finger drag (same direction)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-b border-slate-700 pb-2 mb-2">
+            <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-2">Legend</div>
+            <ul className="space-y-1.5">
+              <li className="flex items-center justify-between gap-3"><span className="text-slate-300">Standard Link</span><span className="w-10 h-[2px] bg-slate-500 rounded-full"></span></li>
+              <li className="flex items-center justify-between gap-3"><span className="text-slate-300">Critical / Error</span><span className="w-10 h-[2px] bg-red-500 rounded-full shadow-[0_0_6px_rgba(239,68,68,0.9)]"></span></li>
+              <li className="flex items-center justify-between gap-3"><span className="text-slate-300">Active Data</span><span className="w-10 h-[2px] bg-[#38bdf8] rounded-full shadow-[0_0_6px_rgba(56,189,248,0.9)]"></span></li>
+            </ul>
+          </div>
+
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-2">Accessibility</div>
+            <ul className="space-y-1.5">
+              <li className="flex justify-between gap-3"><span className="text-slate-300">Reset View</span><span className="text-slate-100 font-medium">R key / reset button</span></li>
+              <li className="flex justify-between gap-3"><span className="text-slate-300">Pan</span><span className="text-slate-100 font-medium">Arrow Keys</span></li>
+              <li className="flex justify-between gap-3"><span className="text-slate-300">Zoom</span><span className="text-slate-100 font-medium">+ / - keys</span></li>
+            </ul>
+          </div>
         </div>
       )}
 
       {isAddDeviceOpen && onAddDevice && <AddDeviceModal onClose={() => setIsAddDeviceOpen(false)} onAdd={onAddDevice} devices={devices} />}
 
-      <div className="absolute bottom-8 right-8 z-30">
+      <div className={`absolute bottom-8 right-8 z-[70] transition-all duration-200 ${isGuideOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <button onClick={() => onShowControlsChange?.(!showControls)} className="bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-full shadow-lg border border-slate-600 transition-all">
           {showControls ? <X className="w-6 h-6" /> : <Settings className="w-6 h-6 animate-spin-slow" />}
         </button>

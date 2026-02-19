@@ -1,8 +1,12 @@
 import { Clock, TrendingUp, Info } from 'lucide-react';
-import { escalationRisk } from '../../data/kpiMockData';
+import { escalationRisk, type EscalationRisk } from '../../data/kpiMockData';
 import RiskGauge from './RiskGauge';
 
-const EscalationCard = () => {
+interface EscalationCardProps {
+    risk?: EscalationRisk;
+}
+
+const EscalationCard = ({ risk = escalationRisk }: EscalationCardProps) => {
     // Determine risk color
     const getRiskColor = (level: string) => {
         switch (level) {
@@ -20,21 +24,21 @@ const EscalationCard = () => {
                     <h3 className="text-gunmetal-100 font-sans font-bold text-lg tracking-tight">Predictive Insights</h3>
                     <p className="text-gunmetal-400 text-xs">Probabilistic estimate with threshold, uncertainty band, and action guidance</p>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${getRiskColor(escalationRisk.level)}`}>
-                    {escalationRisk.level} Exposure
+                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${getRiskColor(risk.level)}`}>
+                    {risk.level} Exposure
                 </div>
             </div>
 
             {/* Main Risk Display */}
-            <div className="h-44 flex flex-col items-center justify-center mb-4">
+            <div className="h-44 flex flex-col items-center justify-center mb-3 rounded-xl border border-gunmetal-700/60 bg-gunmetal-950/35">
                 <RiskGauge
-                    score={escalationRisk.probability}
-                    threshold={escalationRisk.escalationThreshold}
-                    rangeLow={escalationRisk.probabilityRange.low}
-                    rangeHigh={escalationRisk.probabilityRange.high}
+                    score={risk.probability}
+                    threshold={risk.escalationThreshold}
+                    rangeLow={risk.probabilityRange.low}
+                    rangeHigh={risk.probabilityRange.high}
                 />
-                <p className="mt-2 text-[10px] text-gunmetal-400 font-mono uppercase tracking-widest">
-                    Prediction band: {escalationRisk.probabilityRange.low}% to {escalationRisk.probabilityRange.high}% | Escalation threshold: {escalationRisk.escalationThreshold}%
+                <p className="mt-2 px-3 text-center text-[10px] text-gunmetal-400 font-mono uppercase tracking-widest">
+                    Prediction band: {risk.probabilityRange.low}% to {risk.probabilityRange.high}% | Escalation threshold: {risk.escalationThreshold}%
                 </p>
             </div>
 
@@ -45,22 +49,22 @@ const EscalationCard = () => {
                         <Clock className="w-4 h-4 text-alert-warning" />
                         <span className="text-gunmetal-200 text-[10px] font-mono uppercase tracking-widest">Escalation Window</span>
                     </div>
-                    <p className="text-gunmetal-100 font-mono font-semibold tabular-nums">{escalationRisk.timeToCriticalRange}</p>
+                    <p className="text-gunmetal-100 font-mono font-semibold tabular-nums">{risk.timeToCriticalRange}</p>
                 </div>
                 <div className="bg-gunmetal-950/35 p-3 rounded-lg border border-gunmetal-700/70">
                     <div className="flex items-center gap-2 mb-1">
                         <TrendingUp className="w-4 h-4 text-alert-success" />
                         <span className="text-gunmetal-200 text-[10px] font-mono uppercase tracking-widest">Model Reliability</span>
                     </div>
-                    <p className="text-gunmetal-100 font-mono font-semibold tabular-nums">{escalationRisk.modelReliability}%</p>
-                    <p className="text-gunmetal-500 text-[10px] mt-1">{escalationRisk.reliabilityLabel}</p>
+                    <p className="text-gunmetal-100 font-mono font-semibold tabular-nums">{risk.modelReliability}%</p>
+                    <p className="text-gunmetal-500 text-[10px] mt-1">{risk.reliabilityLabel}</p>
                 </div>
             </div>
 
-            <div className="bg-gunmetal-950/25 rounded-lg p-3 border border-gunmetal-700/60 mb-4">
+            <div className="bg-gunmetal-950/25 rounded-lg p-3 border border-gunmetal-700/60 mb-4 ring-1 ring-white/5">
                 <div className="text-[10px] uppercase tracking-widest text-gunmetal-400 font-mono mb-1">Decision Guidance</div>
-                <p className="text-xs text-gunmetal-200 mb-1">{escalationRisk.recommendedAction}</p>
-                <p className="text-[10px] text-gunmetal-500">Expected false positive rate near threshold: {escalationRisk.falsePositiveRate}%.</p>
+                <p className="text-xs text-gunmetal-200 mb-1 leading-relaxed">{risk.recommendedAction}</p>
+                <p className="text-[10px] text-gunmetal-500">Expected false positive rate near threshold: {risk.falsePositiveRate}%.</p>
             </div>
 
             {/* SHAP Explainability Section */}
@@ -71,7 +75,7 @@ const EscalationCard = () => {
                 </div>
 
                 <div className="space-y-2.5">
-                    {escalationRisk.predictionFactors.map((item, idx) => (
+                    {risk.predictionFactors.map((item, idx) => (
                         <div key={idx} className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2 text-gunmetal-400">
                                 <div className={`w-1.5 h-1.5 rounded-full ${item.type === 'risk' ? 'bg-alert-warning' : 'bg-alert-success'}`}></div>

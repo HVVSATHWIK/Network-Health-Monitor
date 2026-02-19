@@ -1,6 +1,10 @@
-import { propagationChain } from '../../data/kpiMockData';
+import { propagationChain, type PropagationNode } from '../../data/kpiMockData';
 
-const PropagationFlow = () => {
+interface PropagationFlowProps {
+    chain?: PropagationNode[];
+}
+
+const PropagationFlow = ({ chain = propagationChain }: PropagationFlowProps) => {
     const tone = (status: string) => {
         if (status === 'critical') return { dot: 'bg-alert-critical', text: 'text-alert-critical', ring: 'ring-alert-critical/30' };
         if (status === 'warning') return { dot: 'bg-alert-warning', text: 'text-alert-warning', ring: 'ring-alert-warning/30' };
@@ -23,8 +27,8 @@ const PropagationFlow = () => {
                     aria-hidden="true"
                 >
                     <line x1="70" y1="120" x2="930" y2="120" stroke="currentColor" className="text-gunmetal-600" strokeWidth="2" opacity="0.7" />
-                    {propagationChain.map((node, idx) => {
-                        const x = propagationChain.length === 1 ? 500 : 70 + (860 * idx) / (propagationChain.length - 1);
+                    {chain.map((node, idx) => {
+                        const x = chain.length === 1 ? 500 : 70 + (860 * idx) / (chain.length - 1);
                         const strokeClass = node.status === 'critical'
                             ? 'text-alert-critical'
                             : node.status === 'warning'
@@ -42,7 +46,7 @@ const PropagationFlow = () => {
 
                 {/* Compact modules */}
                 <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6">
-                    {propagationChain.map((node) => {
+                    {chain.map((node) => {
                         const t = tone(node.status);
                         return (
                             <div key={node.id} className={`rounded-lg border border-gunmetal-700/70 bg-gunmetal-950/35 p-4 ring-1 ${t.ring}`}>

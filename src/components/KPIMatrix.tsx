@@ -8,6 +8,21 @@ interface KPIMatrixProps {
 
 export default function KPIMatrix({ devices, onClose }: KPIMatrixProps) {
 
+    const formatNumber = (value: number, digits = 1) => {
+        if (!Number.isFinite(value)) return '—';
+        return value.toFixed(digits);
+    };
+
+    const formatInt = (value: number) => {
+        if (!Number.isFinite(value)) return '—';
+        return Math.round(value).toString();
+    };
+
+    const formatPercent = (value: number, digits = 1) => {
+        if (!Number.isFinite(value)) return '—';
+        return `${value.toFixed(digits)}%`;
+    };
+
     // Helper to determine cell color based on thresholds
     const getStatusColor = (val: number, type: 'crc' | 'temp' | 'jitter' | 'latency' | 'power' | 'loss' | 'routes' | 'resets' | 'stability' | 'tls' | 'overhead') => {
         if (type === 'crc') return val > 10 ? 'bg-red-500/10 text-red-500 border border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : (val > 0 ? 'bg-amber-500/10 text-amber-500 border border-amber-500/50' : 'text-slate-400');
@@ -52,9 +67,9 @@ export default function KPIMatrix({ devices, onClose }: KPIMatrixProps) {
 
                 {/* Matrix Grid */}
                 <div className="flex-1 overflow-auto bg-[#0B0F17]">
-                    <div className="min-w-[1000px]">
-                        <div className="grid grid-cols-[300px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] sticky top-0 z-10 bg-[#0B0F17]/95 backdrop-blur border-b border-white/5 text-[10px] uppercase tracking-widest font-bold text-slate-500">
-                            <div className="p-4 pl-8 flex items-center gap-2">
+                    <div className="min-w-[1450px]">
+                        <div className="grid grid-cols-[280px_170px_130px_160px_170px_170px_180px_170px] sticky top-0 z-10 bg-[#0B0F17]/95 backdrop-blur border-b border-white/5 text-[10px] uppercase tracking-widest font-bold text-slate-500">
+                            <div className="sticky left-0 z-20 bg-[#0B0F17]/95 p-4 pl-6 flex items-center gap-2 border-r border-white/5">
                                 <Server className="w-3 h-3" /> Asset Identity
                             </div>
                             <div className="p-4 text-center border-l border-white/5 text-blue-400 bg-blue-500/5">
@@ -82,10 +97,10 @@ export default function KPIMatrix({ devices, onClose }: KPIMatrixProps) {
 
                         <div className="divide-y divide-white/5">
                             {devices.map(device => (
-                                <div key={device.id} className="grid grid-cols-[300px_1fr_1fr_1fr_1fr_1fr_1fr_1fr] hover:bg-white/[0.02] transition-colors group">
+                                <div key={device.id} className="grid grid-cols-[280px_170px_130px_160px_170px_170px_180px_170px] hover:bg-white/[0.02] transition-colors group">
 
                                     {/* Asset Info */}
-                                    <div className="p-4 pl-8 flex flex-col justify-center">
+                                    <div className="sticky left-0 z-10 bg-[#0B0F17] group-hover:bg-[#111826] p-4 pl-6 flex flex-col justify-center border-r border-white/5 transition-colors">
                                         <div className="font-bold text-sm text-slate-200 group-hover:text-white transition-colors">{device.name}</div>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className="text-[10px] font-mono text-slate-500 bg-slate-800/50 px-1.5 py-0.5 rounded border border-white/5">{device.id.toUpperCase()}</span>
@@ -94,76 +109,76 @@ export default function KPIMatrix({ devices, onClose }: KPIMatrixProps) {
                                     </div>
 
                                     {/* L1 Metric Cell */}
-                                    <div className="p-4 border-l border-white/5 flex flex-col items-center justify-center gap-1">
-                                        <span className={`text-sm font-mono font-bold ${getStatusColor(device.metrics.l1.temperature, 'temp')}`}>
-                                            {device.metrics.l1.temperature}°C
+                                    <div className="p-4 border-l border-white/5 flex flex-col justify-center gap-1.5">
+                                        <span className={`text-sm font-mono font-bold tabular-nums ${getStatusColor(device.metrics.l1.temperature, 'temp')}`}>
+                                            {formatNumber(device.metrics.l1.temperature, 1)}°C
                                         </span>
                                         {device.metrics.l1.opticalRxPower && (
-                                            <span className={`text-xs font-mono opacity-80 ${getStatusColor(device.metrics.l1.opticalRxPower, 'power')}`}>
-                                                {device.metrics.l1.opticalRxPower} dBm
+                                            <span className={`text-xs font-mono opacity-80 tabular-nums ${getStatusColor(device.metrics.l1.opticalRxPower, 'power')}`}>
+                                                {formatNumber(device.metrics.l1.opticalRxPower, 1)} dBm
                                             </span>
                                         )}
                                     </div>
 
                                     {/* L2 Metric Cell (CRC) */}
-                                    <div className="p-4 border-l border-white/5 flex flex-col items-center justify-center">
+                                    <div className="p-4 border-l border-white/5 flex flex-col justify-center">
                                         <div className={`px-3 py-1 rounded-md font-mono font-bold text-sm ${getStatusColor(device.metrics.l2.crcErrors, 'crc')}`}>
-                                            {device.metrics.l2.crcErrors > 0 ? `CRC: ${device.metrics.l2.crcErrors}` : 'OK'}
+                                            {device.metrics.l2.crcErrors > 0 ? `CRC: ${formatInt(device.metrics.l2.crcErrors)}` : 'OK'}
                                         </div>
                                     </div>
 
                                     {/* L3 Metric Cell */}
-                                    <div className="p-4 border-l border-white/5 flex flex-col items-center justify-center gap-1.5">
-                                        <div className="flex items-center justify-between w-full max-w-[140px] text-xs">
+                                    <div className="p-4 border-l border-white/5 flex flex-col justify-center gap-1.5">
+                                        <div className="flex items-center justify-between w-full text-xs">
                                             <span className="text-slate-500">Loss</span>
-                                            <span className={`font-mono ${getStatusColor(device.metrics.l3.packetLoss, 'loss')}`}>{device.metrics.l3.packetLoss}%</span>
+                                            <span className={`font-mono tabular-nums ${getStatusColor(device.metrics.l3.packetLoss, 'loss')}`}>{formatPercent(device.metrics.l3.packetLoss, 2)}</span>
                                         </div>
-                                        <div className="flex items-center justify-between w-full max-w-[140px] text-xs">
+                                        <div className="flex items-center justify-between w-full text-xs">
                                             <span className="text-slate-500">Routes</span>
-                                            <span className={`font-mono ${getStatusColor(device.metrics.l3.routingTableSize, 'routes')}`}>{device.metrics.l3.routingTableSize}</span>
+                                            <span className={`font-mono tabular-nums ${getStatusColor(device.metrics.l3.routingTableSize, 'routes')}`}>{formatInt(device.metrics.l3.routingTableSize)}</span>
                                         </div>
                                     </div>
 
                                     {/* L4 Metric Cell */}
-                                    <div className="p-4 border-l border-white/5 flex flex-col items-center justify-center gap-1.5">
-                                        <div className="flex items-center justify-between w-full max-w-[120px] text-xs">
+                                    <div className="p-4 border-l border-white/5 flex flex-col justify-center gap-1.5">
+                                        <div className="flex items-center justify-between w-full text-xs">
                                             <span className="text-slate-500">Retx</span>
-                                            <span className={`font-mono ${getStatusColor(device.metrics.l4.tcpRetransmissions * 100, 'jitter')}`}>{device.metrics.l4.tcpRetransmissions}%</span>
+                                            <span className={`font-mono tabular-nums ${getStatusColor(device.metrics.l4.tcpRetransmissions * 100, 'jitter')}`}>{formatPercent(device.metrics.l4.tcpRetransmissions, 2)}</span>
                                         </div>
-                                        <div className="flex items-center justify-between w-full max-w-[120px] text-xs">
+                                        <div className="flex items-center justify-between w-full text-xs">
                                             <span className="text-slate-500">Jitter</span>
-                                            <span className={`font-mono ${getStatusColor(device.metrics.l4.jitter, 'jitter')}`}>{device.metrics.l4.jitter}ms</span>
+                                            <span className={`font-mono tabular-nums ${getStatusColor(device.metrics.l4.jitter, 'jitter')}`}>{formatNumber(device.metrics.l4.jitter, 1)}ms</span>
                                         </div>
                                     </div>
 
                                     {/* L5 Metric Cell */}
-                                    <div className="p-4 border-l border-white/5 flex flex-col items-center justify-center gap-1.5">
-                                        <div className="flex items-center justify-between w-full max-w-[140px] text-xs">
+                                    <div className="p-4 border-l border-white/5 flex flex-col justify-center gap-1.5">
+                                        <div className="flex items-center justify-between w-full text-xs">
                                             <span className="text-slate-500">Stability</span>
-                                            <span className={`font-mono ${getStatusColor(device.metrics.l5.sessionStability, 'stability')}`}>{device.metrics.l5.sessionStability}%</span>
+                                            <span className={`font-mono tabular-nums ${getStatusColor(device.metrics.l5.sessionStability, 'stability')}`}>{formatPercent(device.metrics.l5.sessionStability, 1)}</span>
                                         </div>
-                                        <div className="flex items-center justify-between w-full max-w-[140px] text-xs">
+                                        <div className="flex items-center justify-between w-full text-xs">
                                             <span className="text-slate-500">Resets</span>
-                                            <span className={`font-mono ${getStatusColor(device.metrics.l5.sessionResets, 'resets')}`}>{device.metrics.l5.sessionResets}/hr</span>
+                                            <span className={`font-mono tabular-nums ${getStatusColor(device.metrics.l5.sessionResets, 'resets')}`}>{formatInt(device.metrics.l5.sessionResets)}/hr</span>
                                         </div>
                                     </div>
 
                                     {/* L6 Metric Cell */}
-                                    <div className="p-4 border-l border-white/5 flex flex-col items-center justify-center gap-1.5">
-                                        <div className="flex items-center justify-between w-full max-w-[160px] text-xs">
+                                    <div className="p-4 border-l border-white/5 flex flex-col justify-center gap-1.5">
+                                        <div className="flex items-center justify-between w-full text-xs">
                                             <span className="text-slate-500">TLS Fail</span>
-                                            <span className={`font-mono ${getStatusColor(device.metrics.l6.tlsHandshakeFailures, 'tls')}`}>{device.metrics.l6.tlsHandshakeFailures}/hr</span>
+                                            <span className={`font-mono tabular-nums ${getStatusColor(device.metrics.l6.tlsHandshakeFailures, 'tls')}`}>{formatInt(device.metrics.l6.tlsHandshakeFailures)}/hr</span>
                                         </div>
-                                        <div className="flex items-center justify-between w-full max-w-[160px] text-xs">
+                                        <div className="flex items-center justify-between w-full text-xs">
                                             <span className="text-slate-500">Overhead</span>
-                                            <span className={`font-mono ${getStatusColor(device.metrics.l6.encryptionOverheadMs, 'overhead')}`}>{device.metrics.l6.encryptionOverheadMs}ms</span>
+                                            <span className={`font-mono tabular-nums ${getStatusColor(device.metrics.l6.encryptionOverheadMs, 'overhead')}`}>{formatNumber(device.metrics.l6.encryptionOverheadMs, 1)}ms</span>
                                         </div>
                                     </div>
 
                                     {/* L7 Metric Cell */}
-                                    <div className="p-4 border-l border-white/5 flex flex-col items-center justify-center">
-                                        <div className={`px-4 py-1.5 rounded-lg font-mono font-bold text-sm ${getStatusColor(device.metrics.l7.appLatency, 'latency')}`}>
-                                            {device.metrics.l7.appLatency}ms
+                                    <div className="p-4 border-l border-white/5 flex flex-col justify-center">
+                                        <div className={`px-4 py-1.5 rounded-lg font-mono font-bold text-sm tabular-nums inline-flex w-fit ${getStatusColor(device.metrics.l7.appLatency, 'latency')}`}>
+                                            {formatNumber(device.metrics.l7.appLatency, 1)}ms
                                         </div>
                                     </div>
 
