@@ -29,7 +29,7 @@ const GlobalSummaryBar = () => {
             {/* Escalation Probability */}
             <div className="bg-gunmetal-900/45 backdrop-blur-md border border-gunmetal-700/70 p-4 rounded-xl flex items-center justify-between ring-1 ring-white/5">
                 <div>
-                    <h3 className="text-gunmetal-400 text-xs font-mono uppercase tracking-widest">Escalation Probability</h3>
+                    <h3 className="text-gunmetal-400 text-xs font-mono uppercase tracking-widest">Escalation Estimate</h3>
                     <p className="text-alert-warning font-mono font-semibold text-2xl mt-1 tabular-nums">{kpiSummary.escalationProbability}%</p>
                 </div>
                 <div className="p-3 bg-alert-warning/10 rounded-lg border border-alert-warning/20">

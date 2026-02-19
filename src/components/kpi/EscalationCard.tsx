@@ -18,16 +18,24 @@ const EscalationCard = () => {
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <h3 className="text-gunmetal-100 font-sans font-bold text-lg tracking-tight">Predictive Insights</h3>
-                    <p className="text-gunmetal-400 text-xs">Thin-stroke probability gauge & micro KPIs</p>
+                    <p className="text-gunmetal-400 text-xs">Probabilistic estimate with threshold, uncertainty band, and action guidance</p>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${getRiskColor(escalationRisk.level)}`}>
-                    {escalationRisk.level} Risk
+                    {escalationRisk.level} Exposure
                 </div>
             </div>
 
             {/* Main Risk Display */}
             <div className="h-44 flex flex-col items-center justify-center mb-4">
-                <RiskGauge score={escalationRisk.probability} />
+                <RiskGauge
+                    score={escalationRisk.probability}
+                    threshold={escalationRisk.escalationThreshold}
+                    rangeLow={escalationRisk.probabilityRange.low}
+                    rangeHigh={escalationRisk.probabilityRange.high}
+                />
+                <p className="mt-2 text-[10px] text-gunmetal-400 font-mono uppercase tracking-widest">
+                    Prediction band: {escalationRisk.probabilityRange.low}% to {escalationRisk.probabilityRange.high}% | Escalation threshold: {escalationRisk.escalationThreshold}%
+                </p>
             </div>
 
             {/* Metrics Grid */}
@@ -35,24 +43,31 @@ const EscalationCard = () => {
                 <div className="bg-gunmetal-950/35 p-3 rounded-lg border border-gunmetal-700/70">
                     <div className="flex items-center gap-2 mb-1">
                         <Clock className="w-4 h-4 text-alert-warning" />
-                        <span className="text-gunmetal-200 text-[10px] font-mono uppercase tracking-widest">Time to Critical</span>
+                        <span className="text-gunmetal-200 text-[10px] font-mono uppercase tracking-widest">Escalation Window</span>
                     </div>
-                    <p className="text-gunmetal-100 font-mono font-semibold tabular-nums">{escalationRisk.timeToCritical}</p>
+                    <p className="text-gunmetal-100 font-mono font-semibold tabular-nums">{escalationRisk.timeToCriticalRange}</p>
                 </div>
                 <div className="bg-gunmetal-950/35 p-3 rounded-lg border border-gunmetal-700/70">
                     <div className="flex items-center gap-2 mb-1">
                         <TrendingUp className="w-4 h-4 text-alert-success" />
-                        <span className="text-gunmetal-200 text-[10px] font-mono uppercase tracking-widest">Model Confidence</span>
+                        <span className="text-gunmetal-200 text-[10px] font-mono uppercase tracking-widest">Model Reliability</span>
                     </div>
-                    <p className="text-gunmetal-100 font-mono font-semibold tabular-nums">{escalationRisk.confidence}%</p>
+                    <p className="text-gunmetal-100 font-mono font-semibold tabular-nums">{escalationRisk.modelReliability}%</p>
+                    <p className="text-gunmetal-500 text-[10px] mt-1">{escalationRisk.reliabilityLabel}</p>
                 </div>
+            </div>
+
+            <div className="bg-gunmetal-950/25 rounded-lg p-3 border border-gunmetal-700/60 mb-4">
+                <div className="text-[10px] uppercase tracking-widest text-gunmetal-400 font-mono mb-1">Decision Guidance</div>
+                <p className="text-xs text-gunmetal-200 mb-1">{escalationRisk.recommendedAction}</p>
+                <p className="text-[10px] text-gunmetal-500">Expected false positive rate near threshold: {escalationRisk.falsePositiveRate}%.</p>
             </div>
 
             {/* SHAP Explainability Section */}
             <div className="bg-gunmetal-950/25 rounded-lg p-4 border border-gunmetal-700/60">
                 <div className="flex items-center gap-2 mb-3">
                     <Info className="w-4 h-4 text-gunmetal-400" />
-                    <h4 className="text-gunmetal-200 text-sm font-sans font-bold tracking-tight">Why this prediction?</h4>
+                    <h4 className="text-gunmetal-200 text-sm font-sans font-bold tracking-tight">Signal contributors (non-causal)</h4>
                 </div>
 
                 <div className="space-y-2.5">
@@ -63,14 +78,14 @@ const EscalationCard = () => {
                                 <span>{item.factor}</span>
                             </div>
                             <span className={`font-mono font-bold tabular-nums ${item.type === 'risk' ? 'text-alert-warning' : 'text-alert-success'}`}>
-                                {item.impact > 0 ? '+' : ''}{item.impact}%
+                                {item.signal > 0 ? '+' : ''}{item.signal.toFixed(1)} idx
                             </span>
                         </div>
                     ))}
                 </div>
 
                 <div className="mt-3 pt-2 border-t border-gunmetal-700/60 text-[10px] text-gunmetal-500 text-center font-mono uppercase tracking-widest">
-                    Based on XGBoost feature importance analysis
+                    Relative influence index from SHAP-style attribution (not additive, not causal)
                 </div>
             </div>
         </div>

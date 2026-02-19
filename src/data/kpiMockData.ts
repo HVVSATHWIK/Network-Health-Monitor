@@ -23,12 +23,19 @@ export interface PropagationNode {
 export interface EscalationRisk {
     probability: number; // 0-100
     level: 'Low' | 'Moderate' | 'High' | 'Critical';
-    timeToCritical: string;
-    confidence: number;
-    drivers: string[];
+    probabilityRange: {
+        low: number;
+        high: number;
+    };
+    escalationThreshold: number;
+    timeToCriticalRange: string;
+    modelReliability: number;
+    reliabilityLabel: string;
+    falsePositiveRate: number;
+    recommendedAction: string;
     predictionFactors: {
         factor: string;
-        impact: number; // positive or negative percentage
+        signal: number; // relative SHAP-like influence index (non-causal, non-additive)
         type: 'risk' | 'safety';
     }[];
 }
@@ -65,14 +72,18 @@ export const propagationChain: PropagationNode[] = [
 export const escalationRisk: EscalationRisk = {
     probability: 78,
     level: 'High',
-    timeToCritical: '5–10 minutes',
-    confidence: 91,
-    drivers: ['Packet Loss > 15%', 'Jitter Spike (85ms)', 'CRC Error Storm'],
+    probabilityRange: { low: 64, high: 86 },
+    escalationThreshold: 70,
+    timeToCriticalRange: '5–10 minutes (P50–P90 estimate)',
+    modelReliability: 83,
+    reliabilityLabel: 'Calibrated reliability (last 30d)',
+    falsePositiveRate: 14,
+    recommendedAction: 'Escalate to OT ops if probability stays above threshold for 3 consecutive windows.',
     predictionFactors: [
-        { factor: 'High CRC errors', impact: 22, type: 'risk' },
-        { factor: 'Packet loss > 15%', impact: 18, type: 'risk' },
-        { factor: 'Downstream device count', impact: 12, type: 'risk' },
-        { factor: 'Stable L6/L7 metrics', impact: -5, type: 'safety' },
+        { factor: 'High CRC errors', signal: 2.2, type: 'risk' },
+        { factor: 'Packet loss > 15%', signal: 1.8, type: 'risk' },
+        { factor: 'Downstream device count', signal: 1.2, type: 'risk' },
+        { factor: 'Stable L6/L7 metrics', signal: -0.5, type: 'safety' },
     ]
 };
 
