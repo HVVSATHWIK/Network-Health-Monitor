@@ -106,7 +106,19 @@ export default function AdvancedAnalytics({
     const endMs = timeRangeValue === 'custom' && timeRangeEnd ? timeRangeEnd.getTime() : now;
 
     const duration = Math.max(endMs - startMs, 60 * 1000);
-    const bins = duration <= 30 * 60 * 1000 ? 20 : duration <= 6 * 60 * 60 * 1000 ? 24 : 28;
+    const bins = duration <= 10 * 60 * 1000
+      ? 16
+      : duration <= 30 * 60 * 1000
+        ? 20
+        : duration <= 60 * 60 * 1000
+          ? 24
+          : duration <= 6 * 60 * 60 * 1000
+            ? 28
+            : duration <= 24 * 60 * 60 * 1000
+              ? 36
+              : duration <= 3 * 24 * 60 * 60 * 1000
+                ? 42
+                : 48;
     const step = duration / bins;
     const points: {
       t: number;
@@ -133,7 +145,9 @@ export default function AdvancedAnalytics({
 
     const format = duration <= 6 * 60 * 60 * 1000
       ? { hour: '2-digit', minute: '2-digit', hour12: false } as const
-      : { month: 'short', day: '2-digit' } as const;
+      : duration <= 3 * 24 * 60 * 60 * 1000
+        ? { month: 'short', day: '2-digit', hour: '2-digit', hour12: false } as const
+        : { month: 'short', day: '2-digit' } as const;
 
     const baseCRC = Math.max(2, metrics.totalCRC / safeCount);
     const baseLatency = Math.max(25, metrics.avgLatency);
@@ -145,21 +159,33 @@ export default function AdvancedAnalytics({
     let emaThroughput = baseThroughput;
 
     const series: { time: string; l7_latency: number; l1_crc: number; throughput: number }[] = [];
+    const durationHours = duration / (60 * 60 * 1000);
+
+    // Deterministic noise — makes each time range look visually distinct
+    const noise = (seed: number) => {
+      const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+      return (x - Math.floor(x)) * 2 - 1; // −1 … +1
+    };
 
     for (let i = 0; i < points.length; i += 1) {
       const current = points[i];
       const prev = points[Math.max(0, i - 1)];
 
-      const trendWave = Math.sin((i / Math.max(points.length - 1, 1)) * Math.PI * 2) * 0.8;
-      const crcRaw = baseCRC + current.l1Pressure * 4.8 + current.linkedPressure * 1.9 + trendWave;
+      const normalizedT = (current.t - startMs) / Math.max(duration, 1);
+      const waveCycles = durationHours <= 1 ? 1.3 : durationHours <= 24 ? 2.1 : 2.8;
+      const trendWave = Math.sin(normalizedT * Math.PI * 2 * waveCycles) * 0.8;
+      const binNoise = noise(i * 17.3 + bins * 3.7) * baseCRC * 0.35;
+      const crcRaw = baseCRC + current.l1Pressure * 4.8 + current.linkedPressure * 1.9 + trendWave + binNoise;
       emaCRC = alpha * crcRaw + (1 - alpha) * emaCRC;
 
       const laggedCrcImpact = Math.max(0, emaCRC - (prev ? (baseCRC + prev.l1Pressure * 2.8) : baseCRC));
-      const latencyRaw = baseLatency + current.l7Pressure * 15 + current.linkedPressure * 4.2 + laggedCrcImpact * 1.15;
+      const latencyNoise = noise(i * 23.1 + bins * 5.3) * baseLatency * 0.2;
+      const latencyRaw = baseLatency + current.l7Pressure * 15 + current.linkedPressure * 4.2 + laggedCrcImpact * 1.15 + latencyNoise;
       emaLatency = alpha * latencyRaw + (1 - alpha) * emaLatency;
 
+      const throughputNoise = noise(i * 31.7 + bins * 7.1) * baseThroughput * 0.15;
       const throughputDrop = current.l1Pressure * 24 + current.linkedPressure * 14 + current.l7Pressure * 8;
-      const throughputRaw = baseThroughput - throughputDrop;
+      const throughputRaw = baseThroughput - throughputDrop + throughputNoise;
       emaThroughput = alpha * throughputRaw + (1 - alpha) * emaThroughput;
 
       series.push({
@@ -193,14 +219,12 @@ export default function AdvancedAnalytics({
         {/* L1 vs L7 Correlation Chart */}
         <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-50"><Activity className="w-16 h-16 text-slate-800" /></div>
-          <div className="absolute top-4 right-4 text-[10px] uppercase tracking-widest font-semibold text-blue-300 bg-blue-500/10 border border-blue-500/25 px-2 py-1 rounded-md">
-            Window: {timeRangeLabel}
-          </div>
+
           <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2 tracking-wide">
             <TrendingUp className="w-5 h-5 text-blue-400" />
-            L1 vs L7 Correlation ({timeRangeLabel})
+            L1 vs L7 Correlation
           </h3>
-          <p className="text-xs text-slate-400 mb-6">Market-style timeline: latency trend line + CRC pressure bars (synced with header range)</p>
+          <p className="text-xs text-slate-400 mb-6">Market-style timeline: latency trend line + CRC pressure bars — <span className="text-blue-400 font-medium">{timeRangeLabel}</span></p>
 
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart key={chartSyncKey} data={timeSeriesData}>

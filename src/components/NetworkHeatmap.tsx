@@ -1,58 +1,116 @@
 import { useMemo } from 'react';
 import { Flame } from 'lucide-react';
-import { Alert } from '../types/network';
+import { Alert, Device } from '../types/network';
 
 interface NetworkHeatmapProps {
   alerts?: Alert[];
+  devices?: Device[];
 }
 
-export default function NetworkHeatmap({ alerts = [] }: NetworkHeatmapProps) {
+export default function NetworkHeatmap({ alerts = [], devices = [] }: NetworkHeatmapProps) {
   const heatmapData = useMemo(() => {
-    const data = [];
+    const data: { layer: string; metric: string; value: number }[] = [];
     const layers = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'];
     const metrics = ['Utilization', 'Latency', 'Errors', 'Packets', 'Jitter'];
+    const n = Math.max(devices.length, 1);
 
-    // Check if we have the specific "Rigged" faults active
-    const hasL1Fault = alerts.some(a => a.layer === 'L1' && a.severity === 'critical');
-    const hasL7Fault = alerts.some(a => a.layer === 'L7' && a.severity === 'high');
+    // Aggregate real metrics per layer from actual device telemetry
+    const layerMetrics: Record<string, { utilization: number; latency: number; errors: number; packets: number; jitter: number }> = {};
 
-    for (let i = 0; i < layers.length; i++) {
-      for (let j = 0; j < metrics.length; j++) {
-        const layer = layers[i];
-        const metric = metrics[j];
+    // Compute per-layer averages from real device data
+    const avgTemp = devices.reduce((s, d) => s + d.metrics.l1.temperature, 0) / n;
+    const avgCRC = devices.reduce((s, d) => s + d.metrics.l2.crcErrors, 0) / n;
+    const avgLinkUtil = devices.reduce((s, d) => s + d.metrics.l2.linkUtilization, 0) / n;
+    const avgLoss = devices.reduce((s, d) => s + d.metrics.l3.packetLoss, 0) / n;
+    const avgRoutes = devices.reduce((s, d) => s + d.metrics.l3.routingTableSize, 0) / n;
+    const avgRetrans = devices.reduce((s, d) => s + d.metrics.l4.tcpRetransmissions, 0) / n;
+    const avgJitter = devices.reduce((s, d) => s + d.metrics.l4.jitter, 0) / n;
+    const avgSessionResets = devices.reduce((s, d) => s + d.metrics.l5.sessionResets, 0) / n;
+    const avgSessionStability = devices.reduce((s, d) => s + d.metrics.l5.sessionStability, 0) / n;
+    const avgTlsFail = devices.reduce((s, d) => s + d.metrics.l6.tlsHandshakeFailures, 0) / n;
+    const avgEncOverhead = devices.reduce((s, d) => s + d.metrics.l6.encryptionOverheadMs, 0) / n;
+    const avgAppLatency = devices.reduce((s, d) => s + d.metrics.l7.appLatency, 0) / n;
 
-        // Default Logic: Skew towards Healthy (0-20)
-        // 85% chance of being Healthy (0-20)
-        // 10% chance of being Warning (40-60)
-        // 5% chance of being Critical (80-100)
-        const rand = Math.random();
-        let val = 0;
-        if (rand < 0.85) {
-          val = Math.floor(Math.random() * 20); // Healthy
-        } else if (rand < 0.95) {
-          val = Math.floor(Math.random() * 20) + 40; // Warning
-        } else {
-          val = Math.floor(Math.random() * 20) + 80; // Critical
-        }
+    // Count alerts per layer for the "Packets" and "Errors" pressure signals
+    const alertsByLayer: Record<string, number> = {};
+    alerts.forEach(a => { alertsByLayer[a.layer] = (alertsByLayer[a.layer] || 0) + 1; });
 
-        // --- DYNAMIC DEMO SCENARIO ---
-        // Only trigger the spike if the Fault is actually active in the system
-        if (hasL1Fault && layer === 'L1' && metric === 'Errors') {
-          val = 95; // SPIKE!
-        }
-        if (hasL7Fault && layer === 'L7' && metric === 'Latency') {
-          val = 88; // SPIKE!
-        }
+    const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
 
-        data.push({
-          layer,
-          metric,
-          value: Math.min(100, Math.max(0, val))
-        });
+    // L1 — Physical
+    layerMetrics['L1'] = {
+      utilization: clamp(Math.max(0, avgTemp - 20) * 1.2),       // Temp-driven: 20°C=0%, 100°C=96%
+      latency: clamp(avgAppLatency * 0.05),                       // Physical doesn't have latency per se, tiny contribution
+      errors: clamp(avgCRC > 50 ? 90 : avgCRC > 10 ? 50 : avgCRC * 2),  // CRC errors map to error severity
+      packets: clamp((alertsByLayer['L1'] || 0) * 20),            // Alert count as packet pressure
+      jitter: clamp(avgJitter * 0.3),                             // Physical jitter contribution
+    };
+
+    // L2 — Data Link
+    layerMetrics['L2'] = {
+      utilization: clamp(avgLinkUtil),                             // Direct link utilization
+      latency: clamp(avgCRC * 0.15),                              // CRC causes retransmit delays
+      errors: clamp(avgCRC > 50 ? 85 : avgCRC > 10 ? 40 : avgCRC * 1.5),
+      packets: clamp(avgLinkUtil * 0.4),                          // Packet throughput proportional to utilization
+      jitter: clamp(avgCRC * 0.8),                                // CRC errors increase jitter
+    };
+
+    // L3 — Network
+    layerMetrics['L3'] = {
+      utilization: clamp(avgRoutes / 5),                           // Route table pressure (500=100%)
+      latency: clamp(avgLoss * 8),                                 // Packet loss increases effective latency
+      errors: clamp(avgLoss * 20),                                 // Loss is the primary L3 error
+      packets: clamp(avgRoutes / 3),                               // Route count ~ packet diversity
+      jitter: clamp(avgLoss * 5),                                  // Loss causes jitter spikes
+    };
+
+    // L4 — Transport
+    layerMetrics['L4'] = {
+      utilization: clamp(avgRetrans * 40),                         // Retransmissions drive utilization overhead
+      latency: clamp(avgJitter * 1.5),                             // Jitter IS latency variation
+      errors: clamp(avgRetrans * 30),                              // Retransmissions are transport errors
+      packets: clamp(avgJitter * 0.8 + avgRetrans * 15),           // Combined packet pressure
+      jitter: clamp(avgJitter * 2),                                // Direct jitter mapping
+    };
+
+    // L5 — Session
+    layerMetrics['L5'] = {
+      utilization: clamp(100 - avgSessionStability),                // Instability = utilization pressure
+      latency: clamp(avgSessionResets * 2),                        // Resets cause latency spikes
+      errors: clamp(avgSessionResets * 5),                         // Session resets are errors
+      packets: clamp((100 - avgSessionStability) * 3),             // Instability affects packet flow
+      jitter: clamp(avgSessionResets * 1.5),                       // Resets cause intermittent jitter
+    };
+
+    // L6 — Presentation
+    layerMetrics['L6'] = {
+      utilization: clamp(avgEncOverhead * 5),                      // Encryption overhead
+      latency: clamp(avgEncOverhead * 4),                          // Direct overhead → latency
+      errors: clamp(avgTlsFail * 10),                              // TLS failures
+      packets: clamp(avgTlsFail * 5 + avgEncOverhead * 2),         // Combined
+      jitter: clamp(avgEncOverhead * 2),                           // Encryption processing variance
+    };
+
+    // L7 — Application
+    layerMetrics['L7'] = {
+      utilization: clamp(avgAppLatency / 5),                       // App latency as utilization proxy
+      latency: clamp(Math.min(avgAppLatency / 3, 100)),            // Direct application latency
+      errors: clamp((alertsByLayer['L7'] || 0) * 15 + (avgAppLatency > 500 ? 40 : 0)),
+      packets: clamp(avgAppLatency / 4),                           // Higher latency = more packet pressure
+      jitter: clamp(avgJitter * 0.5 + avgAppLatency * 0.02),       // Combined sources
+    };
+
+    // Build the grid data
+    for (const layer of layers) {
+      const lm = layerMetrics[layer];
+      for (const metric of metrics) {
+        const key = metric.toLowerCase() as keyof typeof lm;
+        data.push({ layer, metric, value: lm[key] ?? 0 });
       }
     }
+
     return data;
-  }, [alerts]); // Re-run when alerts change
+  }, [alerts, devices]);
 
   const getColor = (value: number) => {
     if (value < 20) return 'bg-blue-600';

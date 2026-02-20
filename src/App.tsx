@@ -19,7 +19,6 @@ import { NetworkSimulation } from './services/SimulationService';
 import VisualGuide from './components/VisualGuide';
 import BootSequence from './components/BootSequence';
 import KPIMatrix from './components/KPIMatrix';
-import { UnifiedForensicView } from './components/forensics/unified/UnifiedForensicView'; // Updated import
 import Login from './components/Login'; // Import Login
 import BusinessROI from './components/BusinessROI'; // Import ROI Widget
 import LayerMenu from './components/LayerMenu'; // Import LayerMenu
@@ -66,9 +65,10 @@ function App() {
   const [isForensicOpen, setIsForensicOpen] = useState(false);
   const [forensicSystemMessage, setForensicSystemMessage] = useState<string | undefined>(undefined);
   const [isNetMonitAIOpen, setIsNetMonitAIOpen] = useState(false);
+  const [aiSystemMessage, setAiSystemMessage] = useState<string | undefined>(undefined);
 
   // Time Range State
-  const [timeRange, setTimeRange] = useState<TimeRange>({ ...TIME_RANGE_PRESETS[0] });
+  const [timeRange, setTimeRange] = useState<TimeRange>({ ...TIME_RANGE_PRESETS[2] }); // Default to '1h' so initial alerts don't age out
 
   // Persistent Auth Listener
   useEffect(() => {
@@ -270,7 +270,15 @@ function App() {
     setActiveView('3d');
 
     // Open the forensic scan modal and auto-run a "full stack" diagnosis.
-    setForensicSystemMessage(`Initiate full stack diagnostic scan (L1–L7) for ${userName}.`);
+    const unhealthyCount = devices.filter((d) => d.status !== 'healthy').length;
+    const degradedLinks = connections.filter((c) => c.status !== 'healthy').length;
+    const recentAlerts = filteredAlerts.slice(0, 3).map((a) => `${a.device} (${a.layer}) ${a.message}`).join(' | ');
+    setForensicSystemMessage(
+      `Initiate full stack diagnostic scan (L1–L7) for ${userName}. ` +
+      `Live state: alerts=${filteredAlerts.length}, unhealthyDevices=${unhealthyCount}, degradedLinks=${degradedLinks}. ` +
+      `${recentAlerts ? `Recent alerts: ${recentAlerts}. ` : ''}` +
+      `Scan request id: ${Date.now()}.`
+    );
     setIsForensicOpen(true);
 
     // Clear previous scan timers so repeated clicks behave predictably.
@@ -304,7 +312,43 @@ function App() {
     }, 45000));
   };
 
-  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const runRootCauseAnalysis = () => {
+    setActiveView('3d');
+
+    const recencyWindowMs = 10 * 60 * 1000;
+    const now = Date.now();
+    const severityRank: Record<'critical' | 'high' | 'medium' | 'low' | 'info', number> = {
+      critical: 5,
+      high: 4,
+      medium: 3,
+      low: 2,
+      info: 1,
+    };
+
+    const recentActionableAlerts = filteredAlerts
+      .filter((a) => {
+        const ts = new Date(a.timestamp).getTime();
+        return Number.isFinite(ts) && now - ts <= recencyWindowMs && a.severity !== 'info';
+      })
+      .sort((a, b) => {
+        const severityDelta = severityRank[b.severity] - severityRank[a.severity];
+        if (severityDelta !== 0) return severityDelta;
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      });
+
+    const hasLiveDegradation =
+      devices.some((d) => d.status !== 'healthy') ||
+      connections.some((c) => c.status !== 'healthy');
+
+    const contextPrompt = recentActionableAlerts.length > 0
+      ? `Perform root cause analysis on current live alerts. Prioritize highest severity and explain cause, impact, and remediation. Top alert: ${recentActionableAlerts[0].device} (${recentActionableAlerts[0].layer}) - ${recentActionableAlerts[0].message}`
+      : hasLiveDegradation
+        ? 'Perform proactive root cause analysis using current live telemetry (devices, links, KPIs, workflows). There are degraded elements but no fresh high-signal alert in the last 10 minutes. Identify likely root causes and remediation.'
+        : 'Validate that the system is currently healthy and incident is resolved. If no active fault exists, provide a short health confirmation and top preventive recommendations.';
+
+    setAiSystemMessage(`${contextPrompt}\n\nRequest timestamp: ${new Date().toISOString()}`);
+    setIsNetMonitAIOpen(true);
+  };
 
   // GAMIFICATION: Auto-Advance Tour based on User Actions
   // GAMIFICATION: Auto-Advance Tour Logic removed (Replaced by VisualGuide)
@@ -399,11 +443,30 @@ function App() {
 
               <button
                 id="forensic-cockpit-trigger"
-                onClick={() => setIsCopilotOpen(true)}
+                onClick={() => {
+                  // Build a context-aware forensic prompt
+                  const unhealthyCount = devices.filter((d) => d.status !== 'healthy').length;
+                  const degradedLinks = connections.filter((c) => c.status !== 'healthy').length;
+                  const topAlerts = filteredAlerts.slice(0, 3).map((a) => `${a.device} (${a.layer}): ${a.message}`).join(' | ');
+                  const prompt = unhealthyCount > 0 || filteredAlerts.length > 0
+                    ? `Forensic analysis requested. Live state: ${filteredAlerts.length} alerts, ${unhealthyCount} unhealthy devices, ${degradedLinks} degraded links. ${topAlerts ? `Active issues: ${topAlerts}.` : ''} Investigate root cause and impact chain.`
+                    : `Forensic health audit requested. All ${devices.length} devices operational, ${degradedLinks} degraded links. Perform preventive analysis and identify potential risks.`;
+                  setForensicSystemMessage(`${prompt} Request id: ${Date.now()}.`);
+                  setIsForensicOpen(true);
+                }}
                 className="h-10 whitespace-nowrap inline-flex items-center gap-2 px-3.5 bg-slate-900/70 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-lg transition-all text-sm font-medium"
               >
                 <Terminal className="w-4 h-4" />
                 <span>Forensic Cockpit</span>
+              </button>
+
+              <button
+                id="root-cause-analysis-trigger"
+                onClick={runRootCauseAnalysis}
+                className="h-10 whitespace-nowrap inline-flex items-center gap-2 px-3.5 bg-slate-900/70 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-lg transition-all text-sm font-medium"
+              >
+                <Bot className="w-4 h-4" />
+                <span>Root Cause Analysis</span>
               </button>
 
               <button
@@ -416,28 +479,10 @@ function App() {
               </button>
 
               <div id="network-health-badge" className="hidden md:flex items-center gap-2 bg-slate-900/70 border border-slate-700 px-3 py-1.5 rounded-lg whitespace-nowrap">
-                <Shield className="w-4 h-4 text-green-400" />
+                <Shield className={`w-4 h-4 ${devices.some(d => d.status === 'critical') ? 'text-red-400' : devices.some(d => d.status === 'warning') ? 'text-yellow-400' : 'text-green-400'}`} />
                 <div>
                   <div className="text-[10px] text-slate-500 uppercase tracking-wider">Health</div>
-                  <div className={`text-sm font-bold ${healthPercentage < 90 ? 'text-red-400' : 'text-green-400'}`}>{healthPercentage}%</div>
-                </div>
-              </div>
-
-              <div id="ai-monitor-badge" className="hidden xl:flex items-center gap-2 bg-slate-900/70 px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
-                <Bot className="w-4 h-4 text-indigo-400" />
-                <div>
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider">AI Coverage</div>
-                  <div className="text-xs font-semibold text-indigo-300">
-                    {aiMonitoringSnapshot.monitoredLayers.length}/7 layers · {aiMonitoringSnapshot.monitoredDevices} assets
-                  </div>
-                </div>
-              </div>
-
-              <div className="hidden xl:flex items-center gap-2 bg-slate-900/70 px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
-                <Activity className="w-4 h-4 text-blue-400" />
-                <div>
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider">Assets</div>
-                  <div className="text-xs font-semibold text-blue-300">{healthyDevices}/{totalDevices}</div>
+                  <div className={`text-sm font-bold ${healthPercentage < 70 ? 'text-red-400' : healthPercentage < 90 ? 'text-yellow-400' : 'text-green-400'}`}>{healthPercentage}%</div>
                 </div>
               </div>
 
@@ -485,7 +530,7 @@ function App() {
 
       {/* Visual Guide Overlay (Manual Trigger) */}
       <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6">
-        <div className="mb-6 inline-flex flex-wrap gap-1 rounded-xl border border-slate-800 bg-slate-900/55 p-1.5 backdrop-blur-sm">
+        <div className="mb-3 inline-flex flex-wrap gap-1 rounded-xl border border-slate-800 bg-slate-900/55 p-1.5 backdrop-blur-sm">
           <button
             id="view-3d-trigger"
             onClick={() => setActiveView('3d')}
@@ -532,6 +577,26 @@ function App() {
           </button>
         </div>
 
+        <div className="mb-6 hidden lg:flex items-center gap-2">
+          <div id="ai-monitor-badge" className="flex items-center gap-2 bg-slate-900/70 px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
+            <Bot className="w-4 h-4 text-indigo-400" />
+            <div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider">AI Coverage</div>
+              <div className="text-xs font-semibold text-indigo-300">
+                {aiMonitoringSnapshot.monitoredLayers.length}/7 layers · {aiMonitoringSnapshot.monitoredDevices} assets
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 bg-slate-900/70 px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
+            <Activity className="w-4 h-4 text-blue-400" />
+            <div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider">Assets</div>
+              <div className="text-xs font-semibold text-blue-300">{healthyDevices}/{totalDevices}</div>
+            </div>
+          </div>
+        </div>
+
         {
           activeView === 'layer' && selectedLayer && (
             <LayerOverview
@@ -565,13 +630,13 @@ function App() {
 
               {/* New Analysis Cards */}
               <div className="col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-                <OTHealthCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} />
-                <NetworkLoadCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} />
-                <CorrelationTimelineCard />
+                <OTHealthCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} device={devices.find(d => d.id === 'd3')} />
+                <NetworkLoadCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} device={devices.find(d => d.id === 'd10')} connections={connections} devices={devices} />
+                <CorrelationTimelineCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} alerts={filteredAlerts} devices={devices} connections={connections} />
               </div>
 
               {/* Critical Panels: Status & Alerts */}
-              <div className="col-span-12 lg:col-span-4">
+              <div className="col-span-12 lg:col-span-4" id="asset-status-panel">
                 <DeviceStatus
                   devices={devices}
                   connections={connections}
@@ -580,7 +645,7 @@ function App() {
                   onInjectFault={(id: string) => handleInjectFault(devices.find(d => d.id === id)?.category === 'OT' ? 'l1' : 'l7')}
                 />
               </div>
-              <div className="col-span-12 lg:col-span-8">
+              <div className="col-span-12 lg:col-span-8" id="alerts-panel">
                 <AlertPanel alerts={filteredAlerts} devices={devices} />
               </div>
 
@@ -591,8 +656,8 @@ function App() {
                   selectedDevice={devices.find(d => d.id === selectedDeviceId) ?? null}
                 />
               </div>
-              <div className="col-span-12 lg:col-span-6">
-                <NetworkHeatmap alerts={filteredAlerts} />
+              <div className="col-span-12 lg:col-span-6" id="heatmap-panel">
+                <NetworkHeatmap alerts={filteredAlerts} devices={devices} />
               </div>
             </div>
           )
@@ -682,25 +747,15 @@ function App() {
       </main >
       {/* Onboarding Tour Removed Duplicate */}
 
-      {/* AI Assistant Replaced by Unified Forensic Cockpit */}
-      {
-        isCopilotOpen && (
-          <UnifiedForensicView
-            userName={userName}
-            alerts={filteredAlerts}
-            devices={devices}
-            onClose={() => setIsCopilotOpen(false)}
-          />
-        )
-      }
-
       {/* NetMonitAI Assistant (floating button + chat panel) */}
       <AICopilot
         userName={userName}
+        systemMessage={aiSystemMessage}
         alerts={filteredAlerts}
         devices={devices}
         connections={connections}
         dependencyPaths={dependencyPaths}
+        layerKPIs={layerKPIs}
         systemContext={{
           activeView,
           selectedLayer,

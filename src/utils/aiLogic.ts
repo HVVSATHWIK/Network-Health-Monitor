@@ -371,10 +371,62 @@ const genAI = new GoogleGenerativeAI(
     import.meta.env.VITE_AI_API_KEY || "dummy_key"
 );
 
-const model = genAI.getGenerativeModel(
-    { model: import.meta.env.VITE_AI_MODEL || "gemini-2.5-flash-lite" },
-    { apiVersion: "v1" }
-);
+const PRIMARY_GEMINI_MODEL = import.meta.env.VITE_AI_MODEL || 'gemini-2.5-flash-lite';
+const FALLBACK_GEMINI_MODEL = import.meta.env.VITE_AI_FALLBACK_MODEL || 'gemini-2.0-flash';
+
+const getModel = (modelName: string) =>
+    genAI.getGenerativeModel(
+        { model: modelName },
+        { apiVersion: 'v1' }
+    );
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isTransientGeminiError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+
+    const rec = error as Record<string, unknown>;
+    const status = rec.status;
+    const statusText = rec.statusText;
+    const msg = typeof rec.message === 'string' ? rec.message : String(error);
+    const normalized = `${String(status ?? '')} ${String(statusText ?? '')} ${msg}`.toLowerCase();
+
+    return (
+        normalized.includes('503') ||
+        normalized.includes('429') ||
+        normalized.includes('high demand') ||
+        normalized.includes('unavailable') ||
+        normalized.includes('deadline exceeded') ||
+        normalized.includes('timed out')
+    );
+}
+
+async function generateWithRetry(prompt: string, modelName: string): Promise<string> {
+    const maxAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+            const model = getModel(modelName);
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            return response.text();
+        } catch (error) {
+            const isTransient = isTransientGeminiError(error);
+            const isLastAttempt = attempt === maxAttempts;
+
+            if (!isTransient || isLastAttempt) {
+                throw error;
+            }
+
+            const baseDelay = 700;
+            const jitter = Math.floor(Math.random() * 200);
+            const backoff = baseDelay * Math.pow(2, attempt - 1) + jitter;
+            await sleep(backoff);
+        }
+    }
+
+    throw new Error('Gemini retry loop exhausted unexpectedly');
+}
 
 // ---------------- PROMPT BUILDER ----------------
 
@@ -467,6 +519,18 @@ Answer the question directly and simply.
 IF STATUS CHECK Intent:
 List the relevant alerts or devices clearly.
 
+IF WEBSITE/UI NAVIGATION HELP Intent (user asks how to use the dashboard):
+The dashboard has these key interactions:
+- Click any device in the 3D map or Asset Status list to open a detail panel showing its health metrics, connections, and status.
+- "Run Diagnostic Scan" button scans all devices and opens Forensic Cockpit with results.
+- "Root Cause Analysis" button triggers AI analysis of all active issues.
+- "Forensic Cockpit" opens a deep investigation workspace.
+- "NetMonit AI" opens a chat assistant.
+- The book icon (📖) opens a step-by-step Visual Guide with illustrations.
+- Time Range dropdown filters alerts and data to a chosen window.
+- The heatmap shows color-coded device health across all network layers.
+- Gear icon (⚙) in 3D view lets you inject simulated faults for testing.
+
 ================================================
 USER QUERY:
 "${query}"
@@ -489,11 +553,27 @@ async function callGeminiAPI(
         }
 
         const prompt = buildPrompt(query, alerts, devices, connections, dependencies);
+        try {
+            return await generateWithRetry(prompt, PRIMARY_GEMINI_MODEL);
+        } catch (primaryError) {
+            const canTryFallback =
+                FALLBACK_GEMINI_MODEL.trim().length > 0 &&
+                FALLBACK_GEMINI_MODEL !== PRIMARY_GEMINI_MODEL;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
+            if (canTryFallback && isTransientGeminiError(primaryError)) {
+                try {
+                    return await generateWithRetry(prompt, FALLBACK_GEMINI_MODEL);
+                } catch (fallbackError) {
+                    console.error(`Gemini API Error (fallback model: ${FALLBACK_GEMINI_MODEL}):`, fallbackError);
+                    return 'Gemini is temporarily overloaded (503/high demand). Please retry in 30-60 seconds. Your local quota remains enforced at 15 requests/minute and 1000/day.';
+                }
+            }
 
-        return response.text();
+            console.error(`Gemini API Error (primary model: ${PRIMARY_GEMINI_MODEL}):`, primaryError);
+            const offlineKnowledge = buildOfflineGeneralKnowledgeResponse(query);
+            if (offlineKnowledge) return `${offlineKnowledge}\n\n(Served from local fallback because Gemini request failed.)`;
+            return 'Gemini request failed. Check API key/model settings and retry. If this is a temporary provider spike, try again shortly.';
+        }
 
     } catch (error) {
         console.error("Gemini API Error:", error);
@@ -503,10 +583,55 @@ async function callGeminiAPI(
 
 // ---------------- LOCAL (DETERMINISTIC) ANALYSIS ----------------
 
-type Intent = 'GENERAL_KNOWLEDGE' | 'STATUS_CHECK' | 'DIAGNOSTIC_ANALYSIS';
+type Intent = 'GENERAL_KNOWLEDGE' | 'STATUS_CHECK' | 'DIAGNOSTIC_ANALYSIS' | 'WEBSITE_ASSIST';
+
+function stripRuntimeContext(query: string): string {
+    const marker = 'RUNTIME SYSTEM CONTEXT:';
+    const idx = query.indexOf(marker);
+    if (idx === -1) return query.trim();
+    return query.slice(0, idx).trim();
+}
 
 function classifyIntent(query: string): Intent {
-    const q = query.toLowerCase();
+    const q = stripRuntimeContext(query).toLowerCase();
+
+    const websiteAssistHints = [
+        'where is',
+        'where can i find',
+        'how do i',
+        'how to',
+        'which button',
+        'which tab',
+        'open netmonit ai',
+        'open forensic cockpit',
+        'run diagnostic scan',
+        'import data',
+        'system logs',
+        'kpi intelligence',
+        '3d topology',
+        'analytics view',
+        'layer view',
+        'navigate',
+        'dashboard',
+        'click a device',
+        'click device',
+        'click sensor',
+        'click on a',
+        'select a device',
+        'device details',
+        'device info',
+        'side panel',
+        'detail panel',
+        'asset detail',
+        'guide',
+        'tutorial',
+        'walkthrough',
+        'help me use',
+        'heatmap',
+        'heat map',
+        'color grid',
+    ];
+    if (websiteAssistHints.some((h) => q.includes(h))) return 'WEBSITE_ASSIST';
 
     const statusHints = [
         'list active alerts',
@@ -544,6 +669,141 @@ function classifyIntent(query: string): Intent {
     if (diagnosticHints.some((h) => q.includes(h))) return 'DIAGNOSTIC_ANALYSIS';
 
     return 'GENERAL_KNOWLEDGE';
+}
+
+function buildWebsiteAssistText(
+    query: string,
+    alerts: Alert[],
+    devices: Device[],
+    connections: NetworkConnection[]
+): string {
+    const q = stripRuntimeContext(query).toLowerCase();
+    const unhealthy = devices.filter((d) => d.status !== 'healthy').length;
+    const degradedLinks = connections.filter((c) => c.status !== 'healthy').length;
+
+    if (q.includes('root cause') || q.includes('rca')) {
+        return [
+            'To run root cause analysis:',
+            '1) Click "Root Cause Analysis" button in the header — the AI reads all alerts and device data, then tells you what broke, why, and how to fix it.',
+            '2) Or in Active Alerts, click "AI Root Cause" on any individual alert card for per-alert analysis.',
+            '3) Or use "Run Diagnostic Scan" to trigger a full scan and get forensic results automatically.',
+            '',
+            `Current state: ${alerts.length} active alert(s), ${unhealthy} unhealthy device(s), ${degradedLinks} degraded/down link(s).`,
+        ].join('\n');
+    }
+
+    if (q.includes('click') || q.includes('device') || q.includes('sensor') || q.includes('detail') || q.includes('side panel') || q.includes('info')) {
+        return [
+            'To see detailed info about any device (sensor, switch, PLC, router):',
+            '1) In the 3D Topology map, click on any device node — a detail panel slides in from the right.',
+            '2) Or in the Asset Status list (below the 3D map), click any row to open the same detail panel.',
+            '',
+            'The detail panel shows:',
+            '- Device name and current status (Healthy / Warning / Critical)',
+            '- Live metrics: temperature, latency, CRC errors, packet loss, jitter',
+            '- Upstream and downstream connected devices',
+            '- Quick actions like fault injection for testing',
+            '',
+            'Click the dark backdrop behind the panel to close it.',
+            '',
+            `Current state: ${devices.length} devices total, ${unhealthy} unhealthy, ${degradedLinks} degraded link(s).`,
+        ].join('\n');
+    }
+
+    if (q.includes('forensic cockpit') || q.includes('forensic')) {
+        return [
+            'Forensic Cockpit is available from the header button labeled "Forensic Cockpit".',
+            'It opens with a live summary of your system state (alerts, unhealthy devices, degraded links).',
+            'You can then ask it specific questions like "Analyze the cable fault" or run a full audit.',
+            'It uses AI to trace the problem from root cause through the propagation chain.',
+            `Current state: ${alerts.length} active alert(s) available for investigation.`,
+        ].join('\n');
+    }
+
+    if (q.includes('guide') || q.includes('tutorial') || q.includes('how to use') || q.includes('help')) {
+        return [
+            'Click the book icon (📖) in the header to open the Visual Guide.',
+            'It walks you through every feature step-by-step with illustrations:',
+            '- How to run a diagnostic scan',
+            '- How to click a device to see its details',
+            '- How to read the heatmap and alerts',
+            '- How to use the Forensic Cockpit and AI chat',
+            '- How to simulate faults for testing',
+            '',
+            'You can restart the guide anytime.',
+        ].join('\n');
+    }
+
+    if (q.includes('netmonit ai') || q.includes('ai') || q.includes('chat')) {
+        return [
+            'NetMonit AI opens from the header button "NetMonit AI" (or the floating chat launcher at the bottom).',
+            'Ask it anything:',
+            '- "What is CRC?" — general knowledge answers',
+            '- "List all critical devices" — live status checks',
+            '- "Why is the network slow?" — AI root cause analysis',
+            '',
+            `It sees the same live data: ${alerts.length} alert(s), ${devices.length} device(s), ${connections.length} link(s).`,
+        ].join('\n');
+    }
+
+    if (q.includes('heatmap') || q.includes('heat map') || q.includes('color grid')) {
+        return [
+            'The Network Health Heatmap is a color grid below the 3D map.',
+            'It shows health metrics across all 7 network layers (L1–L7):',
+            '- Green cells = that metric is healthy',
+            '- Yellow cells = needs attention',
+            '- Red cells = problem detected',
+            '',
+            'Values are computed from actual device metrics (temperature, CRC errors, packet loss, latency, etc.) and update in real-time.',
+        ].join('\n');
+    }
+
+    if (q.includes('alert') || q.includes('warning') || q.includes('critical')) {
+        return [
+            'Active Alerts appear in the panel on the 3D Topology view.',
+            'Each alert shows: severity (Critical/High/Medium/Low), device name, layer, and message.',
+            'Click "AI Root Cause" on any alert card to get an AI explanation of what caused it.',
+            'New alerts are generated automatically when a device transitions to warning or critical.',
+            '',
+            `Current: ${alerts.length} active alert(s), ${unhealthy} unhealthy device(s).`,
+        ].join('\n');
+    }
+
+    return [
+        'Here\'s how to navigate the dashboard:',
+        '',
+        '📖 **Guide**: Click the book icon in the header for a step-by-step visual walkthrough.',
+        '🔍 **Run Diagnostic Scan**: Scans all devices and opens forensic results.',
+        '👆 **Click any device**: In the 3D map or Asset Status list — opens a detail panel with all metrics.',
+        '🤖 **Root Cause Analysis**: One-click AI analysis of all active issues.',
+        '🔬 **Forensic Cockpit**: Deep investigation tool with AI-powered chain-of-thought analysis.',
+        '💬 **NetMonit AI**: Chat assistant for questions about your network.',
+        '📊 **Views**: 3D Topology, Analytics, KPI Intelligence, System Logs.',
+        '',
+        `Live status: ${alerts.length} alert(s), ${unhealthy} unhealthy device(s), ${degradedLinks} degraded link(s).`,
+    ].join('\n');
+}
+
+function buildOfflineGeneralKnowledgeResponse(query: string): string | null {
+    const q = stripRuntimeContext(query).toLowerCase();
+
+    if (q.includes('crc')) {
+        return 'CRC (Cyclic Redundancy Check) errors indicate data integrity failures at L2. Rising CRC usually points to bad cabling, duplex mismatch, EMI, or failing ports/transceivers.';
+    }
+    if (q.includes('latency')) {
+        return 'Latency is end-to-end delay for packet delivery, typically measured in milliseconds. Persistent latency spikes are often symptoms of congestion, packet loss, queueing, or upstream physical/link instability.';
+    }
+    if (q.includes('jitter')) {
+        return 'Jitter is variation in packet delay over time. High jitter can break OT/real-time traffic even when average latency appears acceptable.';
+    }
+    if (q.includes('packet loss')) {
+        return 'Packet loss is the percentage of packets that never reach destination. In IT/OT systems, sustained loss often cascades into retransmissions, timeout storms, and application-level failures.';
+    }
+    if (q.includes('osi')) {
+        return 'OSI is a 7-layer model (L1 Physical to L7 Application). In root-cause analysis, faults often originate in lower layers (L1-L3) and propagate upward as L4-L7 symptoms.';
+    }
+
+    return null;
 }
 
 function buildStatusText(alerts: Alert[], devices: Device[]): string {
@@ -696,6 +956,57 @@ function buildDeterministicForensicReport(
     };
 }
 
+function buildHealthyForensicReport(
+    query: string,
+    devices: Device[],
+    connections: NetworkConnection[]
+): ForensicReport {
+    const now = Date.now();
+    const healthyDevices = devices.filter((d) => d.status === 'healthy').length;
+    const degradedLinks = connections.filter((c) => c.status !== 'healthy').length;
+
+    return {
+        criticality: 'low',
+        rootCause: 'No active root cause identified in current live telemetry.',
+        chainOfThought: [
+            {
+                id: `step-${now}-1`,
+                timestamp: now,
+                agent: 'Coordinator',
+                action: 'Validate current telemetry state',
+                status: 'success',
+                result: `${healthyDevices}/${devices.length} devices healthy; ${degradedLinks} degraded/down links`,
+            },
+            {
+                id: `step-${now}-2`,
+                timestamp: now + 300,
+                agent: 'Reliability',
+                action: 'Check for recent high-confidence fault indicators',
+                status: 'success',
+                result: 'No active incident pattern detected',
+            },
+        ],
+        artifacts: [
+            {
+                type: 'json_log',
+                title: 'Healthy State Verification',
+                description: 'No active fault chain identified; system appears stable at analysis time.',
+                data: {
+                    query,
+                    devices: { total: devices.length, healthy: healthyDevices },
+                    links: { total: connections.length, degradedOrDown: degradedLinks },
+                    analyzedAt: new Date(now).toISOString(),
+                },
+            },
+        ],
+        recommendations: [
+            'Continue live monitoring and keep alert thresholds calibrated.',
+            'If issue was recently fixed, monitor for 10-15 minutes to confirm no recurrence.',
+        ],
+        summary: 'System is operating normally. No active root cause found in current telemetry.',
+    };
+}
+
 // ---------------- MAIN ANALYSIS ----------------
 
 export async function analyzeWithMultiAgents(
@@ -726,7 +1037,27 @@ export async function analyzeWithMultiAgents(
 
     // For diagnostics, always return a structured report so forensic UIs can render artifacts/steps.
     if (intent === 'DIAGNOSTIC_ANALYSIS') {
-        return buildDeterministicForensicReport(userQuery, activeAlerts, devices, connections, dependencies);
+        const now = Date.now();
+        const recencyWindowMs = 10 * 60 * 1000;
+        const recentActionableAlerts = activeAlerts.filter((a) => {
+            const ts = new Date(a.timestamp).getTime();
+            const isRecent = Number.isFinite(ts) && now - ts <= recencyWindowMs;
+            return isRecent && a.severity !== 'info';
+        });
+
+        const hasLiveDegradation =
+            devices.some((d) => d.status !== 'healthy') ||
+            connections.some((c) => c.status !== 'healthy');
+
+        if (!hasLiveDegradation && recentActionableAlerts.length === 0) {
+            return buildHealthyForensicReport(userQuery, devices, connections);
+        }
+
+        const alertsForAnalysis = recentActionableAlerts.length > 0
+            ? recentActionableAlerts
+            : activeAlerts.filter((a) => a.severity !== 'info');
+
+        return buildDeterministicForensicReport(userQuery, alertsForAnalysis, devices, connections, dependencies);
     }
 
     // For status checks, return a deterministic status listing.
@@ -734,11 +1065,18 @@ export async function analyzeWithMultiAgents(
         return buildStatusText(activeAlerts, devices);
     }
 
+    // For website/navigation questions, return deterministic assistant guidance.
+    if (intent === 'WEBSITE_ASSIST') {
+        return buildWebsiteAssistText(userQuery, activeAlerts, devices, connections);
+    }
+
     // GENERAL KNOWLEDGE: prefer Gemini if configured, otherwise return a safe fallback.
     const apiKey = import.meta.env.VITE_AI_API_KEY;
     const hasRealKey = typeof apiKey === 'string' && apiKey.trim().length > 0 && apiKey !== 'dummy_key';
     if (!hasRealKey) {
-        return 'AI engine is not configured (missing VITE_AI_API_KEY). Ask a diagnostic or status question to use deterministic analysis.';
+        const offlineKnowledge = buildOfflineGeneralKnowledgeResponse(userQuery);
+        if (offlineKnowledge) return offlineKnowledge;
+        return 'Gemini is not configured. Add VITE_AI_API_KEY to your .env file and restart the dev server. Deterministic diagnostic/status analysis is still available.';
     }
 
     return callGeminiAPI(userQuery, activeAlerts, devices, connections, dependencies);

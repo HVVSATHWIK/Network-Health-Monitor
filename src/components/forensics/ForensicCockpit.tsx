@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, ShieldAlert, Terminal, Activity, Play } from 'lucide-react';
 import { analyzeWithMultiAgents, ForensicReport } from '../../utils/aiLogic';
@@ -42,6 +42,7 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
     const [report, setReport] = useState<ForensicReport | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisText, setAnalysisText] = useState<string | null>(null);
+    const lastSystemMessageRef = useRef<string | undefined>(undefined);
 
     const handleScan = useCallback(async (prompt: string) => {
         if (isAnalyzing) return;
@@ -87,9 +88,10 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
         }
     }, [alerts, devices, isAnalyzing]);
 
-    // Auto-trigger analysis if system message implies it
+    // Auto-trigger analysis only when a NEW system message arrives while open
     useEffect(() => {
-        if (systemMessage && isOpen) {
+        if (systemMessage && isOpen && systemMessage !== lastSystemMessageRef.current) {
+            lastSystemMessageRef.current = systemMessage;
             void handleScan(systemMessage);
         }
     }, [handleScan, systemMessage, isOpen]);
@@ -155,11 +157,11 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
                                 <Search className="w-4 h-4 text-[#66FCF1] absolute left-3 top-3.5" />
                             </div>
                             <div className="flex gap-2 mt-3">
-                                <button onClick={() => handleScan("Analyze Cable Failure")} className="flex-1 bg-[#1F2833] hover:bg-[#66FCF1]/10 border border-[#1F2833] text-[#889299] text-[10px] py-2 uppercase tracking-wider transition-all text-left px-3">
-                                    Sim: Cable Cut
+                                <button onClick={() => handleScan(`Analyze root cause for: ${alerts.length > 0 ? alerts[0].device + ' - ' + alerts[0].message : 'potential physical cable fault on critical OT path'}`)} className="flex-1 bg-[#1F2833] hover:bg-[#66FCF1]/10 border border-[#1F2833] text-[#889299] text-[10px] py-2 uppercase tracking-wider transition-all text-left px-3">
+                                    {alerts.some(a => a.layer === 'L1' || a.layer === 'L2') ? 'Analyze L1/L2 Fault' : 'Sim: Cable Cut'}
                                 </button>
-                                <button onClick={() => handleScan("Analyze Latency Spike")} className="flex-1 bg-[#1F2833] hover:bg-[#66FCF1]/10 border border-[#1F2833] text-[#889299] text-[10px] py-2 uppercase tracking-wider transition-all text-left px-3">
-                                    Sim: L7 Lag
+                                <button onClick={() => handleScan(`Analyze application latency: ${devices.filter(d => d.metrics.l7.appLatency > 200).map(d => d.name).join(', ') || 'check all OT device response times'}`)} className="flex-1 bg-[#1F2833] hover:bg-[#66FCF1]/10 border border-[#1F2833] text-[#889299] text-[10px] py-2 uppercase tracking-wider transition-all text-left px-3">
+                                    {devices.some(d => d.metrics.l7.appLatency > 200) ? 'Analyze Latency' : 'Sim: L7 Lag'}
                                 </button>
                             </div>
                         </div>
@@ -250,10 +252,38 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
                                 <p className="text-[#C5C6C7] text-xs leading-relaxed font-mono whitespace-pre-wrap">{analysisText}</p>
                             </div>
                         )}
-                        {!report && !isAnalyzing && (
-                            <div className="h-full flex flex-col items-center justify-center text-[#1F2833]">
-                                <Activity className="w-16 h-16 mb-4 opacity-20" />
-                                <div className="text-xs font-mono uppercase tracking-widest">Awaiting Diagnostic Input</div>
+                        {!report && !isAnalyzing && !analysisText && (
+                            <div className="h-full flex flex-col items-center justify-center p-4">
+                                <Activity className="w-12 h-12 mb-4 text-[#45A29E] opacity-40" />
+                                <div className="text-xs font-mono uppercase tracking-widest text-[#45A29E] mb-6">
+                                    {alerts.length === 0 ? 'System Operational' : 'Issues Detected'}
+                                </div>
+                                <div className="w-full max-w-sm space-y-3">
+                                    <div className="flex justify-between text-xs font-mono">
+                                        <span className="text-[#889299]">Active Alerts</span>
+                                        <span className={`${alerts.length > 0 ? 'text-[#FF2E2E]' : 'text-[#45A29E]'}`}>{alerts.length}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs font-mono">
+                                        <span className="text-[#889299]">Unhealthy Devices</span>
+                                        <span className={`${devices.filter(d => d.status !== 'healthy').length > 0 ? 'text-[#FF2E2E]' : 'text-[#45A29E]'}`}>{devices.filter(d => d.status !== 'healthy').length}/{devices.length}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs font-mono">
+                                        <span className="text-[#889299]">Device Coverage</span>
+                                        <span className="text-[#45A29E]">{devices.length} assets</span>
+                                    </div>
+                                    {alerts.length > 0 && (
+                                        <div className="mt-4 border-t border-[#1F2833] pt-3">
+                                            <div className="text-[10px] text-[#889299] uppercase tracking-widest mb-2">Top Issue</div>
+                                            <div className="text-xs text-[#C5C6C7] font-mono">{alerts[0].device}: {alerts[0].message}</div>
+                                        </div>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => handleScan(`Perform full system health audit. ${alerts.length} alerts, ${devices.filter(d => d.status !== 'healthy').length} unhealthy devices. Analyze all layers L1-L7.`)}
+                                    className="mt-6 bg-[#66FCF1]/10 hover:bg-[#66FCF1]/20 border border-[#66FCF1]/30 text-[#66FCF1] text-xs font-mono uppercase tracking-wider px-4 py-2 transition-all flex items-center gap-2"
+                                >
+                                    <Play className="w-3 h-3" /> Run Full Audit
+                                </button>
                             </div>
                         )}
                         {isAnalyzing && !report && (

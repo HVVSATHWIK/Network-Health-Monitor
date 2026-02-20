@@ -11,6 +11,8 @@ const RiskGauge: React.FC<RiskGaugeProps> = ({ score, threshold, rangeLow, range
     const thresholdPct = clamp(threshold);
     const lowPct = clamp(rangeLow);
     const highPct = clamp(rangeHigh);
+    const rangeMin = Math.min(lowPct, highPct);
+    const rangeMax = Math.max(lowPct, highPct);
 
     const tone = pct >= 80 ? 'text-alert-critical' : pct >= 60 ? 'text-alert-warning' : 'text-alert-success';
 
@@ -20,36 +22,31 @@ const RiskGauge: React.FC<RiskGaugeProps> = ({ score, threshold, rangeLow, range
     };
 
     // Semicircle gauge: start at 180deg (left), end at 0deg (right)
-    const cx = 100;
-    const cy = 96;
-    const r = 76;
-    const startPt = polar(cx, cy, r, Math.PI); // 180deg
-    void startPt;
+    const cx = 110;
+    const cy = 100;
+    const r = 78;
 
     const left = { x: cx - r, y: cy };
     const right = { x: cx + r, y: cy };
 
     const gaugePath = `M ${left.x} ${left.y} A ${r} ${r} 0 0 1 ${right.x} ${right.y}`;
 
-    const endDeg = Math.PI - (pct / 100) * Math.PI; // from pi -> 0
-    const endPt = polar(cx, cy, r, endDeg);
-    const valuePath = pct <= 0
-        ? ''
-        : `M ${left.x} ${left.y} A ${r} ${r} 0 0 1 ${endPt.x} ${endPt.y}`;
-
-    const thresholdDeg = Math.PI - (thresholdPct / 100) * Math.PI;
+    const thresholdDeg = 180 - (thresholdPct / 100) * 180;
     const thresholdPt = polar(cx, cy, r, thresholdDeg);
+    const thresholdTickInner = polar(cx, cy, r - 6, thresholdDeg);
+    const thresholdTickOuter = polar(cx, cy, r + 3, thresholdDeg);
+    const thresholdLabelDx = thresholdPt.x > cx ? -24 : 8;
+    const thresholdLabelDy = thresholdPt.y < cy - r * 0.55 ? -6 : -4;
 
-    const rangeStartDeg = Math.PI - (lowPct / 100) * Math.PI;
-    const rangeEndDeg = Math.PI - (highPct / 100) * Math.PI;
-    const rangeStartPt = polar(cx, cy, r, rangeStartDeg);
-    const rangeEndPt = polar(cx, cy, r, rangeEndDeg);
-    const rangePath = `M ${rangeStartPt.x} ${rangeStartPt.y} A ${r} ${r} 0 0 1 ${rangeEndPt.x} ${rangeEndPt.y}`;
+    const rangeStartDeg = 180 - (rangeMin / 100) * 180;
+    const rangeEndDeg = 180 - (rangeMax / 100) * 180;
+    void rangeStartDeg;
+    void rangeEndDeg;
 
     return (
         <div className="w-full flex flex-col items-center justify-center">
-            <div className="relative w-[240px]">
-                <svg width={240} height={150} viewBox="0 0 200 130" className="block">
+            <div className="relative w-[260px] pt-1 pb-3">
+                <svg width={260} height={180} viewBox="0 0 220 150" className="block">
                     <path
                         d={gaugePath}
                         stroke="currentColor"
@@ -59,39 +56,41 @@ const RiskGauge: React.FC<RiskGaugeProps> = ({ score, threshold, rangeLow, range
                         strokeLinecap="round"
                         opacity={0.65}
                     />
-                    {valuePath && (
-                        <path
-                            d={valuePath}
-                            stroke="currentColor"
-                            className={tone}
-                            strokeWidth={6}
-                            fill="none"
-                            strokeLinecap="round"
-                        />
-                    )}
-
                     <path
-                        d={rangePath}
+                        d={gaugePath}
                         stroke="currentColor"
-                        className="text-gunmetal-300"
-                        strokeWidth={2}
+                        className={tone}
+                        strokeWidth={6}
                         fill="none"
                         strokeLinecap="round"
-                        strokeDasharray="3 3"
-                        opacity={0.75}
+                        pathLength={100}
+                        strokeDasharray={`${pct} 100`}
                     />
 
+                    <line
+                        x1={thresholdTickInner.x}
+                        y1={thresholdTickInner.y}
+                        x2={thresholdTickOuter.x}
+                        y2={thresholdTickOuter.y}
+                        stroke="currentColor"
+                        className="text-alert-warning"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                    />
                     <circle cx={thresholdPt.x} cy={thresholdPt.y} r={3} className="fill-alert-warning" />
 
                     {/* Micro tick labels */}
-                    <text x="20" y="112" className="fill-gunmetal-500 font-mono" fontSize="10">0</text>
-                    <text x="171" y="112" className="fill-gunmetal-500 font-mono" fontSize="10">100</text>
-                    <text x={thresholdPt.x + 6} y={thresholdPt.y - 4} className="fill-alert-warning font-mono" fontSize="9">T {thresholdPct}</text>
+                    <text x={left.x - 2} y={132} className="fill-gunmetal-500 font-mono" fontSize="10">0</text>
+                    <text x={right.x - 9} y={132} className="fill-gunmetal-500 font-mono" fontSize="10">100</text>
+                    <text x={thresholdPt.x + thresholdLabelDx} y={thresholdPt.y + thresholdLabelDy} className="fill-alert-warning font-mono" fontSize="9">T {thresholdPct}</text>
                 </svg>
 
-                <div className="absolute inset-x-0 top-[58px] text-center">
+                <div className="absolute inset-x-0 top-[56px] text-center">
                     <div className={`text-5xl font-mono font-semibold tabular-nums ${tone}`}>{pct}%</div>
-                    <div className="mt-1 text-[10px] font-mono uppercase tracking-widest text-gunmetal-400">Estimated Event Probability</div>
+                </div>
+
+                <div className="mt-4 text-center text-[10px] font-mono uppercase tracking-widest text-gunmetal-400">
+                    Estimated Event Probability
                 </div>
             </div>
         </div>

@@ -10,7 +10,13 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
     const [progress, setProgress] = useState(0);
     const [step, setStep] = useState<'boot' | 'login' | 'finalizing'>('boot');
     const [inputValue, setInputValue] = useState('');
+    const [finalUserName, setFinalUserName] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
+    const onCompleteRef = useRef(onComplete);
+
+    useEffect(() => {
+        onCompleteRef.current = onComplete;
+    }, [onComplete]);
 
     useEffect(() => {
         if (step === 'boot') {
@@ -66,7 +72,7 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
     useEffect(() => {
         if (step === 'finalizing') {
             const sequence = [
-                { text: `AUTHENTICATING USER: ${inputValue.toUpperCase()}...`, delay: 500 },
+                { text: `AUTHENTICATING USER: ${finalUserName.toUpperCase()}...`, delay: 500 },
                 { text: "ACCESS GRANTED.", delay: 1500 },
                 { text: "LOADING GRAPHICAL INTERFACE...", delay: 2200 },
                 { text: "SYSTEM READY.", delay: 3000 }
@@ -93,7 +99,7 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
             }, 30);
 
             const completeTimeout = setTimeout(() => {
-                onComplete(inputValue);
+                onCompleteRef.current(finalUserName);
             }, 3500);
             timeouts.push(completeTimeout);
 
@@ -102,12 +108,14 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
                 clearInterval(progressInterval);
             };
         }
-    }, [step, inputValue, onComplete]);
+    }, [step, finalUserName]);
 
 
     const handleLoginSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (inputValue.trim().length > 0) {
+        const normalizedName = inputValue.trim();
+        if (normalizedName.length > 0) {
+            setFinalUserName(normalizedName);
             setStep('finalizing');
         }
     };

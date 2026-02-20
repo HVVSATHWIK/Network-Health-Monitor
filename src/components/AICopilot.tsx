@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, X, Sparkles, AlertTriangle, Send, Search, Lock, Zap } from 'lucide-react';
+import { Bot, X, AlertTriangle, Send, Search, Lock, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { analyzeWithMultiAgents } from '../utils/aiLogic';
-import { Alert, Device } from '../types/network';
+import { Alert, Device, LayerKPI } from '../types/network';
 
 interface Message {
     id: string;
@@ -21,6 +21,7 @@ interface AICopilotProps {
     devices: Device[];
     connections: import('../types/network').NetworkConnection[];
     dependencyPaths: import('../types/network').DependencyPath[];
+    layerKPIs?: LayerKPI[];
     systemContext?: {
         activeView: '3d' | 'analytics' | 'layer' | 'logs' | 'kpi';
         selectedLayer: string | null;
@@ -31,13 +32,104 @@ interface AICopilotProps {
     };
 }
 
-export default function AICopilot({ userName = "User", systemMessage, onOpenChange, isOpen = false, alerts, devices, connections, dependencyPaths, systemContext }: AICopilotProps) {
+const buildCoordinatorIntro = (name: string) => `Hi ${name}, I'm NetMonit AI Coordinator.
+Ask me a question and I'll analyze live network context across topology, alerts, KPIs, workflows, and logs.`;
+
+const isGreetingOnly = (query: string): boolean => {
+    const q = query.trim().toLowerCase();
+    if (!q) return false;
+    if (q.length > 40) return false;
+    return /^(hi|hii|hello|hey|yo|hola|good\s+morning|good\s+afternoon|good\s+evening)\b/.test(q);
+};
+
+const isCapabilityRequest = (query: string): boolean => {
+    const q = query.trim().toLowerCase();
+    return (
+        /what\s+can\s+(you|u)\s+do/.test(q) ||
+        q.includes('what can you do') ||
+        q.includes('capabilities') ||
+        q.includes('how can you help') ||
+        q.includes('help me')
+    );
+};
+
+const buildCompactCapabilitiesReply = () => `I can help with:
+- Root-cause analysis (L1-L7)
+- Active alerts and unhealthy device status
+- Blast-radius / impact analysis
+- Remediation recommendations
+- Forensic-style summaries
+- Security, performance, and reliability reviews
+
+Try:
+- "Analyze the root cause for current alerts"
+- "What devices are down right now?"
+- "What is the blast radius if Core Switch 01 fails?"`;
+
+const buildObservabilitySnapshot = (
+    alerts: Alert[],
+    devices: Device[],
+    connections: import('../types/network').NetworkConnection[],
+    dependencyPaths: import('../types/network').DependencyPath[],
+    layerKPIs: LayerKPI[]
+): string => {
+    const unhealthyDevices = devices.filter((d) => d.status !== 'healthy');
+    const degradedConnections = connections.filter((c) => c.status !== 'healthy');
+    const severityCounts = {
+        critical: alerts.filter((a) => a.severity === 'critical').length,
+        high: alerts.filter((a) => a.severity === 'high').length,
+        medium: alerts.filter((a) => a.severity === 'medium').length,
+        low: alerts.filter((a) => a.severity === 'low').length,
+        info: alerts.filter((a) => a.severity === 'info').length,
+    };
+
+    const topAlerts = alerts.slice(0, 8).map((a) =>
+        `${a.severity.toUpperCase()} ${a.layer} ${a.device}: ${a.message}`
+    );
+
+    const topUnhealthyDevices = unhealthyDevices.slice(0, 8).map((d) =>
+        `${d.name} (${d.type}) status=${d.status} ip=${d.ip}`
+    );
+
+    const topDegradedLinks = degradedConnections.slice(0, 8).map((c) =>
+        `${c.id} ${c.source}->${c.target} status=${c.status} latency=${c.latency}ms util=${c.bandwidth}`
+    );
+
+    const kpiCritical = layerKPIs.filter((k) => k.status === 'critical').slice(0, 10).map((k) =>
+        `${k.layer} ${k.name}: ${k.value}${k.unit} (threshold ${k.threshold}${k.unit}, trend=${k.trend})`
+    );
+
+    const kpiWarning = layerKPIs.filter((k) => k.status === 'warning').slice(0, 10).map((k) =>
+        `${k.layer} ${k.name}: ${k.value}${k.unit} (threshold ${k.threshold}${k.unit}, trend=${k.trend})`
+    );
+
+    const workflows = dependencyPaths.slice(0, 10).map((w) =>
+        `${w.appName} criticality=${w.criticality} hops=${w.path.length}`
+    );
+
+    return [
+        `SYSTEM OBSERVABILITY SNAPSHOT:`,
+        `- Alerts: total=${alerts.length}, critical=${severityCounts.critical}, high=${severityCounts.high}, medium=${severityCounts.medium}, low=${severityCounts.low}, info=${severityCounts.info}`,
+        `- Devices: total=${devices.length}, unhealthy=${unhealthyDevices.length}`,
+        `- Connections: total=${connections.length}, degraded_or_down=${degradedConnections.length}`,
+        `- Workflow Paths: total=${dependencyPaths.length}`,
+        `- Layer KPI points: total=${layerKPIs.length}`,
+        topAlerts.length ? `Top Alerts:\n${topAlerts.map((l) => `  • ${l}`).join('\n')}` : 'Top Alerts:\n  • none',
+        topUnhealthyDevices.length ? `Unhealthy Devices:\n${topUnhealthyDevices.map((l) => `  • ${l}`).join('\n')}` : 'Unhealthy Devices:\n  • none',
+        topDegradedLinks.length ? `Degraded Links:\n${topDegradedLinks.map((l) => `  • ${l}`).join('\n')}` : 'Degraded Links:\n  • none',
+        kpiCritical.length ? `Critical KPIs:\n${kpiCritical.map((l) => `  • ${l}`).join('\n')}` : 'Critical KPIs:\n  • none',
+        kpiWarning.length ? `Warning KPIs:\n${kpiWarning.map((l) => `  • ${l}`).join('\n')}` : 'Warning KPIs:\n  • none',
+        workflows.length ? `Workflow Coverage:\n${workflows.map((l) => `  • ${l}`).join('\n')}` : 'Workflow Coverage:\n  • none',
+    ].join('\n');
+};
+
+export default function AICopilot({ userName = "User", systemMessage, onOpenChange, isOpen = false, alerts, devices, connections, dependencyPaths, layerKPIs = [], systemContext }: AICopilotProps) {
     // Chat State
     const [messages, setMessages] = useState<Message[]>([
         {
             id: '1',
             role: 'ai',
-            text: `Hello ${userName}. I am the NetMonit Coordinator. I'm ready to help you analyze network security, performance, and reliability.`
+            text: buildCoordinatorIntro(userName)
         }
     ]);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -53,7 +145,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
             if (newMessages.length > 0 && newMessages[0].role === 'ai') {
                 newMessages[0] = {
                     ...newMessages[0],
-                    text: `Hello ${userName}. I am the NetMonit Coordinator. I'm ready to help you analyze network security, performance, and reliability.`
+                    text: buildCoordinatorIntro(userName)
                 };
             }
             return newMessages;
@@ -75,12 +167,33 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
         // 1. User Message
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: query }]);
 
+        if (isGreetingOnly(query)) {
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                role: 'ai',
+                text: `Hi ${userName} — ready. Ask RCA, status, impact, or remediation and I’ll analyze live context.`
+            }]);
+            setIsProcessing(false);
+            return;
+        }
+
+        if (isCapabilityRequest(query)) {
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                role: 'ai',
+                text: buildCompactCapabilitiesReply()
+            }]);
+            setIsProcessing(false);
+            return;
+        }
+
         try {
+            const snapshot = buildObservabilitySnapshot(alerts, devices, connections, dependencyPaths, layerKPIs);
             const runtimeContext = systemContext
                 ? `\n\nRUNTIME SYSTEM CONTEXT:\n- Active View: ${systemContext.activeView}\n- Selected Layer: ${systemContext.selectedLayer ?? 'none'}\n- Selected Device: ${systemContext.selectedDeviceId ?? 'none'}\n- Time Range: ${systemContext.timeRangeLabel}\n- Network Health: ${systemContext.healthPercentage}%\n- AI Coverage: ${systemContext.aiCoverageSummary}\n- Total Devices: ${devices.length}\n- Active Alerts: ${alerts.length}`
                 : '';
 
-            const contextualQuery = `${query}${runtimeContext}`;
+            const contextualQuery = `${query}${runtimeContext}\n\n${snapshot}`;
 
             // 3. Run Analysis
             const finalResponse = await analyzeWithMultiAgents(contextualQuery, null, alerts, devices, connections, dependencyPaths, () => { });
@@ -101,7 +214,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
         }
 
         setIsProcessing(false);
-    }, [alerts, connections, dependencyPaths, devices, isProcessing, systemContext]);
+    }, [alerts, connections, dependencyPaths, devices, isProcessing, layerKPIs, systemContext, userName]);
 
     const handleSubmit = useCallback(() => {
         if (!inputValue.trim() || isProcessing) return;
@@ -119,10 +232,28 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
         }
     }, [systemMessage, isOpen, onOpenChange, handleAnalysis]);
 
+    const leadAlert = alerts[0];
+    const leadDevice = devices.find((d) => d.status !== 'healthy') ?? devices[0];
     const prompts = [
-        { label: "Root Cause Check", icon: <Zap className="w-3 h-3 text-yellow-400" />, query: "Why did Line A stop at 10:00 AM?" },
-        { label: "Impact Analysis", icon: <AlertTriangle className="w-3 h-3 text-red-400" />, query: "What is the blast radius if Core Switch 01 fails?" },
-        { label: "Security Scan", icon: <Lock className="w-3 h-3 text-blue-400" />, query: "Analyze firewall logs for unauthorized access." }
+        {
+            label: "Root Cause Check",
+            icon: <Zap className="w-3 h-3 text-yellow-400" />,
+            query: leadAlert
+                ? `Analyze root cause for current alert on ${leadAlert.device} (${leadAlert.layer}): ${leadAlert.message}`
+                : 'Analyze current live telemetry and KPIs for root-cause indicators. If no active incident exists, report top emerging risks.',
+        },
+        {
+            label: "Impact Analysis",
+            icon: <AlertTriangle className="w-3 h-3 text-red-400" />,
+            query: leadDevice
+                ? `Run blast-radius and operational impact analysis for ${leadDevice.name} using current topology/workflow context.`
+                : 'Run blast-radius analysis based on current topology, dependencies, and active telemetry.',
+        },
+        {
+            label: "Security Scan",
+            icon: <Lock className="w-3 h-3 text-blue-400" />,
+            query: 'Perform a live security posture scan using current alerts, device states, links, and telemetry. Highlight any immediate risks and actions.',
+        }
     ];
 
     const [mounted, setMounted] = useState(false);
@@ -170,7 +301,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                         {msg.role === 'ai' && (
                             <div className="mt-1 mr-2 flex-shrink-0">
                                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center border border-white/20 shadow-lg">
-                                    <Sparkles className="w-4 h-4 text-white" />
+                                    <Bot className="w-4 h-4 text-white" />
                                 </div>
                             </div>
                         )}

@@ -30,20 +30,20 @@ const EscalationCard = ({ risk = escalationRisk }: EscalationCardProps) => {
             </div>
 
             {/* Main Risk Display */}
-            <div className="h-44 flex flex-col items-center justify-center mb-3 rounded-xl border border-gunmetal-700/60 bg-gunmetal-950/35">
+            <div className="flex flex-col items-center justify-center mb-6 rounded-xl border border-gunmetal-700/60 bg-gunmetal-950/35 px-2 pt-3 pb-5">
                 <RiskGauge
                     score={risk.probability}
                     threshold={risk.escalationThreshold}
                     rangeLow={risk.probabilityRange.low}
                     rangeHigh={risk.probabilityRange.high}
                 />
-                <p className="mt-2 px-3 text-center text-[10px] text-gunmetal-400 font-mono uppercase tracking-widest">
+                <p className="mt-4 px-3 text-center text-[10px] text-gunmetal-400 font-mono uppercase tracking-widest leading-relaxed">
                     Prediction band: {risk.probabilityRange.low}% to {risk.probabilityRange.high}% | Escalation threshold: {risk.escalationThreshold}%
                 </p>
             </div>
 
             {/* Metrics Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-4 mb-6 mt-1">
                 <div className="bg-gunmetal-950/35 p-3 rounded-lg border border-gunmetal-700/70">
                     <div className="flex items-center gap-2 mb-1">
                         <Clock className="w-4 h-4 text-alert-warning" />
@@ -56,7 +56,7 @@ const EscalationCard = ({ risk = escalationRisk }: EscalationCardProps) => {
                         <TrendingUp className="w-4 h-4 text-alert-success" />
                         <span className="text-gunmetal-200 text-[10px] font-mono uppercase tracking-widest">Model Reliability</span>
                     </div>
-                    <p className="text-gunmetal-100 font-mono font-semibold tabular-nums">{risk.modelReliability}%</p>
+                    <p className="text-gunmetal-100 bg-transparent font-mono font-semibold tabular-nums">{risk.modelReliability}%</p>
                     <p className="text-gunmetal-500 text-[10px] mt-1">{risk.reliabilityLabel}</p>
                 </div>
             </div>
