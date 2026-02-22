@@ -3,6 +3,7 @@ import { AlertCircle, AlertTriangle, Info, Sparkles, BrainCircuit, History, Tras
 import { analyzeRootCause } from '../utils/aiLogic';
 import { useState, useEffect, useCallback } from 'react';
 import { getAlertHistory, clearAlertHistory, type ArchivedAlert } from '../services/AlertHistoryDB';
+import { PerfMonitorService } from '../services/PerfMonitorService';
 
 interface AlertPanelProps {
   alerts: Alert[];
@@ -34,11 +35,14 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
   }, [tab, alerts.length, loadHistory]);
 
   const handleClearHistory = async () => {
+    const startedAt = PerfMonitorService.startTimer();
     await clearAlertHistory();
     setHistory([]);
+    PerfMonitorService.endAction('clear_alert_history', startedAt);
   };
 
   const handleAnalyze = async (alertId: string, deviceName: string) => {
+    const startedAt = PerfMonitorService.startTimer();
     setAnalyzingIds(prev => new Set(prev).add(alertId));
 
     // Simulate network delay for effect
@@ -54,6 +58,7 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
       next.delete(alertId);
       return next;
     });
+    PerfMonitorService.endAction('alert_panel_root_cause', startedAt);
   };
 
 
@@ -83,7 +88,11 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
           <button
             role="tab"
             aria-selected={tab === 'active'}
-            onClick={() => setTab('active')}
+            onClick={() => {
+              const startedAt = PerfMonitorService.startTimer();
+              setTab('active');
+              PerfMonitorService.endAction('alerts_tab_active', startedAt);
+            }}
             className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${tab === 'active' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
           >
             Active
@@ -96,7 +105,11 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
           <button
             role="tab"
             aria-selected={tab === 'history'}
-            onClick={() => setTab('history')}
+            onClick={() => {
+              const startedAt = PerfMonitorService.startTimer();
+              setTab('history');
+              PerfMonitorService.endAction('alerts_tab_history', startedAt);
+            }}
             className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all flex items-center gap-1.5 ${tab === 'history' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
           >
             <History className="w-3.5 h-3.5" />

@@ -1,6 +1,7 @@
 import { IdentifierResolver } from './IdentifierResolver';
 import { TelemetryMapper, RawTelemetry } from './TelemetryMapper';
 import { useNetworkStore } from '../store/useNetworkStore';
+import { PerfMonitorService } from './PerfMonitorService';
 import type { Alert, Device } from '../types/network';
 
 /**
@@ -24,6 +25,7 @@ function detectFaultLayer(metrics: Device['metrics']): { layer: Alert['layer']; 
  * or the DataImporter (user-uploaded data).
  */
 export const processTelemetryBatch = (batch: RawTelemetry[]) => {
+    const startedAt = PerfMonitorService.startTimer();
     const { updateDevice, addAlert, removeAlertsForDevice, alerts, devices, faultedDeviceIds } = useNetworkStore.getState();
 
     // Track previous device statuses for transition detection
@@ -82,6 +84,8 @@ export const processTelemetryBatch = (batch: RawTelemetry[]) => {
             if (import.meta.env.DEV) console.warn(`[Ingestion] Could not resolve device for telemetry:`, telemetry);
         }
     });
+
+    PerfMonitorService.recordTelemetryBatch(batch.length, Math.max(0, performance.now() - startedAt));
 };
 
 export const IngestionPipeline = {

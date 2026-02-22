@@ -199,6 +199,7 @@
 import { Alert, Device, NetworkConnection, DependencyPath, CausalChain, LayerKPI } from '../types/network';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { analyzeRelationships } from './relationshipEngine';
+import { PerfMonitorService } from '../services/PerfMonitorService';
 
 // ---------------- TYPES ----------------
 
@@ -561,6 +562,10 @@ async function callGeminiAPI(
     connections: NetworkConnection[],
     dependencies: DependencyPath[]
 ): Promise<string> {
+    const startedAt = PerfMonitorService.startTimer();
+    let requestAttempted = false;
+    let requestSucceeded = false;
+
     try {
         const quota = tryConsumeAIRequest();
         if (!quota.ok) {
@@ -569,7 +574,10 @@ async function callGeminiAPI(
 
         const prompt = buildPrompt(query, alerts, devices, connections, dependencies);
         try {
-            return await generateWithRetry(prompt, PRIMARY_GEMINI_MODEL);
+            requestAttempted = true;
+            const response = await generateWithRetry(prompt, PRIMARY_GEMINI_MODEL);
+            requestSucceeded = true;
+            return response;
         } catch (primaryError) {
             const canTryFallback =
                 FALLBACK_GEMINI_MODEL.trim().length > 0 &&
@@ -577,7 +585,10 @@ async function callGeminiAPI(
 
             if (canTryFallback && isTransientGeminiError(primaryError)) {
                 try {
-                    return await generateWithRetry(prompt, FALLBACK_GEMINI_MODEL);
+                    requestAttempted = true;
+                    const response = await generateWithRetry(prompt, FALLBACK_GEMINI_MODEL);
+                    requestSucceeded = true;
+                    return response;
                 } catch (fallbackError) {
                     if (import.meta.env.DEV) console.error(`Gemini API Error (fallback model: ${FALLBACK_GEMINI_MODEL}):`, fallbackError);
                     return 'Gemini is temporarily overloaded (503/high demand). Please retry in 30-60 seconds. Your local quota remains enforced at 15 requests/minute and 1000/day.';
@@ -593,6 +604,11 @@ async function callGeminiAPI(
     } catch (error) {
         if (import.meta.env.DEV) console.error("Gemini API Error:", error);
         return "AI engine unavailable. Please verify configuration.";
+    } finally {
+        if (requestAttempted) {
+            const duration = Math.max(0, performance.now() - startedAt);
+            PerfMonitorService.recordModelLatency(duration, requestSucceeded);
+        }
     }
 }
 
@@ -1199,7 +1215,7 @@ function buildIndustrialFlowNarrative(devices: Device[]): string {
     return `Industrial path: ${plcLabel} (L1/L2 ingress) -> ${switchLabel} (L2 switching, link checks) -> ${firewallLabel} (L3 zoning + policy) -> ${scadaLabel} (L4 reliability + L7 processing).`;
 }
 
-function buildPropagationNarrative(rootLayer: Alert['layer'], primaryDevice: string): string {
+function buildPropagationNarrative(rootLayer: string, primaryDevice: string): string {
     if (rootLayer === 'L1' || rootLayer === 'L2') {
         return `Propagation model: lower-layer instability at ${primaryDevice} can cascade upward to L3 routing loss, L4 retries/timeouts, and L7 application delay.`;
     }
@@ -1352,6 +1368,7 @@ export async function analyzeWithMultiAgents(
     arg6?: DependencyPath[],
     arg7?: (update: AgentResponse) => void
 ): Promise<AnalysisResult> {
+    const markDeterministic = () => PerfMonitorService.recordDeterministicAI();
 
     // Backward-compatible argument parsing:
     // - New callers: (query, app, alerts, devices, connections, dependencies, onUpdate)
@@ -1374,6 +1391,7 @@ export async function analyzeWithMultiAgents(
     const greetingMatch = strippedQuery.trim().toLowerCase();
     if (greetingMatch.length <= 60 && /^(hi+|hello+|hey+|yo|hola|sup|what'?s\s*up|good\s+(morning|afternoon|evening|day)|how\s+are\s+you|howdy|greetings)\b/.test(greetingMatch)) {
         const unhealthyCount = devices.filter(d => d.status !== 'healthy').length;
+        markDeterministic();
         if (activeAlerts.length > 0 || unhealthyCount > 0) {
             return `Hey there! 👋 I'm tracking **${activeAlerts.length} active alert(s)** and **${unhealthyCount} unhealthy device(s)**. Want me to analyze what's going on, or do you have a specific question?`;
         }
@@ -1395,6 +1413,7 @@ export async function analyzeWithMultiAgents(
             connections.some((c) => c.status !== 'healthy');
 
         if (!hasLiveDegradation && recentActionableAlerts.length === 0) {
+            markDeterministic();
             return buildHealthyForensicReport(userQuery, devices, connections);
         }
 
@@ -1402,11 +1421,13 @@ export async function analyzeWithMultiAgents(
             ? recentActionableAlerts
             : activeAlerts.filter((a) => a.severity !== 'info');
 
+        markDeterministic();
         return buildDeterministicForensicReport(userQuery, alertsForAnalysis, devices, connections, dependencies);
     }
 
     // For status checks, check if user is asking about a specific device first.
     if (intent === 'STATUS_CHECK') {
+        markDeterministic();
         const deviceSpecificResult = buildDeviceSpecificResponse(strippedQuery, activeAlerts, devices, connections);
         if (deviceSpecificResult) return deviceSpecificResult;
         return buildStatusText(activeAlerts, devices, connections);
@@ -1414,6 +1435,7 @@ export async function analyzeWithMultiAgents(
 
     // For website/navigation questions, return deterministic assistant guidance.
     if (intent === 'WEBSITE_ASSIST') {
+        markDeterministic();
         return buildWebsiteAssistText(userQuery, activeAlerts, devices, connections);
     }
 
@@ -1424,11 +1446,17 @@ export async function analyzeWithMultiAgents(
     // Device-specific check — transcends intent. If user mentions a device name,
     // respond with device info even when intent is GENERAL_KNOWLEDGE.
     const deviceSpecific = buildDeviceSpecificResponse(strippedQuery, activeAlerts, devices, connections);
-    if (deviceSpecific) return deviceSpecific;
+    if (deviceSpecific) {
+        markDeterministic();
+        return deviceSpecific;
+    }
 
     // Try offline knowledge first (works with or without Gemini)
     const offlineKnowledge = buildOfflineGeneralKnowledgeResponse(userQuery);
-    if (offlineKnowledge) return offlineKnowledge;
+    if (offlineKnowledge) {
+        markDeterministic();
+        return offlineKnowledge;
+    }
 
     // If we have Gemini, use it for open-ended questions
     if (hasRealKey) {
@@ -1446,10 +1474,12 @@ export async function analyzeWithMultiAgents(
         // Run the deterministic forensic report — better than nothing
         const actionableAlerts = activeAlerts.filter((a) => a.severity !== 'info');
         if (actionableAlerts.length > 0) {
+            markDeterministic();
             return buildDeterministicForensicReport(userQuery, actionableAlerts, devices, connections, dependencies);
         }
     }
 
+    markDeterministic();
     return buildSmartFallbackResponse(userQuery, activeAlerts, devices, connections);
 }
 

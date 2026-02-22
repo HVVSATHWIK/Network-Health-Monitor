@@ -266,6 +266,26 @@ const AnalyticsSVG = () => (
     </MiniSVG>
 );
 
+const PerformanceStatsSVG = () => (
+    <MiniSVG>
+        <rect x="8" y="8" width="144" height="64" rx="4" fill="#0B0C10" stroke="#1F2833" strokeWidth="1" />
+        <rect x="14" y="14" width="64" height="52" rx="3" fill="#1F2937" stroke="#334155" strokeWidth="0.8" />
+        <text x="46" y="22" textAnchor="middle" fontSize="5.5" fill="#94A3B8">System Logs</text>
+        <rect x="18" y="27" width="56" height="4" rx="1" fill="#334155" />
+        <rect x="18" y="34" width="49" height="4" rx="1" fill="#334155" />
+        <rect x="18" y="41" width="52" height="4" rx="1" fill="#334155" />
+        <rect x="18" y="48" width="44" height="4" rx="1" fill="#334155" />
+
+        <rect x="84" y="14" width="62" height="52" rx="3" fill="#111827" stroke="#4F46E5" strokeWidth="0.8" />
+        <text x="115" y="22" textAnchor="middle" fontSize="5.5" fill="#C7D2FE">Performance Stats</text>
+        <rect x="88" y="27" width="54" height="6" rx="1.5" fill="#312E81" opacity="0.55" />
+        <rect x="88" y="36" width="26" height="6" rx="1.5" fill="#334155" />
+        <rect x="116" y="36" width="26" height="6" rx="1.5" fill="#334155" />
+        <rect x="88" y="45" width="54" height="6" rx="1.5" fill="#334155" />
+        <text x="115" y="60" textAnchor="middle" fontSize="5" fill="#94A3B8">Baseline + Export JSON</text>
+    </MiniSVG>
+);
+
 const HealthBadgeSVG = () => (
     <MiniSVG>
         {/* Health badge */}
@@ -349,7 +369,7 @@ export default function VisualGuide() {
         },
         {
             id: 'clickDevice',
-            title: '👆 Click Any Device = Full Details',
+            title: 'Click Any Device for Full Details',
             description: 'In the 3D map or the Asset Status list below it, click on any device (sensor, switch, PLC, router). A detail panel slides in from the right showing all its health data: temperature, latency, error counts, connected devices, and more.',
             targetId: 'canvas-container',
             illustration: <ClickDeviceSVG />,
@@ -434,6 +454,14 @@ export default function VisualGuide() {
             description: 'Switch to this tab for historical charts and trends. See how latency, errors, and other metrics changed over time. Great for spotting repeating patterns or proving that a fix actually worked.',
             targetId: 'view-analytics-trigger',
             illustration: <AnalyticsSVG />
+        },
+        {
+            id: 'performanceStats',
+            title: 'System Logs + Performance Stats',
+            description: 'Open System Logs to see event history and live performance metrics side by side. The Performance Stats panel tracks startup timing, AI latency, telemetry and import throughput, action timings, and memory usage. Use Set Baseline to save a benchmark and Export to download a JSON report.',
+            targetId: 'perf-stats-panel',
+            illustration: <PerformanceStatsSVG />,
+            ensureView: 'logs'
         },
         {
             id: 'faultInjection',

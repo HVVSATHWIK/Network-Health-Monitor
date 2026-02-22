@@ -31,6 +31,7 @@ import AssetDetailPanel from './components/AssetDetailPanel';
 import { OTHealthCard } from './components/dashboard/OTHealthCard';
 import { NetworkLoadCard } from './components/dashboard/NetworkLoadCard';
 import { CorrelationTimelineCard } from './components/dashboard/CorrelationTimelineCard';
+import PerformanceStatsPanel from './components/dashboard/PerformanceStatsPanel';
 import { TimeRangeSelector } from './components/dashboard/TimeRangeSelector';
 import { TIME_RANGE_PRESETS, type TimeRange } from './components/dashboard/timeRangePresets';
 import { DataImporter } from './components/DataImporter';
@@ -39,6 +40,8 @@ import {
   buildAIMonitoringSnapshot,
 } from './utils/aiLogic';
 import type { AILaunchMode } from './components/AICopilot';
+import { PerfMonitorService } from './services/PerfMonitorService';
+import { usePerfStore } from './store/usePerfStore';
 
 import { auth, db } from './firebase'; // Import db
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -64,6 +67,7 @@ function App() {
   const [visualMode, setVisualMode] = useState<'default' | 'scan'>('default');
   const [isChaosOpen, setIsChaosOpen] = useState(false);
   const scanTimeoutsRef = useRef<number[]>([]);
+  const startupMeasuredRef = useRef(false);
   const [isForensicOpen, setIsForensicOpen] = useState(false);
   const [forensicSystemMessage, setForensicSystemMessage] = useState<string | undefined>(undefined);
   const [isNetMonitAIOpen, setIsNetMonitAIOpen] = useState(false);
@@ -76,7 +80,13 @@ function App() {
 
   // Persistent Auth Listener
   useEffect(() => {
+    PerfMonitorService.markStartup('auth_listener_attached');
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!startupMeasuredRef.current) {
+        PerfMonitorService.markStartup('auth_state_resolved');
+        PerfMonitorService.measureStartup('auth_resolution_ms', 'auth_listener_attached', 'auth_state_resolved');
+        startupMeasuredRef.current = true;
+      }
       if (user) {
         // User is signed in
         setIsLoggedIn(true);
@@ -153,6 +163,7 @@ function App() {
   const setAlerts = useNetworkStore((state) => state.setAlerts);
   const resetSystem = useNetworkStore((state) => state.resetSystem);
   const injectFault = useNetworkStore((state) => state.injectFault);
+  const loadPerfBaseline = usePerfStore((state) => state.loadBaseline);
   const [aiMonitoringTimeline, setAiMonitoringTimeline] = useState<AIMonitoringEvent[]>([]);
   const aiEnrichmentInFlight = useRef(false);
 
@@ -162,12 +173,40 @@ function App() {
   const healthPercentage = useMemo(() => Math.round((healthyDevices / totalDevices) * 100), [healthyDevices, totalDevices]);
   const aiMonitoringSnapshot = useMemo(() => buildAIMonitoringSnapshot(alerts, devices, connections, layerKPIs, dependencyPaths), [alerts, devices, connections, layerKPIs, dependencyPaths]);
 
+  const switchView = (view: '3d' | 'analytics' | 'layer' | 'logs' | 'kpi') => {
+    const startedAt = PerfMonitorService.startTimer();
+    setActiveView(view);
+    PerfMonitorService.endAction(`switch_view_${view}`, startedAt);
+  };
+
+  const selectDevice = (deviceId: string | null) => {
+    const startedAt = PerfMonitorService.startTimer();
+    setSelectedDeviceId(deviceId);
+    if (deviceId) PerfMonitorService.endAction('select_device', startedAt);
+  };
+
+  const handleTimeRangeChange = (nextRange: TimeRange) => {
+    const startedAt = PerfMonitorService.startTimer();
+    setTimeRange(nextRange);
+    PerfMonitorService.endAction('change_time_range', startedAt);
+  };
+
   const openAICopilot = (mode: AILaunchMode, systemPrompt?: string) => {
+    const startedAt = PerfMonitorService.startTimer();
     setAiLaunchMode(mode);
     setAiSystemMessage(systemPrompt);
     setAiSessionKey((prev) => prev + 1);
     startTransition(() => setIsNetMonitAIOpen(true));
+    PerfMonitorService.endAction(`open_ai_${mode}`, startedAt);
   };
+
+  useEffect(() => {
+    PerfMonitorService.markStartup('app_mounted');
+    PerfMonitorService.measureStartup('root_to_app_ms', 'root_ready', 'app_mounted');
+    loadPerfBaseline();
+    PerfMonitorService.startMemorySampler(5000);
+    return () => PerfMonitorService.stopMemorySampler();
+  }, [loadPerfBaseline]);
 
   useEffect(() => {
     if (aiEnrichmentInFlight.current) return;
@@ -283,6 +322,7 @@ function App() {
   };
 
   const handleBootComplete = async (name: string) => {
+    const startedAt = PerfMonitorService.startTimer();
     if (name) {
       setUserName(name);
       // Save terminal name to Firestore
@@ -303,12 +343,16 @@ function App() {
         }
       }
     }
+    PerfMonitorService.markStartup('boot_sequence_complete');
+    PerfMonitorService.measureStartup('boot_sequence_ms', 'app_mounted', 'boot_sequence_complete');
+    PerfMonitorService.endAction('boot_complete_handler', startedAt);
     setIsBooting(false);
   };
 
   const runSimulation = () => {
+    const startedAt = PerfMonitorService.startTimer();
     // Make the scan visible: DataFlowVisualization lives in the 3D view.
-    setActiveView('3d');
+    switchView('3d');
 
     // Send diagnostic analysis to the AICopilot chatbot (not the full-screen ForensicCockpit).
     const unhealthyCount = devices.filter((d) => d.status !== 'healthy').length;
@@ -338,10 +382,13 @@ function App() {
     scanTimeoutsRef.current.push(window.setTimeout(() => {
       setVisualMode('default');
     }, 45000));
+
+    PerfMonitorService.endAction('run_diagnostic_scan', startedAt);
   };
 
   const runRootCauseAnalysis = () => {
-    setActiveView('3d');
+    const startedAt = PerfMonitorService.startTimer();
+    switchView('3d');
 
     const recencyWindowMs = 10 * 60 * 1000;
     const now = Date.now();
@@ -375,6 +422,7 @@ function App() {
         : 'Validate that the system is currently healthy and incident is resolved. If no active fault exists, provide a short health confirmation and top preventive recommendations.';
 
     openAICopilot('root-cause', `${contextPrompt}\n\nRequest timestamp: ${new Date().toISOString()}`);
+    PerfMonitorService.endAction('run_root_cause_analysis', startedAt);
   };
 
   // GAMIFICATION: Auto-Advance Tour based on User Actions
@@ -384,25 +432,32 @@ function App() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   const handleLayerSelect = (layer: string) => {
+    const startedAt = PerfMonitorService.startTimer();
     setSelectedLayer(layer);
-    setActiveView('layer');
+    switchView('layer');
     setIsMenuOpen(false);
+    PerfMonitorService.endAction('select_layer', startedAt);
   };
 
   // Fault Injection Logic
   const handleInjectFault = (type: 'l1' | 'l7') => {
+    const startedAt = PerfMonitorService.startTimer();
     injectFault(type);
+    PerfMonitorService.endAction(`inject_fault_${type}`, startedAt);
 
     // AI Reaction - Legacy
     // setAiMessage(`Alert Detected: ${type.toUpperCase()} Anomaly. Analyzing root cause...`); // Removed
   };
 
   const handleReset = () => {
+    const startedAt = PerfMonitorService.startTimer();
     resetSystem();
+    PerfMonitorService.endAction('reset_system', startedAt);
     // setAiMessage("System Reset. Telemetry metrics normalized."); // Removed
   };
 
   const handleAddDevice = (newDevice: Device, parentId?: string) => {
+    const startedAt = PerfMonitorService.startTimer();
     addDevice(newDevice);
 
     if (parentId) {
@@ -430,7 +485,8 @@ function App() {
     });
 
     // Auto-select the new device so detail panel opens
-    setSelectedDeviceId(newDevice.id);
+    selectDevice(newDevice.id);
+    PerfMonitorService.endAction('add_device', startedAt);
   };
 
   // Manual Visual Guide replaces auto tour step logic
@@ -454,7 +510,11 @@ function App() {
             <div className="flex items-center gap-3 shrink-0">
               <button
                 id="layer-menu-trigger"
-                onClick={() => setIsMenuOpen(true)}
+                onClick={() => {
+                  const startedAt = PerfMonitorService.startTimer();
+                  setIsMenuOpen(true);
+                  PerfMonitorService.endAction('open_layer_menu', startedAt);
+                }}
                 aria-label="Open layer menu"
                 className="h-10 w-10 inline-flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-lg transition-colors border border-transparent hover:border-slate-700"
               >
@@ -487,6 +547,7 @@ function App() {
               <button
                 id="forensic-cockpit-trigger"
                 onClick={() => {
+                  const startedAt = PerfMonitorService.startTimer();
                   // Build a context-aware forensic prompt — avoid embedding device names
                   // directly, so the AI route returns structured ForensicReport not a device card.
                   const unhealthyCount = devices.filter((d) => d.status !== 'healthy').length;
@@ -499,6 +560,7 @@ function App() {
                     : `Forensic health audit requested. All ${devices.length} devices operational, ${degradedLinks} degraded link(s). Perform preventive analysis and identify potential risks.`;
                   setForensicSystemMessage(`${prompt} Request id: ${Date.now()}.`);
                   startTransition(() => setIsForensicOpen(true));
+                  PerfMonitorService.endAction('open_forensic_cockpit', startedAt);
                 }}
                 className="h-10 whitespace-nowrap inline-flex items-center gap-2 px-3.5 bg-slate-900/70 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-lg transition-all text-sm font-medium"
               >
@@ -593,14 +655,14 @@ function App() {
       {selectedDeviceId && (
         <div id="asset-detail-overlay" className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-end animate-in fade-in duration-200">
           {/* Click backdrop to close */}
-          <div className="absolute inset-0" onClick={() => setSelectedDeviceId(null)}></div>
+          <div className="absolute inset-0" onClick={() => selectDevice(null)}></div>
 
           <div id="asset-detail-panel" className="w-full max-w-lg h-full bg-slate-900 border-l border-slate-700 shadow-2xl relative z-10 animate-in slide-in-from-right duration-300">
             <AssetDetailPanel
               device={devices.find(d => d.id === selectedDeviceId)!}
               connections={connections}
               devices={devices}
-              onClose={() => setSelectedDeviceId(null)}
+              onClose={() => selectDevice(null)}
               onInjectFault={(id) => handleInjectFault(devices.find(d => d.id === id)?.category === 'OT' ? 'l1' : 'l7')}
             />
           </div>
@@ -618,7 +680,7 @@ function App() {
             id="view-3d-trigger"
             role="tab"
             aria-selected={activeView === '3d'}
-            onClick={() => setActiveView('3d')}
+            onClick={() => switchView('3d')}
             className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === '3d'
               ? 'bg-slate-100 text-slate-950'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
@@ -631,7 +693,7 @@ function App() {
             id="view-analytics-trigger"
             role="tab"
             aria-selected={activeView === 'analytics'}
-            onClick={() => setActiveView('analytics')}
+            onClick={() => switchView('analytics')}
             className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === 'analytics'
               ? 'bg-slate-100 text-slate-950'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
@@ -644,7 +706,7 @@ function App() {
             id="view-kpi-trigger"
             role="tab"
             aria-selected={activeView === 'kpi'}
-            onClick={() => setActiveView('kpi')}
+            onClick={() => switchView('kpi')}
             className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === 'kpi'
               ? 'bg-slate-100 text-slate-950'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
@@ -657,7 +719,7 @@ function App() {
             id="view-logs-trigger"
             role="tab"
             aria-selected={activeView === 'logs'}
-            onClick={() => setActiveView('logs')}
+            onClick={() => switchView('logs')}
             className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === 'logs'
               ? 'bg-slate-100 text-slate-950'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
@@ -715,7 +777,7 @@ function App() {
                   showControls={isChaosOpen}
                   onShowControlsChange={setIsChaosOpen}
                   selectedDeviceId={selectedDeviceId}
-                  onDeviceSelect={setSelectedDeviceId}
+                  onDeviceSelect={selectDevice}
                   onAddDevice={handleAddDevice}
                 />
               </div>
@@ -733,7 +795,7 @@ function App() {
                   devices={devices}
                   connections={connections}
                   selectedDeviceId={selectedDeviceId}
-                  onSelectDevice={setSelectedDeviceId}
+                  onSelectDevice={selectDevice}
                   onInjectFault={(id: string) => handleInjectFault(devices.find(d => d.id === id)?.category === 'OT' ? 'l1' : 'l7')}
                 />
               </div>
@@ -761,10 +823,14 @@ function App() {
             <Suspense fallback={<LoadingSkeleton label="Loading Analytics…" />}>
             <div id="analytics-view" className="space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
-                <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+                <TimeRangeSelector value={timeRange} onChange={handleTimeRangeChange} />
                 <button
                   id="kpi-matrix-trigger"
-                  onClick={() => setShowMatrix(true)}
+                  onClick={() => {
+                    const startedAt = PerfMonitorService.startTimer();
+                    setShowMatrix(true);
+                    PerfMonitorService.endAction('open_kpi_matrix', startedAt);
+                  }}
                   className="h-9 whitespace-nowrap inline-flex items-center gap-2 px-3 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 rounded-lg transition-all text-sm font-medium"
                 >
                   <Activity className="w-4 h-4" />
@@ -793,9 +859,13 @@ function App() {
             <Suspense fallback={<LoadingSkeleton label="Loading KPI Intelligence…" />}>
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
-                <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+                <TimeRangeSelector value={timeRange} onChange={handleTimeRangeChange} />
                 <button
-                  onClick={() => setShowMatrix(true)}
+                  onClick={() => {
+                    const startedAt = PerfMonitorService.startTimer();
+                    setShowMatrix(true);
+                    PerfMonitorService.endAction('open_kpi_matrix', startedAt);
+                  }}
                   className="h-9 whitespace-nowrap inline-flex items-center gap-2 px-3 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 rounded-lg transition-all text-sm font-medium"
                 >
                   <Activity className="w-4 h-4" />
@@ -822,8 +892,13 @@ function App() {
         {
           activeView === 'logs' && (
             <Suspense fallback={<LoadingSkeleton label="Loading System Logs…" />}>
-            <div className="h-[calc(100vh-140px)]">
-              <SmartLogPanel logs={smartLogs} aiTimeline={aiMonitoringTimeline} />
+            <div className="h-[calc(100vh-140px)] grid grid-cols-1 xl:grid-cols-12 gap-4">
+              <div className="xl:col-span-8 h-full min-h-0">
+                <SmartLogPanel logs={smartLogs} aiTimeline={aiMonitoringTimeline} />
+              </div>
+              <div className="xl:col-span-4 h-full min-h-0">
+                <PerformanceStatsPanel />
+              </div>
             </div>
             </Suspense>
           )

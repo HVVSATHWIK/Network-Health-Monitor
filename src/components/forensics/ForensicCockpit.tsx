@@ -6,6 +6,7 @@ import { Alert, Device } from '../../types/network';
 import OTDRTrace from './visualizations/OTDRTrace';
 import LatencyHistogram from './visualizations/LatencyHistogram';
 import InvestigationStream from './InvestigationStream';
+import { PerfMonitorService } from '../../services/PerfMonitorService';
 
 type OTDRPoint = { distance: number; signal: number };
 type LatencyHistogramBin = { range: string; count: number; bin: number };
@@ -46,6 +47,7 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
 
     const handleScan = useCallback(async (prompt: string) => {
         if (isAnalyzing) return;
+        const startedAt = PerfMonitorService.startTimer();
         setQuery(prompt);
         setIsAnalyzing(true);
         setReport(null); // Clear previous
@@ -85,6 +87,8 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
         } catch (e) {
             if (import.meta.env.DEV) console.error(e);
             setIsAnalyzing(false);
+        } finally {
+            PerfMonitorService.endAction('forensic_scan_ms', startedAt);
         }
     }, [alerts, devices, isAnalyzing]);
 

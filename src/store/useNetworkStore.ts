@@ -40,11 +40,6 @@ const cloneDevices = (source: Device[]) => source.map(d => ({
     }
 }));
 
-const cloneAlerts = (source: Alert[]) => source.map(a => ({
-    ...a,
-    timestamp: new Date(a.timestamp)
-}));
-
 const cloneConnections = (source: NetworkConnection[]) => source.map(c => ({ ...c }));
 
 /**

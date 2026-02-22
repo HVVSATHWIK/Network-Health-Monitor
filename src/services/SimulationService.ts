@@ -2,6 +2,7 @@ import { AssetRegistry } from './AssetRegistry';
 import { RawTelemetry } from './TelemetryMapper';
 import { IngestionPipeline } from './IngestionPipeline';
 import { Device } from '../types/network';
+import { PerfMonitorService } from './PerfMonitorService';
 
 class SimulationService {
     private intervalId: number | null = null;
@@ -25,6 +26,7 @@ class SimulationService {
     }
 
     private tick() {
+        const startedAt = PerfMonitorService.startTimer();
         const allDevices = AssetRegistry.getAllDevices();
 
         // Simulate telemetry for a random subset of devices each tick
@@ -35,6 +37,7 @@ class SimulationService {
 
         // Use the shared pipeline to process generated data
         IngestionPipeline.processTelemetryBatch(updates);
+        PerfMonitorService.endAction('simulation_tick_ms', startedAt);
     }
 
     private generateTelemetryForDevice(device: Device): RawTelemetry | null {

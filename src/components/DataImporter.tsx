@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { Upload } from 'lucide-react';
 import { IngestionPipeline } from '../services/IngestionPipeline';
 import { RawTelemetry } from '../services/TelemetryMapper';
+import { PerfMonitorService } from '../services/PerfMonitorService';
 
 export const DataImporter: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -15,6 +16,7 @@ export const DataImporter: React.FC = () => {
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
+        const startedAt = PerfMonitorService.startTimer();
 
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -28,6 +30,7 @@ export const DataImporter: React.FC = () => {
 
                     if (validBatch.length > 0) {
                         IngestionPipeline.processTelemetryBatch(validBatch);
+                        PerfMonitorService.recordFileImport(validBatch.length, Math.max(0, performance.now() - startedAt));
                         alert(`Successfully imported ${validBatch.length} telemetry records.`);
                     } else {
                         alert('No valid telemetry records found in JSON.');
