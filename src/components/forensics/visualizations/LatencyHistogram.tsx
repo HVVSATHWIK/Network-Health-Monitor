@@ -14,7 +14,7 @@ export default function LatencyHistogram({ data, title = "Latency Distribution",
                 <BarChart data={data} barGap={0} barCategoryGap={0}>
                     <XAxis
                         dataKey="range"
-                        stroke="#889299"
+                        stroke="#94a3b8"
                         fontSize={9}
                         tickLine={false}
                         interval={4}
@@ -23,13 +23,13 @@ export default function LatencyHistogram({ data, title = "Latency Distribution",
                         hide
                     />
                     <Tooltip
-                        cursor={{ fill: 'rgba(102, 252, 241, 0.1)' }}
-                        contentStyle={{ backgroundColor: '#0B0C10', borderColor: '#66FCF1', fontSize: '12px' }}
-                        itemStyle={{ color: '#66FCF1' }}
+                        cursor={{ fill: 'rgba(99, 102, 241, 0.12)' }}
+                        contentStyle={{ backgroundColor: '#020617', borderColor: '#6366f1', fontSize: '12px' }}
+                        itemStyle={{ color: '#c7d2fe' }}
                     />
-                    <Bar dataKey="count" fill="#45A29E">
+                    <Bar dataKey="count" fill="#818cf8">
                         {data.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.bin > 1000 ? '#FF2E2E' : (entry.bin > 200 ? '#FFA700' : '#45A29E')} />
+                            <Cell key={`cell-${index}`} fill={entry.bin > 1000 ? '#ef4444' : (entry.bin > 200 ? '#f59e0b' : '#818cf8')} />
                         ))}
                     </Bar>
                 </BarChart>
