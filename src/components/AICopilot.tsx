@@ -351,7 +351,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
             <span className="font-semibold pr-2">NetMonit AI</span>
         </button>
     ) : (
-        <div className="fixed inset-x-4 bottom-4 sm:inset-x-auto sm:right-4 sm:top-[92px] sm:bottom-4 w-[calc(100vw-2rem)] sm:w-[400px] h-[calc(100dvh-2rem)] sm:h-auto sm:max-h-[calc(100dvh-108px)] bg-slate-950/95 backdrop-blur-2xl border border-indigo-500/30 rounded-2xl shadow-2xl flex flex-col z-40 animate-in zoom-in-95 origin-bottom-right overflow-hidden font-sans">
+        <div className="fixed top-[4.5rem] inset-x-3 bottom-3 sm:inset-x-auto sm:right-4 sm:top-[5rem] sm:bottom-4 2xl:top-[4.5rem] w-auto sm:w-[400px] bg-slate-950/95 backdrop-blur-2xl border border-indigo-500/30 rounded-2xl shadow-2xl flex flex-col z-40 animate-in zoom-in-95 origin-bottom-right overflow-hidden font-sans">
 
             {/* 1. Header */}
             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-gradient-to-r from-slate-900 to-indigo-950/50">
