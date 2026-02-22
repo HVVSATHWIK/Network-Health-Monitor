@@ -52,12 +52,12 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
     <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-2xl h-full overflow-hidden flex flex-col">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-white tracking-wide">Active Alerts</h2>
-        <span className="bg-red-100 text-red-800 text-sm font-semibold px-3 py-1 rounded-full">
+        <span className="bg-red-500/20 text-red-400 text-sm font-semibold px-3 py-1 rounded-full">
           {alerts.length}
         </span>
       </div>
 
-      <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
+      <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1" role="log" aria-label="Active alerts" aria-live="polite">
         {alerts.map((alert) => {
           const config = severityConfig[alert.severity];
           const Icon = config.icon;
@@ -85,14 +85,14 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
 
                   {/* Standard AI Correlation (from static data) */}
                   {alert.aiCorrelation && !rootCauseInsight && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
+                    <div className="mt-3 pt-3 border-t border-slate-700/50">
                       <div className="flex items-start gap-2">
-                        <Sparkles className="w-4 h-4 text-purple-600 flex-shrink-0 mt-0.5" />
+                        <Sparkles className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
                         <div>
-                          <div className="text-xs font-semibold text-purple-700 mb-1">
+                          <div className="text-xs font-semibold text-purple-400 mb-1">
                             AI Context
                           </div>
-                          <div className="text-xs text-gray-600">
+                          <div className="text-xs text-slate-400">
                             {alert.aiCorrelation}
                           </div>
                         </div>

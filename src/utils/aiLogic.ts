@@ -579,19 +579,19 @@ async function callGeminiAPI(
                 try {
                     return await generateWithRetry(prompt, FALLBACK_GEMINI_MODEL);
                 } catch (fallbackError) {
-                    console.error(`Gemini API Error (fallback model: ${FALLBACK_GEMINI_MODEL}):`, fallbackError);
+                    if (import.meta.env.DEV) console.error(`Gemini API Error (fallback model: ${FALLBACK_GEMINI_MODEL}):`, fallbackError);
                     return 'Gemini is temporarily overloaded (503/high demand). Please retry in 30-60 seconds. Your local quota remains enforced at 15 requests/minute and 1000/day.';
                 }
             }
 
-            console.error(`Gemini API Error (primary model: ${PRIMARY_GEMINI_MODEL}):`, primaryError);
+            if (import.meta.env.DEV) console.error(`Gemini API Error (primary model: ${PRIMARY_GEMINI_MODEL}):`, primaryError);
             const offlineKnowledge = buildOfflineGeneralKnowledgeResponse(query);
             if (offlineKnowledge) return `${offlineKnowledge}\n\n(Served from local fallback because Gemini request failed.)`;
             return 'Gemini request failed. Check API key/model settings and retry. If this is a temporary provider spike, try again shortly.';
         }
 
     } catch (error) {
-        console.error("Gemini API Error:", error);
+        if (import.meta.env.DEV) console.error("Gemini API Error:", error);
         return "AI engine unavailable. Please verify configuration.";
     }
 }

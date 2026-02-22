@@ -4,16 +4,21 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NetMonit | Network Monitoring System</title>
+  <meta name="theme-color" content="#020617" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>NetMonit | Industrial Network Health Monitor</title>
   <meta name="description"
     content="NetMonit AI-assisted network monitoring system for IT/OT convergence with L1-L7 KPIs, 3D topology, real-time data flow, and guided forensics." />
+  <meta name="keywords" content="network monitoring, IT/OT, SCADA, PLC, industrial IoT, root cause analysis, digital twin, L1-L7 diagnostics" />
+  <meta name="author" content="NetMonit" />
 
   <!-- Canonical + Open Graph (WhatsApp/LinkedIn) -->
   <link rel="canonical" href="https://netmonit-aa2cd.web.app/" />
   <meta property="og:url" content="https://netmonit-aa2cd.web.app/" />
   <meta property="og:site_name" content="NetMonit" />
-  <meta property="og:title" content="NetMonit | Network Monitoring System" />
+  <meta property="og:title" content="NetMonit | Industrial Network Health Monitor" />
   <meta property="og:description"
     content="AI-assisted monitoring for converged smart-factory IT/OT networks: L1–L7 KPIs, digital twin topology, live packet-path visibility, and RCA-ready forensics." />
 
@@ -26,20 +31,46 @@
 
   <!-- Twitter/X -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="NetMonit | Network Monitoring System" />
+  <meta name="twitter:title" content="NetMonit | Industrial Network Health Monitor" />
   <meta name="twitter:description"
     content="AI-assisted monitoring for converged smart-factory IT/OT networks: L1–L7 KPIs, digital twin topology, live packet-path visibility, and RCA-ready forensics." />
   <meta name="twitter:image" content="https://images.weserv.nl/?url=netmonit-aa2cd.web.app/preview.svg&output=png&w=1200&h=630&fit=cover">
 
-  <!-- Industrial Forensic Fonts -->
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "NetMonit",
+    "url": "https://netmonit-aa2cd.web.app/",
+    "description": "AI-assisted industrial network health monitoring platform with L1-L7 diagnostics, 3D digital twin topology, and root cause analysis.",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "creator": { "@type": "Organization", "name": "NetMonit" }
+  }
+  </script>
+
+  <!-- Industrial Forensic Fonts (non-blocking) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;700&display=swap"
-    rel="stylesheet">
+    rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  </noscript>
 </head>
 
 <body>
+  <noscript>
+    <div style="padding:2rem;text-align:center;background:#020617;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif">
+      <div>
+        <h1 style="font-size:1.5rem;margin-bottom:1rem">NetMonit requires JavaScript</h1>
+        <p>Please enable JavaScript in your browser to use the Network Health Monitor.</p>
+      </div>
+    </div>
+  </noscript>
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>

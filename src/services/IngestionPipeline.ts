@@ -73,7 +73,7 @@ export const processTelemetryBatch = (batch: RawTelemetry[]) => {
                 }
             }
         } else {
-            console.warn(`[Ingestion] Could not resolve device for telemetry:`, telemetry);
+            if (import.meta.env.DEV) console.warn(`[Ingestion] Could not resolve device for telemetry:`, telemetry);
         }
     });
 };

@@ -52,7 +52,7 @@ export default function DeviceStatus({
     <div id="asset-status-panel" className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-2xl h-full flex flex-col transition-all duration-300">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-white tracking-wide">Asset Status</h2>
-        <div className="p-2 bg-slate-800 rounded-full text-slate-400">
+        <div className="p-2 bg-slate-800 rounded-full text-slate-400" role="img" aria-label="Asset status panel">
           <Search className="w-4 h-4" />
         </div>
       </div>
@@ -90,7 +90,10 @@ export default function DeviceStatus({
                 : 'border-slate-700/50 bg-slate-800/20 hover:border-blue-500/50 hover:bg-slate-800/50'
                 }`}
               onClick={() => onSelectDevice?.(device.id)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectDevice?.(device.id); } }}
               role="button"
+              tabIndex={0}
+              aria-label={`View details for ${device.name}, status ${device.status}`}
             >
               {/* Status Bar Indicator */}
               <div className={`absolute left-0 top-0 bottom-0 w-1 ${config.bg.replace('/30', '')}`}></div>
@@ -104,8 +107,8 @@ export default function DeviceStatus({
                     <span className="font-semibold text-gray-200 text-sm truncate">{device.name}</span>
                     <div className={`w-1.5 h-1.5 rounded-full ${config.dot} animate-pulse`} />
                   </div>
-                  <div className="text-xs text-slate-500 truncate flex items-center gap-2">
-                    <span className="font-mono text-slate-600">{device.ip}</span>
+                  <div className="text-xs text-slate-400 truncate flex items-center gap-2">
+                    <span className="font-mono text-slate-400">{device.ip}</span>
                     <span>•</span>
                     <span className="truncate">{device.location}</span>
                   </div>

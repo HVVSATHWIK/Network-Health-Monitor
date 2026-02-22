@@ -83,7 +83,7 @@ export default function ForensicCockpit({ alerts, devices, isOpen, onOpenChange,
             }
 
         } catch (e) {
-            console.error(e);
+            if (import.meta.env.DEV) console.error(e);
             setIsAnalyzing(false);
         }
     }, [alerts, devices, isAnalyzing]);

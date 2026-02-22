@@ -77,7 +77,7 @@ export default function Login({ onLogin }: LoginProps) {
                 }
             } catch (err: unknown) {
                 if (cancelled) return;
-                console.error("Google Redirect Login Failed:", err);
+                if (import.meta.env.DEV) console.error("Google Redirect Login Failed:", err);
                 const code = getErrorCode(err);
                 if (code === 'auth/unauthorized-domain') {
                     setError(buildUnauthorizedDomainError());
@@ -123,7 +123,7 @@ export default function Login({ onLogin }: LoginProps) {
             }
 
         } catch (err: unknown) {
-            console.error("Auth Failed:", err);
+            if (import.meta.env.DEV) console.error("Auth Failed:", err);
             const code = getErrorCode(err);
             // Better error messages
             if (code === 'auth/email-already-in-use') setError("Email already registered.");
@@ -148,7 +148,7 @@ export default function Login({ onLogin }: LoginProps) {
             const result = await signInWithPopup(auth, googleProvider);
             await upsertGoogleProfileAndContinue(result.user);
         } catch (err: unknown) {
-            console.error("Google Login Failed:", err);
+            if (import.meta.env.DEV) console.error("Google Login Failed:", err);
             const code = getErrorCode(err);
             if (code === 'auth/unauthorized-domain') {
                 setError(buildUnauthorizedDomainError());
@@ -158,7 +158,7 @@ export default function Login({ onLogin }: LoginProps) {
                     await signInWithRedirect(auth, googleProvider);
                     return;
                 } catch (redirectErr) {
-                    console.error("Google Redirect Fallback Failed:", redirectErr);
+                    if (import.meta.env.DEV) console.error("Google Redirect Fallback Failed:", redirectErr);
                 }
                 setError("SSO popup was blocked. Retrying with redirect...");
             } else {
@@ -219,7 +219,7 @@ export default function Login({ onLogin }: LoginProps) {
                         </div>
                     </div>
 
-                    <div className="text-[10px] text-slate-600 mt-12 font-mono">
+                    <div className="text-[10px] text-slate-500 mt-12 font-mono">
                         v2.4.0-stable | ENTERPRISE EDITION
                     </div>
                 </div>
@@ -271,6 +271,7 @@ export default function Login({ onLogin }: LoginProps) {
                                         value={fullName}
                                         onChange={(e) => setFullName(e.target.value)}
                                         placeholder="Full Name (e.g. John Doe)"
+                                        aria-label="Full name"
                                         className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 text-sm rounded-xl focus:ring-2 focus:ring-blue-500 block w-full p-3 transition-all hover:border-slate-700 placeholder-slate-600"
                                         required
                                     />
@@ -282,6 +283,7 @@ export default function Login({ onLogin }: LoginProps) {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="admin@globalmfg.com"
+                                    aria-label="Email address"
                                     className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 text-sm rounded-xl focus:ring-2 focus:ring-blue-500 block w-full p-3 transition-all hover:border-slate-700 placeholder-slate-600"
                                     required
                                 />
@@ -292,6 +294,7 @@ export default function Login({ onLogin }: LoginProps) {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
+                                    aria-label="Password"
                                     className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 text-sm rounded-xl focus:ring-2 focus:ring-blue-500 block w-full p-3 transition-all hover:border-slate-700 placeholder-slate-600"
                                     required
                                     minLength={6}

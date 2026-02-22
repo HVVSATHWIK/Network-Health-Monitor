@@ -1,5 +1,5 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "netmonit",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -24,7 +24,6 @@
     "firebase": "^12.6.0",
     "lucide-react": "^0.344.0",
     "meshline": "^3.3.1",
-    "package.json": "^0.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-is": "^19.2.1",

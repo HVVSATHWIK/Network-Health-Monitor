@@ -280,7 +280,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                 text: responseText
             }]);
         } catch (error: unknown) {
-            console.error(error);
+            if (import.meta.env.DEV) console.error(error);
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'ai',
@@ -364,7 +364,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                         <p className="text-[10px] text-indigo-300 font-medium">AI Analysis Assistant</p>
                     </div>
                 </div>
-                <button onClick={() => onOpenChange?.(false)} className="text-slate-400 hover:text-white transition-colors bg-white/5 p-1.5 rounded-lg hover:bg-white/10">
+                <button onClick={() => onOpenChange?.(false)} aria-label="Close AI assistant" className="text-slate-400 hover:text-white transition-colors bg-white/5 p-1.5 rounded-lg hover:bg-white/10">
                     <X className="w-4 h-4" />
                 </button>
             </div>
@@ -446,6 +446,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && !isProcessing && handleSubmit()}
                         placeholder="Ask Coordinator..."
+                        aria-label="Chat message"
                         className="w-full bg-slate-950/50 border border-slate-700 rounded-xl pl-10 pr-3 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
                         disabled={isProcessing}
                     />
@@ -455,6 +456,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                     onClick={handleSubmit}
                     disabled={!inputValue.trim() || isProcessing}
                     className="aspect-square bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-lg hover:shadow-indigo-500/20 flex items-center justify-center w-12"
+                    aria-label="Send message"
                 >
                     <Send className="w-5 h-5" />
                 </button>

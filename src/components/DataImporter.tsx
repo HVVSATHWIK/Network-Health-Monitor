@@ -36,7 +36,7 @@ export const DataImporter: React.FC = () => {
                     alert('Invalid JSON format. Expected an array of telemetry objects.');
                 }
             } catch (error) {
-                console.error('Import error:', error);
+                if (import.meta.env.DEV) console.error('Import error:', error);
                 alert('Failed to parse JSON file.');
             }
 

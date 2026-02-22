@@ -1,36 +1,39 @@
 import { Activity, Shield, Play, Terminal, Bot, Menu, Boxes, LineChart, Gauge } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
 import AlertPanel from './components/AlertPanel';
 import DeviceStatus from './components/DeviceStatus';
-import Advanced3DTopology from './components/Advanced3DTopology';
-import AdvancedAnalytics from './components/AdvancedAnalytics';
-import NetworkHeatmap from './components/NetworkHeatmap';
-import DataFlowVisualization from './components/DataFlowVisualization';
-import ForensicCockpit from './components/forensics/ForensicCockpit';
-import AICopilot from './components/AICopilot';
+import LoadingSkeleton from './components/LoadingSkeleton';
+
+// Lazy-loaded view components (code-split)
+const Advanced3DTopology = lazy(() => import('./components/Advanced3DTopology'));
+const AdvancedAnalytics = lazy(() => import('./components/AdvancedAnalytics'));
+const NetworkHeatmap = lazy(() => import('./components/NetworkHeatmap'));
+const DataFlowVisualization = lazy(() => import('./components/DataFlowVisualization'));
+const ForensicCockpit = lazy(() => import('./components/forensics/ForensicCockpit'));
+const AICopilot = lazy(() => import('./components/AICopilot'));
+const SmartLogPanel = lazy(() => import('./components/SmartLogPanel'));
+const RealTimeKPIPage = lazy(() => import('./components/kpi/RealTimeKPIPage'));
+const BusinessROI = lazy(() => import('./components/BusinessROI'));
 
 import { Device, NetworkConnection } from './types/network';
-import SmartLogPanel from './components/SmartLogPanel'; // Import SmartLogPanel
 import type { AIMonitoringEvent } from './components/SmartLogPanel';
-import { smartLogs } from './data/smartLogs'; // Import mock logs
+import { smartLogs } from './data/smartLogs';
 import { useNetworkStore } from './store/useNetworkStore';
 import { NetworkSimulation } from './services/SimulationService';
 
 import VisualGuide from './components/VisualGuide';
 import BootSequence from './components/BootSequence';
 import KPIMatrix from './components/KPIMatrix';
-import Login from './components/Login'; // Import Login
-import BusinessROI from './components/BusinessROI'; // Import ROI Widget
-import LayerMenu from './components/LayerMenu'; // Import LayerMenu
-import LayerOverview from './components/LayerOverview'; // Import LayerOverview
-import AssetDetailPanel from './components/AssetDetailPanel'; // Import AssetDetailPanel
+import Login from './components/Login';
+import LayerMenu from './components/LayerMenu';
+import LayerOverview from './components/LayerOverview';
+import AssetDetailPanel from './components/AssetDetailPanel';
 import { OTHealthCard } from './components/dashboard/OTHealthCard';
 import { NetworkLoadCard } from './components/dashboard/NetworkLoadCard';
 import { CorrelationTimelineCard } from './components/dashboard/CorrelationTimelineCard';
 import { TimeRangeSelector } from './components/dashboard/TimeRangeSelector';
 import { TIME_RANGE_PRESETS, type TimeRange } from './components/dashboard/timeRangePresets';
 import { DataImporter } from './components/DataImporter';
-import RealTimeKPIPage from './components/kpi/RealTimeKPIPage';
 import {
   analyzeWithMultiAgents,
   buildAIMonitoringSnapshot,
@@ -51,14 +54,10 @@ function App() {
   const [activeView, setActiveView] = useState<'3d' | 'analytics' | 'layer' | 'logs' | 'kpi'>('3d');
   const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // const [showTour, setShowTour] = useState(true); // Replaced by VisualGuide
-  // const [tourStep, setTourStep] = useState(0);
   const [isBooting, setIsBooting] = useState(false);
   const [showMatrix, setShowMatrix] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState("Admin User");
-  // const [organization, setOrganization] = useState("Global Mfg - NA East"); // Unused
-  // const [aiMessage, setAiMessage] = useState<string | undefined>(undefined); // Unused
   const [visualMode, setVisualMode] = useState<'default' | 'scan'>('default');
   const [isChaosOpen, setIsChaosOpen] = useState(false);
   const scanTimeoutsRef = useRef<number[]>([]);
@@ -88,10 +87,12 @@ function App() {
           }
         } catch (error) {
           const code = getFirebaseErrorCode(error);
-          if (code === 'permission-denied') {
-            console.warn('Firestore users profile read denied by security rules. Using auth profile fallback.');
-          } else {
-            console.error("Error fetching user profile:", error);
+          if (import.meta.env.DEV) {
+            if (code === 'permission-denied') {
+              console.warn('Firestore users profile read denied by security rules. Using auth profile fallback.');
+            } else {
+              console.error("Error fetching user profile:", error);
+            }
           }
         }
 
@@ -129,10 +130,10 @@ function App() {
   const aiEnrichmentInFlight = useRef(false);
 
 
-  const healthyDevices = devices.filter(d => d.status === 'healthy').length;
+  const healthyDevices = useMemo(() => devices.filter(d => d.status === 'healthy').length, [devices]);
   const totalDevices = devices.length;
-  const healthPercentage = Math.round((healthyDevices / totalDevices) * 100);
-  const aiMonitoringSnapshot = buildAIMonitoringSnapshot(alerts, devices, connections, layerKPIs, dependencyPaths);
+  const healthPercentage = useMemo(() => Math.round((healthyDevices / totalDevices) * 100), [healthyDevices, totalDevices]);
+  const aiMonitoringSnapshot = useMemo(() => buildAIMonitoringSnapshot(alerts, devices, connections, layerKPIs, dependencyPaths), [alerts, devices, connections, layerKPIs, dependencyPaths]);
 
   useEffect(() => {
     if (aiEnrichmentInFlight.current) return;
@@ -186,7 +187,7 @@ function App() {
           )
         );
       } catch (error) {
-        console.error('AI enrichment failed:', error);
+        if (import.meta.env.DEV) console.error('AI enrichment failed:', error);
         setAiMonitoringTimeline((prev) => {
           const next: AIMonitoringEvent[] = [
             ...prev,
@@ -208,7 +209,7 @@ function App() {
   }, [alerts, devices, connections, dependencyPaths, setAlerts]);
 
   // Filter Alerts based on Time Range
-  const filteredAlerts = alerts.filter(alert => {
+  const filteredAlerts = useMemo(() => alerts.filter(alert => {
     const alertTime = new Date(alert.timestamp).getTime();
     if (timeRange.value === 'custom' && timeRange.start && timeRange.end) {
       return alertTime >= timeRange.start.getTime() && alertTime <= timeRange.end.getTime();
@@ -234,7 +235,7 @@ function App() {
     }
 
     return alertTime >= cutoff;
-  });
+  }), [alerts, timeRange]);
 
   const handleLogin = (user: string, _org: string) => {
     void _org;
@@ -255,10 +256,12 @@ function App() {
           }, { merge: true });
         } catch (e) {
           const code = getFirebaseErrorCode(e);
-          if (code === 'permission-denied') {
-            console.warn('Firestore users profile write denied by security rules.');
-          } else {
-            console.error("Error saving terminal name:", e);
+          if (import.meta.env.DEV) {
+            if (code === 'permission-denied') {
+              console.warn('Firestore users profile write denied by security rules.');
+            } else {
+              console.error("Error saving terminal name:", e);
+            }
           }
         }
       }
@@ -295,20 +298,9 @@ function App() {
       document.getElementById('data-flow-viz')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 150));
 
-    // 2. AI Narration Sequence (Removed legacy setAiMessage)
-    // setAiMessage(`Initiating Full Stack Telemetry Scan for ${userName}...`);
+    // 2. Scan narration removed (was legacy setAiMessage)
 
     scanTimeoutsRef.current.push(window.setTimeout(() => {
-      // setAiMessage("Analyzing Layer 1 Physical Links... Detected 2ms jitter on Switch-02.");
-    }, 15000));
-
-    scanTimeoutsRef.current.push(window.setTimeout(() => {
-      // setAiMessage("Correlating with Layer 7 Application Latency...");
-      // Inject a simulated "fix" or "optimization" visual
-    }, 30000));
-
-    scanTimeoutsRef.current.push(window.setTimeout(() => {
-      // setAiMessage("Optimization Complete. Routing efficiency improved by 15%. Dashboard updated.");
       setVisualMode('default');
     }, 45000));
   };
@@ -429,6 +421,7 @@ function App() {
               <button
                 id="layer-menu-trigger"
                 onClick={() => setIsMenuOpen(true)}
+                aria-label="Open layer menu"
                 className="h-10 w-10 inline-flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-lg transition-colors border border-transparent hover:border-slate-700"
               >
                 <Menu className="w-5 h-5" />
@@ -497,7 +490,7 @@ function App() {
               <div id="network-health-badge" className="hidden md:flex items-center gap-2 bg-slate-900/70 border border-slate-700 px-3 py-1.5 rounded-lg whitespace-nowrap">
                 <Shield className={`w-4 h-4 ${devices.some(d => d.status === 'critical') ? 'text-red-400' : devices.some(d => d.status === 'warning') ? 'text-yellow-400' : 'text-green-400'}`} />
                 <div>
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider">Health</div>
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider">Health</div>
                   <div className={`text-sm font-bold ${healthPercentage < 70 ? 'text-red-400' : healthPercentage < 90 ? 'text-yellow-400' : 'text-green-400'}`}>{healthPercentage}%</div>
                 </div>
               </div>
@@ -545,10 +538,13 @@ function App() {
       {showMatrix && <KPIMatrix devices={devices} onClose={() => setShowMatrix(false)} />}
 
       {/* Visual Guide Overlay (Manual Trigger) */}
-      <main className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6">
-        <div className="mb-3 inline-flex flex-wrap gap-1 rounded-xl border border-slate-800 bg-slate-900/55 p-1.5 backdrop-blur-sm">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-semibold">Skip to main content</a>
+      <main id="main-content" className="max-w-[1800px] mx-auto px-4 sm:px-6 py-6">
+        <div className="mb-3 inline-flex flex-wrap gap-1 rounded-xl border border-slate-800 bg-slate-900/55 p-1.5 backdrop-blur-sm" role="tablist" aria-label="Dashboard views">
           <button
             id="view-3d-trigger"
+            role="tab"
+            aria-selected={activeView === '3d'}
             onClick={() => setActiveView('3d')}
             className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === '3d'
               ? 'bg-slate-100 text-slate-950'
@@ -560,6 +556,8 @@ function App() {
           </button>
           <button
             id="view-analytics-trigger"
+            role="tab"
+            aria-selected={activeView === 'analytics'}
             onClick={() => setActiveView('analytics')}
             className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === 'analytics'
               ? 'bg-slate-100 text-slate-950'
@@ -571,6 +569,8 @@ function App() {
           </button>
           <button
             id="view-kpi-trigger"
+            role="tab"
+            aria-selected={activeView === 'kpi'}
             onClick={() => setActiveView('kpi')}
             className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === 'kpi'
               ? 'bg-slate-100 text-slate-950'
@@ -582,6 +582,8 @@ function App() {
           </button>
           <button
             id="view-logs-trigger"
+            role="tab"
+            aria-selected={activeView === 'logs'}
             onClick={() => setActiveView('logs')}
             className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${activeView === 'logs'
               ? 'bg-slate-100 text-slate-950'
@@ -597,7 +599,7 @@ function App() {
           <div id="ai-monitor-badge" className="flex items-center gap-2 bg-slate-900/70 px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
             <Bot className="w-4 h-4 text-indigo-400" />
             <div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider">AI Coverage</div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider">AI Coverage</div>
               <div className="text-xs font-semibold text-indigo-300">
                 {aiMonitoringSnapshot.monitoredLayers.length}/7 layers · {aiMonitoringSnapshot.monitoredDevices} assets
               </div>
@@ -607,7 +609,7 @@ function App() {
           <div className="flex items-center gap-2 bg-slate-900/70 px-3 py-1.5 rounded-lg whitespace-nowrap border border-slate-700">
             <Activity className="w-4 h-4 text-blue-400" />
             <div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider">Assets</div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider">Assets</div>
               <div className="text-xs font-semibold text-blue-300">{healthyDevices}/{totalDevices}</div>
             </div>
           </div>
@@ -626,6 +628,7 @@ function App() {
 
         {
           activeView === '3d' && (
+            <Suspense fallback={<LoadingSkeleton label="Loading 3D Topology…" />}>
             <div className="grid grid-cols-12 gap-6">
               <div className="col-span-12">
                 <Advanced3DTopology
@@ -676,11 +679,13 @@ function App() {
                 <NetworkHeatmap alerts={filteredAlerts} devices={devices} />
               </div>
             </div>
+            </Suspense>
           )
         }
 
         {
           activeView === 'analytics' && (
+            <Suspense fallback={<LoadingSkeleton label="Loading Analytics…" />}>
             <div id="analytics-view" className="space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
                 <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
@@ -706,11 +711,13 @@ function App() {
                 timeRangeEnd={timeRange.end}
               />
             </div>
+            </Suspense>
           )
         }
 
         {
           activeView === 'kpi' && (
+            <Suspense fallback={<LoadingSkeleton label="Loading KPI Intelligence…" />}>
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
                 <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
@@ -735,14 +742,17 @@ function App() {
                 />
               </div>
             </div>
+            </Suspense>
           )
         }
 
         {
           activeView === 'logs' && (
+            <Suspense fallback={<LoadingSkeleton label="Loading System Logs…" />}>
             <div className="h-[calc(100vh-140px)]">
               <SmartLogPanel logs={smartLogs} aiTimeline={aiMonitoringTimeline} />
             </div>
+            </Suspense>
           )
         }
 

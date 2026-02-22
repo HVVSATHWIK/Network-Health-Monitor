@@ -1,0 +1,19 @@
+{
+  "name": "NetMonit — Industrial Network Health Monitor",
+  "short_name": "NetMonit",
+  "description": "AI-assisted monitoring for converged IT/OT networks: L1–L7 KPIs, digital twin topology, live packet-path visibility, and RCA-ready forensics.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#020617",
+  "background_color": "#020617",
+  "orientation": "any",
+  "categories": ["utilities", "productivity", "business"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
