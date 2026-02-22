@@ -1,5 +1,5 @@
 import { Activity, Brain, Cpu, Download, Gauge, History, MemoryStick, Timer } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { PerfMonitorService } from '../../services/PerfMonitorService';
 import { usePerfStore } from '../../store/usePerfStore';
 
@@ -8,15 +8,23 @@ const ms = (value: number) => `${value.toFixed(1)} ms`;
 const sec = (msValue: number) => `${(msValue / 1000).toFixed(1)}s`;
 
 export default function PerformanceStatsPanel() {
-  const snapshot = usePerfStore((state) => state.buildSnapshot());
+  // Use a stable selector for baseline and setBaseline
   const baseline = usePerfStore((state) => state.baseline);
   const setBaseline = usePerfStore((state) => state.setBaselineFromCurrent);
+  // Store the snapshot in local state and update on store changes
+  const [snapshot, setSnapshot] = useState(() => usePerfStore.getState().buildSnapshot());
+  useEffect(() => {
+    // Subscribe to all store changes and update snapshot
+    const unsub = usePerfStore.subscribe(
+      () => setSnapshot(usePerfStore.getState().buildSnapshot())
+    );
+    return unsub;
+  }, []);
 
-  const startupRows = useMemo(() => Object.entries(snapshot.startup), [snapshot.startup]);
+  const startupRows = useMemo(() => Object.entries(snapshot.startup), [snapshot]);
 
   const regressions = useMemo(() => {
     if (!baseline) return [] as string[];
-
     const findings: string[] = [];
     for (const [key, current] of Object.entries(snapshot.startup)) {
       const prior = baseline.startup[key];
@@ -24,14 +32,12 @@ export default function PerformanceStatsPanel() {
       const drift = ((current - prior) / prior) * 100;
       if (drift >= 20) findings.push(`${key} regressed by ${drift.toFixed(0)}%`);
     }
-
     const baselineAvg = baseline.model.avgLatencyMs;
     const currentAvg = snapshot.model.avgLatencyMs;
     if (baselineAvg > 0) {
       const drift = ((currentAvg - baselineAvg) / baselineAvg) * 100;
       if (drift >= 20) findings.push(`Model latency regressed by ${drift.toFixed(0)}%`);
     }
-
     return findings;
   }, [baseline, snapshot]);
 
