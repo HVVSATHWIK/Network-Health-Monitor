@@ -184,6 +184,26 @@ describe('classifyIntent', () => {
     expect(classifyIntent('')).toBe('GENERAL_KNOWLEDGE');
     expect(classifyIntent('a')).toBe('GENERAL_KNOWLEDGE');
   });
+
+  it('does NOT let "unhealthy" match the "health" status hint (word boundary)', () => {
+    // This was the root cause of the Forensic Cockpit / Diagnostic Scan bug:
+    // prompts containing "unhealthy devices" were mis-classified as STATUS_CHECK.
+    expect(classifyIntent('Forensic analysis requested. 1 unhealthy devices. Investigate root cause.')).toBe('DIAGNOSTIC_ANALYSIS');
+    expect(classifyIntent('Initiate diagnostic scan. unhealthyDevices=2. Scan request id: 123.')).toBe('DIAGNOSTIC_ANALYSIS');
+    expect(classifyIntent('3 unhealthy nodes detected, analyze impact')).toBe('DIAGNOSTIC_ANALYSIS');
+  });
+
+  it('still classifies standalone "health" as STATUS_CHECK', () => {
+    expect(classifyIntent('is the network healthy?')).toBe('STATUS_CHECK');
+    expect(classifyIntent('network health report')).toBe('STATUS_CHECK');
+    expect(classifyIntent('check health')).toBe('STATUS_CHECK');
+  });
+
+  it('prioritizes diagnostic over status when both hints present', () => {
+    // "analysis" (diagnostic) + system message text that might contain status-like words
+    expect(classifyIntent('Forensic diagnostic analysis of current alerts and degraded links')).toBe('DIAGNOSTIC_ANALYSIS');
+    expect(classifyIntent('Analyze the status of all critical devices')).toBe('DIAGNOSTIC_ANALYSIS');
+  });
 });
 
 // ─── stripRuntimeContext ────────────────────────────────────────────────

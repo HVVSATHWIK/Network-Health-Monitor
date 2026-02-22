@@ -297,17 +297,17 @@ function App() {
     // Make the scan visible: DataFlowVisualization lives in the 3D view.
     setActiveView('3d');
 
-    // Open the forensic scan modal and auto-run a "full stack" diagnosis.
+    // Send diagnostic analysis to the AICopilot chatbot (not the full-screen ForensicCockpit).
     const unhealthyCount = devices.filter((d) => d.status !== 'healthy').length;
     const degradedLinks = connections.filter((c) => c.status !== 'healthy').length;
     const recentAlerts = filteredAlerts.slice(0, 3).map((a) => `${a.device} (${a.layer}) ${a.message}`).join(' | ');
-    setForensicSystemMessage(
+    setAiSystemMessage(
       `Initiate full stack diagnostic scan (L1–L7) for ${userName}. ` +
       `Live state: alerts=${filteredAlerts.length}, unhealthyDevices=${unhealthyCount}, degradedLinks=${degradedLinks}. ` +
       `${recentAlerts ? `Recent alerts: ${recentAlerts}. ` : ''}` +
       `Scan request id: ${Date.now()}.`
     );
-    setIsForensicOpen(true);
+    setIsNetMonitAIOpen(true);
 
     // Clear previous scan timers so repeated clicks behave predictably.
     scanTimeoutsRef.current.forEach((id) => window.clearTimeout(id));
@@ -321,8 +321,6 @@ function App() {
     scanTimeoutsRef.current.push(window.setTimeout(() => {
       document.getElementById('data-flow-viz')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 150));
-
-    // 2. Scan narration removed (was legacy setAiMessage)
 
     scanTimeoutsRef.current.push(window.setTimeout(() => {
       setVisualMode('default');
@@ -477,13 +475,16 @@ function App() {
               <button
                 id="forensic-cockpit-trigger"
                 onClick={() => {
-                  // Build a context-aware forensic prompt
+                  // Build a context-aware forensic prompt — avoid embedding device names
+                  // directly, so the AI route returns structured ForensicReport not a device card.
                   const unhealthyCount = devices.filter((d) => d.status !== 'healthy').length;
                   const degradedLinks = connections.filter((c) => c.status !== 'healthy').length;
-                  const topAlerts = filteredAlerts.slice(0, 3).map((a) => `${a.device} (${a.layer}): ${a.message}`).join(' | ');
+                  const alertSummary = filteredAlerts.length > 0
+                    ? `${filteredAlerts.length} alert(s) across layers ${[...new Set(filteredAlerts.map(a => a.layer))].join(', ')}`
+                    : 'no active alerts';
                   const prompt = unhealthyCount > 0 || filteredAlerts.length > 0
-                    ? `Forensic analysis requested. Live state: ${filteredAlerts.length} alerts, ${unhealthyCount} unhealthy devices, ${degradedLinks} degraded links. ${topAlerts ? `Active issues: ${topAlerts}.` : ''} Investigate root cause and impact chain.`
-                    : `Forensic health audit requested. All ${devices.length} devices operational, ${degradedLinks} degraded links. Perform preventive analysis and identify potential risks.`;
+                    ? `Forensic diagnostic analysis requested. ${alertSummary}, ${unhealthyCount} unhealthy device(s), ${degradedLinks} degraded link(s). Investigate root cause and impact chain across all OSI layers.`
+                    : `Forensic health audit requested. All ${devices.length} devices operational, ${degradedLinks} degraded link(s). Perform preventive analysis and identify potential risks.`;
                   setForensicSystemMessage(`${prompt} Request id: ${Date.now()}.`);
                   setIsForensicOpen(true);
                 }}

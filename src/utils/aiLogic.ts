@@ -648,51 +648,8 @@ function classifyIntent(query: string): Intent {
     ];
     if (websiteAssistHints.some((h) => q.includes(h))) return 'WEBSITE_ASSIST';
 
-    const statusHints = [
-        'list active alerts',
-        'active alerts',
-        'show alerts',
-        'what devices are down',
-        'devices are down',
-        'criticals',
-        'show critical',
-        'status',
-        'health',
-        'what is down',
-        'what is offline',
-        'show me the alerts',
-        'how many alerts',
-        'how many devices',
-        'any alerts',
-        'any problems',
-        'any issues',
-        'anything wrong',
-        'everything ok',
-        'is everything ok',
-        'is the network ok',
-        'network healthy',
-        'is it healthy',
-        'all good',
-        'overview',
-        'summary',
-        'summarize',
-        'give me a summary',
-        'what is happening',
-        'what\'s happening',
-        'what is going on',
-        'what\'s going on',
-        'how bad',
-        'how is the network',
-        'how are things',
-        'current state',
-        'current situation',
-        'situation report',
-        'sitrep',
-        'tell me about the network',
-        'network report',
-    ];
-    if (statusHints.some((h) => q.includes(h))) return 'STATUS_CHECK';
-
+    // Diagnostic intent checked BEFORE status — more specific and higher priority.
+    // Prevents prompts like "analyze unhealthy devices" from matching "health" as STATUS_CHECK.
     const diagnosticHints = [
         'root cause',
         'rca',
@@ -748,13 +705,59 @@ function classifyIntent(query: string): Intent {
         'vulnerability',
         'scan',
         'audit',
-        'blast radius',
         'performance issue',
         'slow',
         'lagging',
         'timeout',
     ];
     if (diagnosticHints.some((h) => q.includes(h))) return 'DIAGNOSTIC_ANALYSIS';
+
+    // Word-boundary regex for hints that might appear as substrings
+    // (e.g. "health" inside "unhealthy", "status" inside "statusHints")
+    const statusWordBoundaryHints = ['health', 'status'];
+    const statusSubstringHints = [
+        'list active alerts',
+        'active alerts',
+        'show alerts',
+        'what devices are down',
+        'devices are down',
+        'criticals',
+        'show critical',
+        'what is down',
+        'what is offline',
+        'show me the alerts',
+        'how many alerts',
+        'how many devices',
+        'any alerts',
+        'any problems',
+        'any issues',
+        'anything wrong',
+        'everything ok',
+        'is everything ok',
+        'is the network ok',
+        'network healthy',
+        'is it healthy',
+        'all good',
+        'overview',
+        'summary',
+        'summarize',
+        'give me a summary',
+        'what is happening',
+        'what\'s happening',
+        'what is going on',
+        'what\'s going on',
+        'how bad',
+        'how is the network',
+        'how are things',
+        'current state',
+        'current situation',
+        'situation report',
+        'sitrep',
+        'tell me about the network',
+        'network report',
+    ];
+    if (statusSubstringHints.some((h) => q.includes(h))) return 'STATUS_CHECK';
+    if (statusWordBoundaryHints.some((h) => new RegExp(`\\b${h}\\b`).test(q))) return 'STATUS_CHECK';
 
     return 'GENERAL_KNOWLEDGE';
 }
