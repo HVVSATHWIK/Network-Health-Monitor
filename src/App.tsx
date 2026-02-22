@@ -1,5 +1,5 @@
 import { Activity, Shield, Play, Terminal, Bot, Menu, Boxes, LineChart, Gauge, LogOut, ChevronDown } from 'lucide-react';
-import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense, useMemo, startTransition } from 'react';
 import AlertPanel from './components/AlertPanel';
 import DeviceStatus from './components/DeviceStatus';
 import LoadingSkeleton from './components/LoadingSkeleton';
@@ -307,7 +307,7 @@ function App() {
       `${recentAlerts ? `Recent alerts: ${recentAlerts}. ` : ''}` +
       `Scan request id: ${Date.now()}.`
     );
-    setIsNetMonitAIOpen(true);
+    startTransition(() => setIsNetMonitAIOpen(true));
 
     // Clear previous scan timers so repeated clicks behave predictably.
     scanTimeoutsRef.current.forEach((id) => window.clearTimeout(id));
@@ -362,7 +362,7 @@ function App() {
         : 'Validate that the system is currently healthy and incident is resolved. If no active fault exists, provide a short health confirmation and top preventive recommendations.';
 
     setAiSystemMessage(`${contextPrompt}\n\nRequest timestamp: ${new Date().toISOString()}`);
-    setIsNetMonitAIOpen(true);
+    startTransition(() => setIsNetMonitAIOpen(true));
   };
 
   // GAMIFICATION: Auto-Advance Tour based on User Actions
@@ -486,7 +486,7 @@ function App() {
                     ? `Forensic diagnostic analysis requested. ${alertSummary}, ${unhealthyCount} unhealthy device(s), ${degradedLinks} degraded link(s). Investigate root cause and impact chain across all OSI layers.`
                     : `Forensic health audit requested. All ${devices.length} devices operational, ${degradedLinks} degraded link(s). Perform preventive analysis and identify potential risks.`;
                   setForensicSystemMessage(`${prompt} Request id: ${Date.now()}.`);
-                  setIsForensicOpen(true);
+                  startTransition(() => setIsForensicOpen(true));
                 }}
                 className="h-10 whitespace-nowrap inline-flex items-center gap-2 px-3.5 bg-slate-900/70 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-lg transition-all text-sm font-medium"
               >
@@ -505,7 +505,7 @@ function App() {
 
               <button
                 id="netmonit-ai-trigger"
-                onClick={() => setIsNetMonitAIOpen(true)}
+                onClick={() => startTransition(() => setIsNetMonitAIOpen(true))}
                 className="h-10 whitespace-nowrap inline-flex items-center gap-2 px-3.5 bg-slate-900/70 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-lg transition-all text-sm font-medium"
               >
                 <Bot className="w-4 h-4" />
@@ -835,6 +835,7 @@ function App() {
       {/* Onboarding Tour Removed Duplicate */}
 
       {/* NetMonitAI Assistant (floating button + chat panel) */}
+      <Suspense fallback={null}>
       <AICopilot
         userName={userName}
         systemMessage={aiSystemMessage}
@@ -854,8 +855,10 @@ function App() {
         isOpen={isNetMonitAIOpen}
         onOpenChange={setIsNetMonitAIOpen}
       />
+      </Suspense>
 
       {/* Diagnostic Scan Forensic Console (only mounted when open to avoid extra launcher UI) */}
+      <Suspense fallback={null}>
       {
         isForensicOpen && (
           <ForensicCockpit
@@ -868,6 +871,7 @@ function App() {
           />
         )
       }
+      </Suspense>
     </div >
   );
 }
