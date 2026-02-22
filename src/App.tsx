@@ -1,4 +1,4 @@
-import { Activity, Shield, Play, Terminal, Bot, Menu, Boxes, LineChart, Gauge } from 'lucide-react';
+import { Activity, Shield, Play, Terminal, Bot, Menu, Boxes, LineChart, Gauge, LogOut, ChevronDown } from 'lucide-react';
 import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react';
 import AlertPanel from './components/AlertPanel';
 import DeviceStatus from './components/DeviceStatus';
@@ -40,7 +40,7 @@ import {
 } from './utils/aiLogic';
 
 import { auth, db } from './firebase'; // Import db
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore'; // Import Firestore functions
 
 const getFirebaseErrorCode = (error: unknown): string | undefined => {
@@ -55,6 +55,8 @@ function App() {
   const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBooting, setIsBooting] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const [showMatrix, setShowMatrix] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState("Admin User");
@@ -107,6 +109,28 @@ function App() {
 
     return () => unsubscribe();
   }, []);
+
+  // Close user menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    if (showUserMenu) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showUserMenu]);
+
+  const handleSignOut = async () => {
+    setShowUserMenu(false);
+    try {
+      await signOut(auth);
+      setIsLoggedIn(false);
+      setIsBooting(false);
+    } catch (error) {
+      if (import.meta.env.DEV) console.error('Sign out failed:', error);
+    }
+  };
 
   // Lifecycle: Start/Stop Simulation
   useEffect(() => {
@@ -499,10 +523,46 @@ function App() {
                 <VisualGuide />
               </div>
               <div className="hidden xl:block w-px h-6 bg-slate-700 mx-1"></div>
-              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-400 whitespace-nowrap max-w-[220px]">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                <span className="truncate">{userName}</span>
-                <span className="hidden xl:inline">Online</span>
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setShowUserMenu(prev => !prev)}
+                  className="hidden sm:flex items-center gap-2 text-sm text-slate-400 whitespace-nowrap max-w-[220px] hover:text-slate-200 transition-colors rounded-lg px-2 py-1.5 hover:bg-slate-800/60"
+                  aria-label="User menu"
+                  aria-expanded={showUserMenu}
+                  aria-haspopup="true"
+                >
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                  <span className="truncate">{userName}</span>
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showUserMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 z-50">
+                    <div className="px-4 py-3 border-b border-slate-800">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-lg">
+                          {userName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-white truncate">{userName}</div>
+                          <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                            Active Session
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-1.5">
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
