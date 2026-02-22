@@ -742,6 +742,17 @@ function classifyIntent(query: string): Intent {
         'help me understand',
         'tell me what\'s wrong',
         'deep dive',
+        'security scan',
+        'security posture',
+        'security check',
+        'vulnerability',
+        'scan',
+        'audit',
+        'blast radius',
+        'performance issue',
+        'slow',
+        'lagging',
+        'timeout',
     ];
     if (diagnosticHints.some((h) => q.includes(h))) return 'DIAGNOSTIC_ANALYSIS';
 
@@ -922,6 +933,14 @@ function buildOfflineGeneralKnowledgeResponse(query: string): string | null {
         return 'I\'m your AI network analysis assistant! Here\'s what I can help with:\n\n- **Root Cause Analysis**: Trace faults from L1-L7 using live telemetry\n- **Status Checks**: Show active alerts, unhealthy devices, degraded links\n- **Impact Analysis**: Blast-radius assessment for device/link failures\n- **Security Scanning**: Review current security posture and risks\n- **Network Knowledge**: Explain protocols, concepts, and best practices\n- **Navigation Help**: Guide you through the dashboard features\n\nTry asking: *"What\'s wrong with the network?"*, *"List all critical alerts"*, or *"What is SCADA?"*';
     }
 
+    // Identity and self-awareness
+    if (q.includes('who are you') || q.includes('what are you') || q.includes('your name') || q.includes('introduce yourself')) {
+        return 'I\'m **NetMonit AI**, the intelligent assistant built into this Industrial Network Health Monitor. I analyze real-time telemetry across all 7 OSI layers (L1–L7), perform root cause analysis, track alert propagation chains, and help operators understand and fix network issues. I can also answer general networking questions and guide you through the dashboard. What would you like to know?';
+    }
+    if (q.includes('what is netmonit') || q.includes('about netmonit') || q.includes('about this app') || q.includes('what does this app') || q.includes('what does netmonit')) {
+        return '**NetMonit** is an Industrial Network Health Monitoring platform that provides:\n\n- **3D Digital Twin**: Real-time visualization of your network topology\n- **L1–L7 Diagnostics**: Full OSI-stack telemetry monitoring\n- **AI Root Cause Analysis**: Automated fault tracing across layers\n- **Forensic Cockpit**: Deep investigation workspace with chain-of-thought analysis\n- **KPI Intelligence**: Layer-specific health metrics and trend analysis\n- **Alert Management**: Real-time alerts with severity tracking\n\nIt\'s designed for IT/OT convergence environments — monitoring both traditional IT infrastructure and industrial control systems (PLCs, SCADA, sensors).';
+    }
+
     // Additional knowledge entries
     if (q.includes('ethernet/ip') || q.includes('ethernet ip') || q.includes('enip')) {
         return '**EtherNet/IP (Ethernet Industrial Protocol)** is an application-layer protocol for industrial automation. It uses TCP/UDP on standard Ethernet and is widely deployed in manufacturing with Allen-Bradley/Rockwell PLCs. It supports real-time I/O and explicit messaging for configuration.';
@@ -952,6 +971,81 @@ function buildOfflineGeneralKnowledgeResponse(query: string): string | null {
     }
 
     return null;
+}
+
+/** Try to detect a device name in the query and return device-specific status. */
+function buildDeviceSpecificResponse(
+    query: string,
+    alerts: Alert[],
+    devices: Device[],
+    connections: NetworkConnection[]
+): string | null {
+    const q = stripRuntimeContext(query).toLowerCase().trim();
+
+    // Try to match a device by name (case-insensitive substring)
+    const matchedDevice = devices.find((d) =>
+        q.includes(d.name.toLowerCase()) || q.includes(d.id.toLowerCase())
+    );
+    if (!matchedDevice) return null;
+
+    const deviceAlerts = alerts.filter((a) => a.device === matchedDevice.name);
+    const deviceConns = connections.filter(
+        (c) => c.source === matchedDevice.id || c.target === matchedDevice.id
+    );
+    const statusIcon =
+        matchedDevice.status === 'healthy' ? '✅' :
+        matchedDevice.status === 'warning' ? '🟡' : '🔴';
+
+    const lines = [
+        `### ${statusIcon} ${matchedDevice.name}`,
+        '',
+        `| Property | Value |`,
+        `|----------|-------|`,
+        `| **Type** | ${matchedDevice.type} |`,
+        `| **Status** | ${matchedDevice.status} |`,
+        `| **IP** | ${matchedDevice.ip} |`,
+        `| **Category** | ${matchedDevice.category} |`,
+        `| **Location** | ${matchedDevice.location} |`,
+        `| **Connections** | ${deviceConns.length} link(s) |`,
+    ];
+
+    if (matchedDevice.vlan != null) {
+        lines.push(`| **VLAN** | ${matchedDevice.vlan} |`);
+    }
+
+    // Key metrics
+    const m = matchedDevice.metrics;
+    lines.push('', '**Key Metrics:**');
+    lines.push(`- 🌡️ Temperature: **${m.l1.temperature.toFixed(1)}°C**`);
+    lines.push(`- ⚡ CRC Errors: **${m.l2.crcErrors}**`);
+    lines.push(`- 📉 Packet Loss: **${m.l3.packetLoss.toFixed(1)}%**`);
+    lines.push(`- ⏱️ Latency: **${m.l7.appLatency.toFixed(1)}ms**`);
+    lines.push(`- 📊 Jitter: **${m.l4.jitter.toFixed(1)}ms**`);
+    lines.push(`- 🔄 TCP Retransmissions: **${m.l4.tcpRetransmissions.toFixed(2)}/s**`);
+
+    if (deviceAlerts.length > 0) {
+        lines.push('', '**Active Alerts:**');
+        deviceAlerts.forEach((a) => {
+            const sev = a.severity === 'critical' ? '🔴' : a.severity === 'high' ? '🟠' : '🟡';
+            lines.push(`- ${sev} [${a.severity.toUpperCase()}] ${a.layer}: ${a.message}`);
+        });
+    }
+
+    if (deviceConns.length > 0) {
+        const degraded = deviceConns.filter((c) => c.status !== 'healthy');
+        if (degraded.length > 0) {
+            lines.push('', '**Degraded Links:**');
+            degraded.forEach((c) => {
+                lines.push(`- ${c.source} → ${c.target}: **${c.status}** (latency: ${c.latency}ms)`);
+            });
+        }
+    }
+
+    if (matchedDevice.status !== 'healthy') {
+        lines.push('', '---', '💡 Ask me *"analyze root cause"* to trace what\'s affecting this device.');
+    }
+
+    return lines.join('\n');
 }
 
 function buildStatusText(alerts: Alert[], devices: Device[], connections?: NetworkConnection[]): string {
@@ -1242,6 +1336,17 @@ export async function analyzeWithMultiAgents(
     }
 
     const intent = classifyIntent(userQuery);
+    const strippedQuery = stripRuntimeContext(userQuery);
+
+    // Greeting handling (for callers other than AICopilot which has its own greeting logic)
+    const greetingMatch = strippedQuery.trim().toLowerCase();
+    if (greetingMatch.length <= 60 && /^(hi+|hello+|hey+|yo|hola|sup|what'?s\s*up|good\s+(morning|afternoon|evening|day)|how\s+are\s+you|howdy|greetings)\b/.test(greetingMatch)) {
+        const unhealthyCount = devices.filter(d => d.status !== 'healthy').length;
+        if (activeAlerts.length > 0 || unhealthyCount > 0) {
+            return `Hey there! 👋 I'm tracking **${activeAlerts.length} active alert(s)** and **${unhealthyCount} unhealthy device(s)**. Want me to analyze what's going on, or do you have a specific question?`;
+        }
+        return `Hey there! 👋 Network looks healthy right now with ${devices.length} devices monitored. I can help with root cause analysis, status checks, impact assessments, or any networking questions. What do you need?`;
+    }
 
     // For diagnostics, always return a structured report so forensic UIs can render artifacts/steps.
     if (intent === 'DIAGNOSTIC_ANALYSIS') {
@@ -1268,8 +1373,10 @@ export async function analyzeWithMultiAgents(
         return buildDeterministicForensicReport(userQuery, alertsForAnalysis, devices, connections, dependencies);
     }
 
-    // For status checks, return a rich status report with context.
+    // For status checks, check if user is asking about a specific device first.
     if (intent === 'STATUS_CHECK') {
+        const deviceSpecificResult = buildDeviceSpecificResponse(strippedQuery, activeAlerts, devices, connections);
+        if (deviceSpecificResult) return deviceSpecificResult;
         return buildStatusText(activeAlerts, devices, connections);
     }
 
@@ -1281,6 +1388,11 @@ export async function analyzeWithMultiAgents(
     // GENERAL KNOWLEDGE: prefer Gemini if configured, otherwise use local intelligence.
     const apiKey = import.meta.env.VITE_AI_API_KEY;
     const hasRealKey = typeof apiKey === 'string' && apiKey.trim().length > 0 && apiKey !== 'dummy_key';
+
+    // Device-specific check — transcends intent. If user mentions a device name,
+    // respond with device info even when intent is GENERAL_KNOWLEDGE.
+    const deviceSpecific = buildDeviceSpecificResponse(strippedQuery, activeAlerts, devices, connections);
+    if (deviceSpecific) return deviceSpecific;
 
     // Try offline knowledge first (works with or without Gemini)
     const offlineKnowledge = buildOfflineGeneralKnowledgeResponse(userQuery);
@@ -1408,3 +1520,19 @@ export async function analyzeRootCause(
 
     return typeof res === 'string' ? res : res.summary;
 }
+
+// ---------------- TEST EXPORTS ----------------
+// These are exported solely for unit testing; they are NOT part of the public API.
+export const _testExports = {
+    classifyIntent,
+    stripRuntimeContext,
+    buildStatusText,
+    buildDeviceSpecificResponse,
+    buildOfflineGeneralKnowledgeResponse,
+    buildWebsiteAssistText,
+    buildSmartFallbackResponse,
+    buildDeterministicForensicReport,
+    buildHealthyForensicReport,
+    deriveCriticality,
+    buildRecommendations,
+};
