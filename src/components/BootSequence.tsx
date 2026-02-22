@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Cpu, Terminal, ArrowRight } from 'lucide-react';
+import { Terminal, ArrowRight, Shield, Fingerprint } from 'lucide-react';
+import Logo3D from './Logo3D';
 
 interface BootSequenceProps {
     onComplete: (userName: string) => void;
@@ -22,15 +23,15 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
         if (step === 'boot') {
             const sequence = [
                 { text: "INITIALIZING KERNEL...", delay: 500 },
-                { text: "LOADING ASSETS: /mesh/server_rack_v2.gltf", delay: 1200 },
-                { text: "LOADING ASSETS: /mesh/industrial_switch.gltf", delay: 1800 },
-                { text: "VERIFYING INTEGRITY...", delay: 2400 },
-                { text: "ESTABLISHING SECURE CONNECTION (TLS 1.3)...", delay: 3000 },
+                { text: "LOADING TOPOLOGY ENGINE v3.1.0", delay: 1000 },
+                { text: "MOUNTING 3D RENDERER: WebGL2 [OK]", delay: 1500 },
+                { text: "LOADING ASSETS: /mesh/server_rack_v2.gltf", delay: 2000 },
+                { text: "ESTABLISHING SECURE CONNECTION (TLS 1.3)...", delay: 2600 },
+                { text: "VERIFYING CERTIFICATE CHAIN ✓", delay: 3100 },
             ];
 
             const timeouts: Array<ReturnType<typeof window.setTimeout>> = [];
 
-            // Log Sequence
             sequence.forEach((item) => {
                 const t = setTimeout(() => {
                     setLogs(prev => [...prev, item.text]);
@@ -38,14 +39,12 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
                 timeouts.push(t);
             });
 
-            // Transition to Login
             const loginTimeout = setTimeout(() => {
                 setStep('login');
-                setLogs(prev => [...prev, "AUTHENTICATION REQUIRED."]);
-            }, 3500);
+                setLogs(prev => [...prev, "IDENTITY VERIFICATION REQUIRED."]);
+            }, 3600);
             timeouts.push(loginTimeout);
 
-            // Progress Bar (Part 1)
             const progressInterval = setInterval(() => {
                 setProgress(prev => {
                     if (prev >= 60) {
@@ -72,9 +71,10 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
     useEffect(() => {
         if (step === 'finalizing') {
             const sequence = [
-                { text: `AUTHENTICATING USER: ${finalUserName.toUpperCase()}...`, delay: 500 },
-                { text: "ACCESS GRANTED.", delay: 1500 },
-                { text: "LOADING GRAPHICAL INTERFACE...", delay: 2200 },
+                { text: `AUTHENTICATING OPERATOR: ${finalUserName.toUpperCase()}...`, delay: 500 },
+                { text: "CLEARANCE LEVEL: FULL ACCESS ✓", delay: 1200 },
+                { text: "INITIALIZING DIGITAL TWIN ENGINE...", delay: 1800 },
+                { text: "LOADING L1–L7 DIAGNOSTIC STACK...", delay: 2400 },
                 { text: "SYSTEM READY.", delay: 3000 }
             ];
 
@@ -87,7 +87,6 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
                 timeouts.push(t);
             });
 
-            // Progress Bar (Part 2)
             const progressInterval = setInterval(() => {
                 setProgress(prev => {
                     if (prev >= 100) {
@@ -110,7 +109,6 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
         }
     }, [step, finalUserName]);
 
-
     const handleLoginSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const normalizedName = inputValue.trim();
@@ -121,69 +119,123 @@ export default function BootSequence({ onComplete }: BootSequenceProps) {
     };
 
     return (
-        <div className="fixed inset-0 z-[60] bg-black text-green-500 font-mono flex flex-col items-center justify-center p-4 sm:p-8 select-none overflow-x-hidden overflow-y-auto">
+        <div className="fixed inset-0 z-[60] bg-slate-950 text-cyan-400 font-sans flex flex-col items-center justify-center p-4 sm:p-8 select-none overflow-x-hidden overflow-y-auto">
 
-            {/* Central Logo / Icon */}
-            <div className="mb-8 relative">
-                <div className="absolute inset-0 bg-green-500/20 blur-xl rounded-full animate-pulse"></div>
-                <Cpu className="w-24 h-24 text-green-500 relative z-10 animate-spin-slow" />
+            {/* Atmospheric background — matches Login page design language */}
+            <div className="absolute inset-0 pointer-events-none">
+                {/* Grid pattern */}
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:50px_50px] opacity-15" />
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900/80 to-blue-950/30" />
+                {/* Blurred orbs */}
+                <div className="absolute top-[-10%] left-[15%] w-[500px] h-[500px] bg-cyan-500/8 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-15%] right-[10%] w-[600px] h-[600px] bg-blue-600/6 rounded-full blur-[140px]" />
+                <div className="absolute top-[40%] right-[30%] w-[300px] h-[300px] bg-indigo-500/5 rounded-full blur-[100px]" />
             </div>
 
-            <div className="w-full max-w-lg mb-8">
-                <h1 className="text-3xl font-bold mb-2 tracking-widest text-center text-white">NetMonit OS v2.0</h1>
-                <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-green-500 transition-all duration-100 ease-linear shadow-[0_0_10px_#22c55e]"
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
-                <div className="flex justify-between text-xs text-slate-500 mt-1">
-                    <span>MEMORY: 16GB OK</span>
-                    <span>GPU: DETECTED</span>
-                </div>
-            </div>
+            {/* Content */}
+            <div className="relative z-10 flex flex-col items-center w-full max-w-2xl">
 
-            {/* Login Prompt Override */}
-            {step === 'login' && (
-                <form onSubmit={handleLoginSubmit} className="w-full max-w-lg mb-8 animate-in fade-in zoom-in duration-300">
-                    <div className="flex items-center gap-4 bg-black border-2 border-green-500/50 p-4 rounded-lg shadow-[0_0_20px_rgba(34,197,94,0.2)]">
-                        <Terminal className="w-6 h-6 animate-pulse" />
-                        <div className="flex-1">
-                            <div className="text-xs text-green-400 mb-1">ENTER NAME</div>
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                value={inputValue}
-                                onChange={(e) => setInputValue(e.target.value)}
-                                className="w-full bg-transparent border-none outline-none text-xl font-bold text-white uppercase placeholder-green-900"
-                                placeholder="TYPE NAME..."
-                                autoFocus
-                            />
-                        </div>
-                        <button type="submit" disabled={!inputValue.trim()} className="p-2 bg-green-900/30 hover:bg-green-500/20 rounded-full transition-colors disabled:opacity-50">
-                            <ArrowRight className="w-6 h-6" />
-                        </button>
+                {/* 3D Spinning Logo */}
+                <div className="mb-4 relative animate-float">
+                    {/* Outer glow halo */}
+                    <div className="absolute inset-[-20px] bg-cyan-400/10 blur-2xl rounded-full animate-glow-pulse" />
+                    <Logo3D size={160} speed={1.2} colorScheme="boot" className="relative z-10" />
+                </div>
+
+                {/* Title block */}
+                <div className="w-full max-w-lg mb-8 text-center">
+                    <h1 className="text-4xl font-bold mb-1 tracking-tight text-white">
+                        Net<span className="text-cyan-400">Monit</span>
+                    </h1>
+                    <p className="text-[11px] font-mono text-slate-500 tracking-[0.25em] uppercase mb-5">
+                        Industrial Network Health Monitor • v2.4
+                    </p>
+
+                    {/* Progress bar */}
+                    <div className="h-1 w-full bg-slate-800/80 rounded-full overflow-hidden backdrop-blur-sm">
+                        <div
+                            className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500 transition-all duration-100 ease-linear shadow-[0_0_12px_rgba(34,211,238,0.5)]"
+                            style={{ width: `${progress}%` }}
+                        />
                     </div>
-                </form>
-            )}
+                    <div className="flex justify-between text-[10px] text-slate-600 mt-1.5 font-mono">
+                        <span className="flex items-center gap-1.5">
+                            <Shield className="w-3 h-3" />
+                            TLS 1.3 SECURED
+                        </span>
+                        <span>{progress}%</span>
+                    </div>
+                </div>
 
-            {/* Terminal Output */}
-            <div className="w-full max-w-2xl bg-black/50 border border-green-900/50 p-4 rounded-lg h-64 overflow-hidden relative font-sm">
-                <div className="absolute top-0 left-0 w-full h-full pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-10 bg-[length:100%_2px,3px_1px]"></div>
-
-                <div className="flex flex-col justify-end h-full gap-1">
-                    {logs.map((log, idx) => (
-                        <div key={idx} className="flex items-center gap-2 animate-in slide-in-from-left fade-in duration-200">
-                            <span className="text-green-700">{`>`}</span>
-                            <span className={idx === logs.length - 1 ? "text-green-400 font-bold" : "text-green-600/80"}>
-                                {log}
-                            </span>
+                {/* Identity input  */}
+                {step === 'login' && (
+                    <form onSubmit={handleLoginSubmit} className="w-full max-w-lg mb-8 animate-in fade-in zoom-in duration-300">
+                        <div className="flex items-center gap-4 bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 p-4 rounded-2xl shadow-[0_0_30px_rgba(34,211,238,0.08),inset_0_1px_0_rgba(255,255,255,0.05)]">
+                            <div className="p-2 bg-cyan-500/10 rounded-xl">
+                                <Fingerprint className="w-5 h-5 text-cyan-400" />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-[10px] text-cyan-400/80 mb-1 font-mono tracking-wider uppercase">Operator Identity</div>
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                    className="w-full bg-transparent border-none outline-none text-lg font-semibold text-white placeholder-slate-600"
+                                    placeholder="Enter your name..."
+                                    autoFocus
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={!inputValue.trim()}
+                                className="p-2.5 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/20 rounded-xl transition-all duration-200 disabled:opacity-30 disabled:border-slate-700/30 group"
+                            >
+                                <ArrowRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
+                            </button>
                         </div>
-                    ))}
-                    <div className="animate-pulse text-green-500">_</div>
+                    </form>
+                )}
+
+                {/* System log terminal */}
+                <div className="w-full max-w-2xl bg-slate-900/40 backdrop-blur-xl border border-white/5 p-5 rounded-2xl h-64 overflow-hidden relative shadow-[0_4px_40px_rgba(0,0,0,0.3)]">
+                    {/* Subtle CRT scanline overlay (toned down) */}
+                    <div className="absolute top-0 left-0 w-full h-full pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.12)_50%)] z-10 bg-[length:100%_2px] opacity-40" />
+
+                    {/* Header bar */}
+                    <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-white/5">
+                        <Terminal className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="text-[10px] font-mono text-slate-500 tracking-wider uppercase">System Log</span>
+                        <div className="ml-auto flex gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-cyan-400/60 animate-pulse" />
+                            <div className="w-2 h-2 rounded-full bg-blue-400/40" />
+                            <div className="w-2 h-2 rounded-full bg-slate-600/40" />
+                        </div>
+                    </div>
+
+                    {/* Logs */}
+                    <div className="flex flex-col justify-end h-[calc(100%-2.5rem)] gap-1 font-mono text-sm">
+                        {logs.map((log, idx) => {
+                            const isLast = idx === logs.length - 1;
+                            const isSuccess = log.includes('✓') || log.includes('ACCESS') || log.includes('READY') || log.includes('CLEARANCE');
+                            return (
+                                <div key={idx} className="flex items-center gap-2.5 animate-in slide-in-from-left fade-in duration-200">
+                                    <span className="text-slate-600 text-xs">{'>'}</span>
+                                    <span className={
+                                        isSuccess ? 'text-emerald-400 font-semibold' :
+                                        isLast ? 'text-cyan-300 font-medium' :
+                                        'text-slate-400'
+                                    }>
+                                        {log}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                        <div className="animate-pulse text-cyan-400 text-xs">█</div>
+                    </div>
                 </div>
             </div>
-
         </div>
     );
 }

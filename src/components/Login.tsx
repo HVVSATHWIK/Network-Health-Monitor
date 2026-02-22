@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Network, Lock, ChevronRight, Server, Activity, AlertCircle, UserPlus } from 'lucide-react';
+import { Lock, ChevronRight, Server, Activity, AlertCircle, UserPlus } from 'lucide-react';
+import Logo3D from './Logo3D';
 import { auth, googleProvider, db } from '../firebase';
 import {
     createUserWithEmailAndPassword,
@@ -185,8 +186,8 @@ export default function Login({ onLogin }: LoginProps) {
                 <div className="w-full md:w-5/12 p-6 sm:p-10 md:p-12 flex flex-col justify-between bg-gradient-to-b from-slate-800/50 to-slate-900/50 border-b md:border-b-0 md:border-r border-white/5 relative group">
                     <div>
                         <div className="flex items-center gap-3 mb-10">
-                            <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow duration-500">
-                                <Network className="w-8 h-8 text-white" />
+                            <div className="relative rounded-xl shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow duration-500 overflow-hidden">
+                                <Logo3D size={48} speed={0.8} colorScheme="blue" />
                             </div>
                             <span className="text-2xl font-bold text-white tracking-tight">NetMonit</span>
                         </div>
