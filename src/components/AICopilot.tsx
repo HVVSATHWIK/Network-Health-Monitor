@@ -14,7 +14,7 @@ function formatForensicReportAsMarkdown(report: ForensicReport): string {
     const lines: string[] = [];
 
     // Criticality badge
-    const critBadge: Record<string, string> = { extreme: '🔴 EXTREME', high: '🟠 HIGH', medium: '🟡 MEDIUM', low: '🟢 LOW' };
+    const critBadge: Record<string, string> = { extreme: '[EXTREME]', high: '[HIGH]', medium: '[MEDIUM]', low: '[LOW]' };
     lines.push(`## ${critBadge[report.criticality] ?? report.criticality.toUpperCase()} Severity`);
     lines.push('');
 
@@ -26,8 +26,8 @@ function formatForensicReportAsMarkdown(report: ForensicReport): string {
     if (report.chainOfThought.length > 0) {
         lines.push('### Investigation Steps');
         report.chainOfThought.forEach((step, i) => {
-            const icon = step.status === 'success' ? '✅' : step.status === 'failed' ? '❌' : '⏳';
-            lines.push(`${i + 1}. ${icon} **${step.agent}** — ${step.action}${step.result ? `  \n   → ${step.result}` : ''}`);
+            const statusTag = step.status === 'success' ? '[SUCCESS]' : step.status === 'failed' ? '[FAILED]' : '[RUNNING]';
+            lines.push(`${i + 1}. ${statusTag} **${step.agent}** — ${step.action}${step.result ? `  \n   -> ${step.result}` : ''}`);
         });
         lines.push('');
     }
@@ -80,7 +80,7 @@ interface AICopilotProps {
 
 const buildCoordinatorIntro = (name: string, mode: AILaunchMode) => {
     if (mode === 'root-cause') {
-        return `Hey ${name}! 👋 I'm in **Root Cause Analysis** mode.
+        return `Hey ${name}. I'm in **Root Cause Analysis** mode.
 
 I will focus on:
 - Most likely fault origin (L1-L7)
@@ -92,7 +92,7 @@ Share an incident detail or use a quick action below.`;
     }
 
     if (mode === 'diagnostic') {
-        return `Hey ${name}! 👋 I'm in **Diagnostic Scan** mode.
+        return `Hey ${name}. I'm in **Diagnostic Scan** mode.
 
 I will run a broad health sweep across:
 - Device and link status
@@ -103,17 +103,50 @@ I will run a broad health sweep across:
 Use a quick action to begin a deep scan.`;
     }
 
-    return `Hey ${name}! 👋 I'm **NetMonit AI** — your intelligent network analysis assistant.
+    return `Hey ${name}. I'm **NetMonit AI** — your intelligent network analysis assistant.
 
 I can help you with:
-- 🔍 **Root cause analysis** across all 7 OSI layers
-- 📊 **Live status checks** on alerts, devices, and links
-- 💥 **Impact & blast-radius analysis**
-- 🛡️ **Security posture reviews**
-- 📚 **Networking concepts** (protocols, troubleshooting, best practices)
+- **Root cause analysis** across all 7 OSI layers
+- **Live status checks** on alerts, devices, and links
+- **Impact & blast-radius analysis**
+- **Security posture reviews**
+- **Networking concepts** (protocols, troubleshooting, best practices)
 
 Just ask me anything — or tap one of the quick actions below to get started!`;
 };
+
+const getInputPlaceholder = (mode: AILaunchMode): string => {
+    if (mode === 'root-cause') return 'Ask root cause, impact radius, or remediation plan...';
+    if (mode === 'diagnostic') return 'Ask for scan summary, thresholds, or risk forecast...';
+    return 'Ask about alerts, devices, links, workflows, or KPIs...';
+};
+
+const getInputExamples = (mode: AILaunchMode): string[] => {
+    if (mode === 'root-cause') {
+        return [
+            'What is the primary root cause right now?',
+            'Show impact radius by workflow.',
+            'Give immediate remediation steps.'
+        ];
+    }
+    if (mode === 'diagnostic') {
+        return [
+            'Run full L1-L7 diagnostic summary.',
+            'Which metrics are closest to threshold?',
+            'What risks may appear in next 30 minutes?'
+        ];
+    }
+    return [
+        'Summarize current network health.',
+        'List unhealthy devices and degraded links.',
+        'Explain top active alerts.'
+    ];
+};
+
+const normalizeChatText = (text: string): string => text
+    .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 
 const isGreetingOnly = (query: string): boolean => {
     const q = query.trim().toLowerCase();
@@ -309,15 +342,15 @@ export default function AICopilot({ userName = "User", systemMessage, launchMode
                 const alertCount = alerts.length;
                 const unhealthyCount = devices.filter(d => d.status !== 'healthy').length;
                 if (alertCount > 0 || unhealthyCount > 0) {
-                    greetingReply = `Hey ${userName}! 👋 Ready to help. I'm currently tracking **${alertCount} active alert(s)** and **${unhealthyCount} device(s) need attention**. Want me to analyze what's going on, or do you have a specific question?`;
+                    greetingReply = `Hey ${userName}. Ready to help. I'm currently tracking **${alertCount} active alert(s)** and **${unhealthyCount} device(s) need attention**. Want me to analyze what's going on, or do you have a specific question?`;
                 } else {
-                    greetingReply = `Hey ${userName}! 👋 Network looks healthy right now. I can help with root cause analysis, status checks, impact assessments, or answer any networking questions. What do you need?`;
+                    greetingReply = `Hey ${userName}. Network looks healthy right now. I can help with root cause analysis, status checks, impact assessments, or answer any networking questions. What do you need?`;
                 }
             }
             setMessages(prev => [...prev, {
                 id: nextMsgId(),
                 role: 'ai',
-                text: greetingReply
+                text: normalizeChatText(greetingReply)
             }]);
             setIsProcessing(false);
             return;
@@ -327,7 +360,7 @@ export default function AICopilot({ userName = "User", systemMessage, launchMode
             setMessages(prev => [...prev, {
                 id: nextMsgId(),
                 role: 'ai',
-                text: buildCompactCapabilitiesReply(launchMode)
+                text: normalizeChatText(buildCompactCapabilitiesReply(launchMode))
             }]);
             setIsProcessing(false);
             return;
@@ -352,7 +385,7 @@ export default function AICopilot({ userName = "User", systemMessage, launchMode
             setMessages(prev => [...prev, {
                 id: nextMsgId(),
                 role: 'ai',
-                text: responseText
+                text: normalizeChatText(responseText)
             }]);
         } catch (error: unknown) {
             if (import.meta.env.DEV) console.error(error);
@@ -385,6 +418,8 @@ export default function AICopilot({ userName = "User", systemMessage, launchMode
     const leadAlert = alerts[0];
     const leadDevice = devices.find((d) => d.status !== 'healthy') ?? devices[0];
     const modeSection: 'assistant' | 'root-cause' = launchMode === 'assistant' ? 'assistant' : 'root-cause';
+    const inputPlaceholder = getInputPlaceholder(launchMode);
+    const inputExamples = getInputExamples(launchMode);
     const prompts = launchMode === 'root-cause'
         ? [
             {
@@ -572,28 +607,43 @@ export default function AICopilot({ userName = "User", systemMessage, launchMode
             </div>
 
             {/* 5. Input Area */}
-            <div className="p-3 bg-slate-900 border-t border-white/10 flex gap-2">
-                <div className="flex-1 relative">
-                    <input
-                        type="text"
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && !isProcessing && handleSubmit()}
-                        placeholder="Ask Coordinator..."
-                        aria-label="Chat message"
-                        className="w-full bg-slate-950/50 border border-slate-700 rounded-xl pl-10 pr-3 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
-                        disabled={isProcessing}
-                    />
-                    <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <div className="p-3 bg-slate-900 border-t border-white/10">
+                <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                        <input
+                            type="text"
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && !isProcessing && handleSubmit()}
+                            placeholder={inputPlaceholder}
+                            aria-label="Chat message"
+                            className="w-full bg-slate-950/50 border border-slate-700 rounded-xl pl-10 pr-3 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+                            disabled={isProcessing}
+                        />
+                        <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                    </div>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={!inputValue.trim() || isProcessing}
+                        className="aspect-square bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-lg hover:shadow-indigo-500/20 flex items-center justify-center w-12"
+                        aria-label="Send message"
+                    >
+                        <Send className="w-5 h-5" />
+                    </button>
                 </div>
-                <button
-                    onClick={handleSubmit}
-                    disabled={!inputValue.trim() || isProcessing}
-                    className="aspect-square bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-lg hover:shadow-indigo-500/20 flex items-center justify-center w-12"
-                    aria-label="Send message"
-                >
-                    <Send className="w-5 h-5" />
-                </button>
+                <div className="mt-2 text-[10px] text-slate-400 flex flex-wrap items-center gap-1.5">
+                    <span>Try:</span>
+                    {inputExamples.map((example) => (
+                        <button
+                            key={example}
+                            type="button"
+                            onClick={() => setInputValue(example)}
+                            className="text-[10px] px-2 py-0.5 rounded-md border border-slate-700 bg-slate-800/60 hover:bg-slate-700/70 hover:text-slate-200 transition-colors"
+                        >
+                            {example}
+                        </button>
+                    ))}
+                </div>
             </div>
         </div>
     );
