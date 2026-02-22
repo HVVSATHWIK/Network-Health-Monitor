@@ -44,6 +44,8 @@ export interface Device {
   mac?: string;
   location: string;
   manufacturer?: string;
+  vlan?: number;         // VLAN ID (e.g. 10, 20, 100)
+  subnetMask?: string;   // CIDR notation mask (e.g. '255.255.255.0' or '/24')
 }
 
 export interface LayerKPI {
@@ -81,6 +83,7 @@ export interface NetworkConnection {
   bandwidth: number;
   latency: number;
   status: 'healthy' | 'degraded' | 'down';
+  vlan?: number;  // VLAN tag if applicable
 }
 
 export interface DependencyPath {

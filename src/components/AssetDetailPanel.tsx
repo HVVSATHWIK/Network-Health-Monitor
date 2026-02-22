@@ -146,21 +146,21 @@ export default function AssetDetailPanel({
                         <MetricCard
                             icon={ArrowRightLeft}
                             label="Latency"
-                            value={device.metrics.l7.appLatency}
+                            value={Number(device.metrics.l7.appLatency.toFixed(1))}
                             unit="ms"
                             trend={device.status === 'healthy' ? -5 : 24}
                         />
                         <MetricCard
                             icon={Wifi}
                             label="Packet Loss"
-                            value={device.metrics.l3.packetLoss.toFixed(1)}
+                            value={Number(device.metrics.l3.packetLoss.toFixed(1))}
                             unit="%"
                             trend={device.metrics.l3.packetLoss > 1 ? 15 : 0}
                         />
                         <MetricCard
                             icon={Thermometer}
                             label="Temp"
-                            value={device.metrics.l1.temperature}
+                            value={Number(device.metrics.l1.temperature.toFixed(1))}
                             unit="°C"
                         />
                         <MetricCard

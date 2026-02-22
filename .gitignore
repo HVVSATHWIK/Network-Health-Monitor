@@ -30,4 +30,7 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.env.local
+.env.*
 *.zip
+*.pdf

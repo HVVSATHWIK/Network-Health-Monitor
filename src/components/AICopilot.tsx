@@ -3,8 +3,46 @@ import { createPortal } from 'react-dom';
 import { Bot, X, AlertTriangle, Send, Search, Lock, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { analyzeWithMultiAgents } from '../utils/aiLogic';
+import { analyzeWithMultiAgents, ForensicReport } from '../utils/aiLogic';
 import { Alert, Device, LayerKPI } from '../types/network';
+
+/** Convert a structured ForensicReport into rich readable markdown for the chat. */
+function formatForensicReportAsMarkdown(report: ForensicReport): string {
+    const lines: string[] = [];
+
+    // Criticality badge
+    const critBadge: Record<string, string> = { extreme: '🔴 EXTREME', high: '🟠 HIGH', medium: '🟡 MEDIUM', low: '🟢 LOW' };
+    lines.push(`## ${critBadge[report.criticality] ?? report.criticality.toUpperCase()} Severity`);
+    lines.push('');
+
+    // Root cause
+    lines.push(`**Root Cause:** ${report.rootCause}`);
+    lines.push('');
+
+    // Chain of thought
+    if (report.chainOfThought.length > 0) {
+        lines.push('### Investigation Steps');
+        report.chainOfThought.forEach((step, i) => {
+            const icon = step.status === 'success' ? '✅' : step.status === 'failed' ? '❌' : '⏳';
+            lines.push(`${i + 1}. ${icon} **${step.agent}** — ${step.action}${step.result ? `  \n   → ${step.result}` : ''}`);
+        });
+        lines.push('');
+    }
+
+    // Recommendations
+    if (report.recommendations.length > 0) {
+        lines.push('### Recommended Actions');
+        report.recommendations.forEach((r) => {
+            lines.push(`- ${r}`);
+        });
+        lines.push('');
+    }
+
+    // Summary footer
+    lines.push(`---\n*${report.summary}*`);
+
+    return lines.join('\n');
+}
 
 interface Message {
     id: string;
@@ -32,14 +70,22 @@ interface AICopilotProps {
     };
 }
 
-const buildCoordinatorIntro = (name: string) => `Hi ${name}, I'm NetMonit AI Coordinator.
-Ask me a question and I'll analyze live network context across topology, alerts, KPIs, workflows, and logs.`;
+const buildCoordinatorIntro = (name: string) => `Hey ${name}! 👋 I'm **NetMonit AI** — your intelligent network analysis assistant.
+
+I can help you with:
+- 🔍 **Root cause analysis** across all 7 OSI layers
+- 📊 **Live status checks** on alerts, devices, and links
+- 💥 **Impact & blast-radius analysis**
+- 🛡️ **Security posture reviews**
+- 📚 **Networking concepts** (protocols, troubleshooting, best practices)
+
+Just ask me anything — or tap one of the quick actions below to get started!`;
 
 const isGreetingOnly = (query: string): boolean => {
     const q = query.trim().toLowerCase();
     if (!q) return false;
-    if (q.length > 40) return false;
-    return /^(hi|hii|hello|hey|yo|hola|good\s+morning|good\s+afternoon|good\s+evening)\b/.test(q);
+    if (q.length > 60) return false;
+    return /^(hi+|hello+|hey+|yo|hola|sup|what'?s\s*up|good\s+(morning|afternoon|evening|day)|how\s+are\s+you|howdy|greetings|thanks?|thank\s+you|ok|okay|cool|great|bye|goodbye|see\s+you|cheers|nice)\b/.test(q);
 };
 
 const isCapabilityRequest = (query: string): boolean => {
@@ -168,10 +214,35 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: query }]);
 
         if (isGreetingOnly(query)) {
+            const q = query.trim().toLowerCase();
+            let greetingReply: string;
+            if (/^(thanks?|thank\s+you|cheers)/.test(q)) {
+                greetingReply = `You're welcome, ${userName}! Let me know if there's anything else I can help with — I'm always monitoring.`;
+            } else if (/^(bye|goodbye|see\s+you)/.test(q)) {
+                greetingReply = `Goodbye, ${userName}! I'll keep watching the network. Come back anytime you need analysis or have questions.`;
+            } else if (/^(ok|okay|cool|great|nice)/.test(q)) {
+                greetingReply = `Got it! Let me know if you need anything — I can run diagnostics, check alerts, explain networking concepts, or help navigate the dashboard.`;
+            } else if (/^(how\s+are\s+you|what'?s\s*up|sup)/.test(q)) {
+                const alertCount = alerts.length;
+                const unhealthyCount = devices.filter(d => d.status !== 'healthy').length;
+                if (alertCount > 0 || unhealthyCount > 0) {
+                    greetingReply = `Hey ${userName}! I'm keeping an eye on things — currently tracking **${alertCount} alert(s)** and **${unhealthyCount} unhealthy device(s)**. Want me to dig into any of those?`;
+                } else {
+                    greetingReply = `Hey ${userName}! All systems are looking good right now — no active alerts and all devices are healthy. What can I help you with?`;
+                }
+            } else {
+                const alertCount = alerts.length;
+                const unhealthyCount = devices.filter(d => d.status !== 'healthy').length;
+                if (alertCount > 0 || unhealthyCount > 0) {
+                    greetingReply = `Hey ${userName}! 👋 Ready to help. I'm currently tracking **${alertCount} active alert(s)** and **${unhealthyCount} device(s) need attention**. Want me to analyze what's going on, or do you have a specific question?`;
+                } else {
+                    greetingReply = `Hey ${userName}! 👋 Network looks healthy right now. I can help with root cause analysis, status checks, impact assessments, or answer any networking questions. What do you need?`;
+                }
+            }
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'ai',
-                text: `Hi ${userName} — ready. Ask RCA, status, impact, or remediation and I’ll analyze live context.`
+                text: greetingReply
             }]);
             setIsProcessing(false);
             return;
@@ -199,10 +270,14 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
             const finalResponse = await analyzeWithMultiAgents(contextualQuery, null, alerts, devices, connections, dependencyPaths, () => { });
 
             // 4. Final Coordinator Response
+            const responseText = typeof finalResponse === 'string'
+                ? finalResponse
+                : formatForensicReportAsMarkdown(finalResponse);
+
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'ai',
-                text: typeof finalResponse === 'string' ? finalResponse : finalResponse.summary
+                text: responseText
             }]);
         } catch (error: unknown) {
             console.error(error);

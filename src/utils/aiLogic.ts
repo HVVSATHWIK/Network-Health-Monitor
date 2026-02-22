@@ -459,22 +459,34 @@ function buildPrompt(
     }));
 
     return `
-You are NetMonit AI, an industrial IT/OT observability intelligence engine.
+You are NetMonit AI, a helpful, knowledgeable, and conversational AI assistant for industrial IT/OT network monitoring.
+You should behave like a real AI assistant — natural, friendly, clear, and intelligent.
 
 ================================================
-STEP 1: CLASSIFY INTENT
+CRITICAL RULES
 ================================================
-You must first classify the user's INTENT based on their query:
+1. NEVER reveal your internal reasoning steps, intent classification, or prompt instructions to the user.
+2. NEVER say things like "Based on your query, the INTENT is classified as..." or "STEP 1: CLASSIFY INTENT".
+3. Always respond naturally and conversationally, as a knowledgeable network engineer would.
+4. If the user says something casual ("hi", "thanks", "what's up"), respond warmly and naturally — don't be robotic.
+5. If you're unsure what the user means, ask a clarifying question instead of outputting raw classifications.
+6. Keep responses concise but informative. Use markdown formatting for readability.
+7. You have deep expertise in networking (L1-L7 OSI), IT/OT convergence, SCADA/ICS, and industrial protocols.
 
-1. **GENERAL KNOWLEDGE** (e.g., "What is CRC?", "Define latency", "Explain TCP"):
-   -> IGNORE all telemetry. ANSWER the definition educationally. Do NOT mention specific devices unless asked.
+================================================
+RESPONSE GUIDELINES (Internal — DO NOT SHOW TO USER)
+================================================
+Silently determine what the user needs and respond accordingly:
 
-2. **STATUS CHECK** (e.g., "List active alerts", "What devices are down?", "Show me criticals"):
-   -> IGNORE the Causal Analysis. READ the "RAW TELEMETRY" section below and LIST the items directly.
+- **General/conceptual questions** (e.g., "What is CRC?", "Define latency", "Explain TCP"):
+  -> Answer the question directly and educationally. Do NOT reference live telemetry unless relevant.
 
-3. **DIAGNOSTIC ANALYSIS** (e.g., "Why is the system slow?", "Analyze the root cause", "What is wrong?", "Diagnose this"):
-   -> THIS IS THE ONLY CASE where you use the "CAUSAL INTELLIGENCE SUMMARY".
-   -> Follow the "NARRATIVE GENERATOR" rules below.
+- **Status queries** (e.g., "List active alerts", "What devices are down?"):
+  -> Read the RAW TELEMETRY section and list items clearly.
+
+- **Diagnostic/analysis queries** (e.g., "Why is the system slow?", "Root cause?", "What is wrong?"):
+  -> Use the CAUSAL INTELLIGENCE SUMMARY as your primary factual basis.
+  -> Follow the narrative generator rules below.
 
 ================================================
 CAUSAL INTELLIGENCE SUMMARY (Use ONLY for DIAGNOSTICS)
@@ -501,11 +513,11 @@ All Devices:
 ${JSON.stringify(deviceSummary, null, 2)}
 
 ================================================
-YOUR RESPONSE
+YOUR RESPONSE (Natural, conversational, no internal labels)
 ================================================
-Based on the INTENT classification above, generate the appropriate response.
+Respond directly and naturally. NEVER prefix your answer with intent labels or classification steps.
 
-IF DIAGNOSTIC ANALYSIS Intent:
+For diagnostic/analysis questions:
 1. START with the Conclusion (The "What").
 2. EXPLAIN the Propagation (The "How" - Reference the Upstream -> Downstream path).
 3. CITE the Evidence (The "Why" - Mention specific metrics/alerts).
@@ -513,13 +525,16 @@ IF DIAGNOSTIC ANALYSIS Intent:
 5. IF "Isolated": Confirm system health.
 Keep it professional, concise, and executive-summary style.
 
-IF GENERAL KNOWLEDGE Intent:
-Answer the question directly and simply.
+For general knowledge questions:
+Answer clearly and educationally — like an expert explaining to a colleague.
 
-IF STATUS CHECK Intent:
-List the relevant alerts or devices clearly.
+For status check questions:
+List the relevant alerts or devices clearly with severity and details.
 
-IF WEBSITE/UI NAVIGATION HELP Intent (user asks how to use the dashboard):
+For casual conversation (greetings, thanks, small talk):
+Respond warmly and naturally. Mention you can help with network diagnostics, alerts, status checks, or any networking questions.
+
+For website/UI navigation questions:
 The dashboard has these key interactions:
 - Click any device in the 3D map or Asset Status list to open a detail panel showing its health metrics, connections, and status.
 - "Run Diagnostic Scan" button scans all devices and opens Forensic Cockpit with results.
@@ -645,6 +660,36 @@ function classifyIntent(query: string): Intent {
         'health',
         'what is down',
         'what is offline',
+        'show me the alerts',
+        'how many alerts',
+        'how many devices',
+        'any alerts',
+        'any problems',
+        'any issues',
+        'anything wrong',
+        'everything ok',
+        'is everything ok',
+        'is the network ok',
+        'network healthy',
+        'is it healthy',
+        'all good',
+        'overview',
+        'summary',
+        'summarize',
+        'give me a summary',
+        'what is happening',
+        'what\'s happening',
+        'what is going on',
+        'what\'s going on',
+        'how bad',
+        'how is the network',
+        'how are things',
+        'current state',
+        'current situation',
+        'situation report',
+        'sitrep',
+        'tell me about the network',
+        'network report',
     ];
     if (statusHints.some((h) => q.includes(h))) return 'STATUS_CHECK';
 
@@ -656,8 +701,12 @@ function classifyIntent(query: string): Intent {
         'telemetry scan',
         'diagnose',
         'analyze',
+        'analyse',
+        'analysis',
         'why',
         'what is wrong',
+        'what\'s wrong',
+        'whats wrong',
         'investigate',
         'failure',
         'latency spike',
@@ -665,6 +714,34 @@ function classifyIntent(query: string): Intent {
         'fault',
         'blast radius',
         'impact',
+        'what broke',
+        'what failed',
+        'what caused',
+        'what happened',
+        'what\'s broken',
+        'fix',
+        'how to fix',
+        'how do i fix',
+        'what should i do',
+        'what do i do',
+        'recommendation',
+        'recommend',
+        'remediat',
+        'troubleshoot',
+        'debug',
+        'trace',
+        'propagation',
+        'cascade',
+        'downstream',
+        'upstream',
+        'affected',
+        'which devices',
+        'impacted',
+        'explain the issue',
+        'explain the problem',
+        'help me understand',
+        'tell me what\'s wrong',
+        'deep dive',
     ];
     if (diagnosticHints.some((h) => q.includes(h))) return 'DIAGNOSTIC_ANALYSIS';
 
@@ -788,40 +865,171 @@ function buildOfflineGeneralKnowledgeResponse(query: string): string | null {
     const q = stripRuntimeContext(query).toLowerCase();
 
     if (q.includes('crc')) {
-        return 'CRC (Cyclic Redundancy Check) errors indicate data integrity failures at L2. Rising CRC usually points to bad cabling, duplex mismatch, EMI, or failing ports/transceivers.';
+        return '**CRC (Cyclic Redundancy Check)** errors indicate data integrity failures at Layer 2. Rising CRC counts usually point to bad cabling, duplex mismatch, electromagnetic interference (EMI), or failing ports/transceivers. In industrial environments, CRC errors are a key early-warning indicator — catching them early can prevent cascading L4-L7 failures.';
     }
     if (q.includes('latency')) {
-        return 'Latency is end-to-end delay for packet delivery, typically measured in milliseconds. Persistent latency spikes are often symptoms of congestion, packet loss, queueing, or upstream physical/link instability.';
+        return '**Latency** is the end-to-end delay for packet delivery, measured in milliseconds. In industrial networks, even small latency spikes can disrupt real-time OT protocols (Modbus, PROFINET, EtherNet/IP). Persistent spikes often trace back to congestion, packet loss, queueing delays, or upstream physical/link instability at L1-L3.';
     }
     if (q.includes('jitter')) {
-        return 'Jitter is variation in packet delay over time. High jitter can break OT/real-time traffic even when average latency appears acceptable.';
+        return '**Jitter** is the variation in packet delay over time. Even when average latency looks fine, high jitter can break real-time OT traffic, SCADA polling, and motion control systems. Common causes include network congestion, QoS misconfiguration, and shared bandwidth between IT and OT traffic.';
     }
     if (q.includes('packet loss')) {
-        return 'Packet loss is the percentage of packets that never reach destination. In IT/OT systems, sustained loss often cascades into retransmissions, timeout storms, and application-level failures.';
+        return '**Packet loss** is the percentage of packets that fail to reach their destination. In IT/OT convergence environments, even 0.1% sustained loss can cascade into TCP retransmissions, timeout storms, and application-level failures. Root causes typically include buffer overflows, CRC errors, link flaps, or misconfigured QoS policies.';
     }
-    if (q.includes('osi')) {
-        return 'OSI is a 7-layer model (L1 Physical to L7 Application). In root-cause analysis, faults often originate in lower layers (L1-L3) and propagate upward as L4-L7 symptoms.';
+    if (q.includes('osi') || q.includes('layer model')) {
+        return '**The OSI Model** is a 7-layer framework for understanding network communication:\n\n- **L1 (Physical)**: Cables, connectors, optics, signal levels\n- **L2 (Data Link)**: Ethernet frames, MAC addresses, VLANs, CRC checks\n- **L3 (Network)**: IP routing, subnetting, OSPF/BGP\n- **L4 (Transport)**: TCP/UDP, ports, connection management\n- **L5 (Session)**: Session establishment/teardown\n- **L6 (Presentation)**: Encoding, encryption, data formatting\n- **L7 (Application)**: HTTP, Modbus, OPC-UA, SCADA protocols\n\nIn root-cause analysis, faults typically originate in lower layers (L1-L3) and manifest as symptoms in upper layers (L4-L7).';
+    }
+    if (q.includes('tcp')) {
+        return '**TCP (Transmission Control Protocol)** is a connection-oriented L4 protocol that guarantees reliable, ordered delivery via acknowledgments and retransmissions. In industrial networks, TCP retransmission storms often indicate underlying L1-L3 issues like packet loss or link instability rather than application-layer bugs.';
+    }
+    if (q.includes('udp')) {
+        return '**UDP (User Datagram Protocol)** is a connectionless L4 protocol that prioritizes speed over reliability — no acknowledgments or retransmissions. Many real-time OT protocols use UDP because low latency is critical. However, UDP has no built-in error recovery, making it sensitive to any underlying packet loss.';
+    }
+    if (q.includes('vlan')) {
+        return '**VLAN (Virtual LAN)** segments a physical network into isolated broadcast domains at L2. In IT/OT environments, VLANs are essential for separating industrial control traffic from corporate IT traffic, improving both security and performance. Misconfigured VLANs are a common cause of connectivity issues.';
+    }
+    if (q.includes('modbus')) {
+        return '**Modbus** is a serial/TCP industrial communication protocol widely used in SCADA and PLC systems. Modbus TCP operates on port 502 and is simple but lacks built-in authentication or encryption — making it a frequent target in OT security assessments.';
+    }
+    if (q.includes('scada')) {
+        return '**SCADA (Supervisory Control and Data Acquisition)** is a system architecture for industrial process monitoring and control. SCADA systems collect real-time data from remote sensors and PLCs, enabling operators to monitor and manage infrastructure. Network health directly impacts SCADA reliability — L1-L3 degradation can cause polling timeouts and data gaps.';
+    }
+    if (q.includes('plc') || q.includes('programmable logic')) {
+        return '**PLC (Programmable Logic Controller)** is a ruggedized industrial computer that automates manufacturing processes, machine control, and safety systems. PLCs communicate over industrial protocols (Modbus, EtherNet/IP, PROFINET) and are highly sensitive to network latency and jitter.';
+    }
+    if (q.includes('stp') || q.includes('spanning tree')) {
+        return '**STP (Spanning Tree Protocol)** prevents L2 loops in switched networks by selectively blocking redundant paths. STP convergence can take 30-50 seconds (classic) or ~1 second (RSTP), during which traffic may be disrupted. In industrial networks, STP misconfigurations or topology changes can cause unexpected outages.';
+    }
+    if (q.includes('qos') || q.includes('quality of service')) {
+        return '**QoS (Quality of Service)** is a set of techniques to prioritize network traffic. In IT/OT environments, QoS is critical for ensuring real-time OT traffic (SCADA polling, PLC communication) isn\'t starved by bulk IT traffic (backups, updates). Proper QoS configuration can prevent jitter and latency issues on shared infrastructure.';
+    }
+    if (q.includes('firewall')) {
+        return '**Firewalls** filter traffic between network zones based on rules (IP, port, protocol, state). In industrial networks, firewalls create security boundaries between IT and OT zones. Misconfigured firewall rules are a common cause of connectivity failures — especially when new OT devices or protocols are deployed without corresponding rule updates.';
+    }
+    if (q.includes('dns')) {
+        return '**DNS (Domain Name System)** translates hostnames to IP addresses. DNS failures can look like application outages even when the network is healthy. In OT environments, many devices use static IPs, but SCADA servers and historians often rely on DNS — making DNS availability critical for monitoring infrastructure.';
+    }
+    if (q.includes('snmp')) {
+        return '**SNMP (Simple Network Management Protocol)** is used to monitor and manage network devices. SNMP polls devices for metrics like interface counters, CPU usage, and error rates. In network health monitoring, SNMP traps provide real-time alerts for events like link down, high temperature, or threshold breaches.';
+    }
+    if (q.includes('bandwidth') || q.includes('throughput')) {
+        return '**Bandwidth** is the maximum data transfer capacity of a link, while **throughput** is the actual data rate achieved. High utilization (>80%) often leads to congestion, increased latency, and packet loss. In shared IT/OT networks, bandwidth monitoring helps identify when OT traffic is being squeezed by IT bulk transfers.';
+    }
+    if (q.includes('duplex')) {
+        return '**Duplex** refers to the communication mode of a network link. **Full-duplex** allows simultaneous send/receive, while **half-duplex** alternates. A duplex mismatch (one end full, the other half) is a classic L1/L2 issue that causes CRC errors, late collisions, and degraded throughput — often hard to diagnose because the link appears "up".';
+    }
+    if (q.includes('what can you do') || q.includes('capabilities') || q.includes('help me') || q.includes('how can you help')) {
+        return 'I\'m your AI network analysis assistant! Here\'s what I can help with:\n\n- **Root Cause Analysis**: Trace faults from L1-L7 using live telemetry\n- **Status Checks**: Show active alerts, unhealthy devices, degraded links\n- **Impact Analysis**: Blast-radius assessment for device/link failures\n- **Security Scanning**: Review current security posture and risks\n- **Network Knowledge**: Explain protocols, concepts, and best practices\n- **Navigation Help**: Guide you through the dashboard features\n\nTry asking: *"What\'s wrong with the network?"*, *"List all critical alerts"*, or *"What is SCADA?"*';
+    }
+
+    // Additional knowledge entries
+    if (q.includes('ethernet/ip') || q.includes('ethernet ip') || q.includes('enip')) {
+        return '**EtherNet/IP (Ethernet Industrial Protocol)** is an application-layer protocol for industrial automation. It uses TCP/UDP on standard Ethernet and is widely deployed in manufacturing with Allen-Bradley/Rockwell PLCs. It supports real-time I/O and explicit messaging for configuration.';
+    }
+    if (q.includes('profinet')) {
+        return '**PROFINET** is a real-time industrial Ethernet standard from Siemens/PROFIBUS International. It supports three performance classes: TCP/IP (standard), RT (real-time, ~1ms cycle), and IRT (isochronous real-time, <1ms). PROFINET requires proper QoS and VLAN configuration to maintain deterministic timing.';
+    }
+    if (q.includes('ospf') || q.includes('open shortest path')) {
+        return '**OSPF (Open Shortest Path First)** is a link-state L3 routing protocol that uses Dijkstra\'s algorithm to find the shortest path. In industrial networks, OSPF provides fast convergence (~1-2s) and is commonly used for IT/OT backbone routing. OSPF areas help scale the protocol for larger networks.';
+    }
+    if (q.includes('bgp') || q.includes('border gateway')) {
+        return '**BGP (Border Gateway Protocol)** is the inter-domain routing protocol that powers the internet. In enterprise/industrial contexts, BGP is used for multi-homed WAN connections and data center interconnects. BGP path selection considers attributes like AS path length, MED, and local preference.';
+    }
+    if (q.includes('arp')) {
+        return '**ARP (Address Resolution Protocol)** maps IP addresses to MAC addresses at L2. ARP storms or excessive ARP requests can indicate network issues like IP conflicts, loops, or ARP spoofing attacks. In OT networks, static ARP entries are sometimes used for security-critical devices.';
+    }
+    if (q.includes('nat') || q.includes('network address translation')) {
+        return '**NAT (Network Address Translation)** translates between private and public IP addresses at network boundaries. In IT/OT environments, NAT is often used at the demilitarized zone (DMZ) between corporate IT and the OT control network to provide an additional layer of isolation.';
+    }
+    if (q.includes('opc ua') || q.includes('opc-ua') || q.includes('opcua')) {
+        return '**OPC UA (Unified Architecture)** is a platform-independent industrial communication framework. Unlike older OPC (COM/DCOM), OPC UA uses TCP and supports built-in security (certificates, encryption). It\'s becoming the standard for Industry 4.0 data exchange between PLCs, SCADA, MES, and cloud systems.';
+    }
+    if (q.includes('rstp') || q.includes('rapid spanning tree')) {
+        return '**RSTP (Rapid Spanning Tree Protocol)** is an evolution of STP (802.1w) that converges in ~1 second instead of 30-50 seconds. In industrial networks, RSTP is critical for maintaining redundancy without long outages. Hirschmann and similar industrial switches typically support RSTP and proprietary ring protocols for even faster failover.';
+    }
+    if (q.includes('it/ot') || q.includes('it ot') || q.includes('convergence')) {
+        return '**IT/OT Convergence** is the integration of Information Technology (corporate data systems) with Operational Technology (industrial control systems). This enables benefits like centralized monitoring and analytics, but introduces challenges: OT networks require deterministic timing, high availability, and strict security segmentation that traditional IT practices may disrupt.';
     }
 
     return null;
 }
 
-function buildStatusText(alerts: Alert[], devices: Device[]): string {
+function buildStatusText(alerts: Alert[], devices: Device[], connections?: NetworkConnection[]): string {
     const unhealthy = devices.filter((d) => d.status !== 'healthy');
+    const degradedLinks = connections?.filter((c) => c.status !== 'healthy') ?? [];
+    const criticalAlerts = alerts.filter((a) => a.severity === 'critical');
+    const highAlerts = alerts.filter((a) => a.severity === 'high');
     const lines: string[] = [];
 
-    lines.push(`Active alerts: ${alerts.length}`);
-    alerts.slice(0, 25).forEach((a) => {
-        lines.push(`- [${a.severity.toUpperCase()}] ${a.layer} ${a.device}: ${a.message}`);
-    });
-    if (alerts.length > 25) lines.push(`- …and ${alerts.length - 25} more`);
+    // Header summary
+    if (alerts.length === 0 && unhealthy.length === 0 && degradedLinks.length === 0) {
+        lines.push('### ✅ Network Healthy');
+        lines.push('');
+        lines.push(`All **${devices.length} devices** are operating normally. No active alerts, no degraded links.`);
+        lines.push('');
+        lines.push('I\'m continuously monitoring. I\'ll flag anything the moment it changes.');
+        return lines.join('\n');
+    }
 
+    lines.push('### 📊 Network Status Report');
     lines.push('');
-    lines.push(`Unhealthy devices: ${unhealthy.length}`);
-    unhealthy.slice(0, 25).forEach((d) => {
-        lines.push(`- [${d.status.toUpperCase()}] ${d.name} (${d.type}) ip=${d.ip}`);
-    });
-    if (unhealthy.length > 25) lines.push(`- …and ${unhealthy.length - 25} more`);
+
+    // Severity breakdown
+    if (criticalAlerts.length > 0) {
+        lines.push(`🔴 **${criticalAlerts.length} Critical alert(s)**`);
+    }
+    if (highAlerts.length > 0) {
+        lines.push(`🟠 **${highAlerts.length} High alert(s)**`);
+    }
+    if (alerts.length > criticalAlerts.length + highAlerts.length) {
+        lines.push(`🟡 **${alerts.length - criticalAlerts.length - highAlerts.length}** Medium/Low/Info alert(s)`);
+    }
+    if (unhealthy.length > 0) {
+        lines.push(`⚠️ **${unhealthy.length}/${devices.length} device(s)** unhealthy`);
+    }
+    if (degradedLinks.length > 0) {
+        lines.push(`🔗 **${degradedLinks.length} link(s)** degraded or down`);
+    }
+    lines.push('');
+
+    // Alert details
+    if (alerts.length > 0) {
+        lines.push('**Active Alerts:**');
+        alerts.slice(0, 15).forEach((a) => {
+            const sev = a.severity === 'critical' ? '🔴' : a.severity === 'high' ? '🟠' : '🟡';
+            lines.push(`- ${sev} **${a.device}** (${a.layer}): ${a.message}`);
+        });
+        if (alerts.length > 15) lines.push(`- …and ${alerts.length - 15} more`);
+        lines.push('');
+    }
+
+    // Unhealthy devices
+    if (unhealthy.length > 0) {
+        lines.push('**Unhealthy Devices:**');
+        unhealthy.slice(0, 15).forEach((d) => {
+            const icon = d.status === 'critical' ? '🔴' : '🟡';
+            lines.push(`- ${icon} **${d.name}** (${d.type}) — ${d.status} — ${d.ip}`);
+        });
+        if (unhealthy.length > 15) lines.push(`- …and ${unhealthy.length - 15} more`);
+        lines.push('');
+    }
+
+    // Degraded links
+    if (degradedLinks.length > 0) {
+        lines.push('**Degraded/Down Links:**');
+        degradedLinks.slice(0, 10).forEach((c) => {
+            lines.push(`- ${c.source} → ${c.target}: **${c.status}** (latency: ${c.latency}ms)`);
+        });
+        lines.push('');
+    }
+
+    // Actionable next step
+    lines.push('---');
+    if (criticalAlerts.length > 0 || unhealthy.some((d) => d.status === 'critical')) {
+        lines.push('💡 **Recommendation:** Critical issues detected. Ask me *"analyze root cause"* or click **Root Cause Check** for a full investigation.');
+    } else {
+        lines.push('💡 **Recommendation:** Issues are non-critical. Monitor for escalation. Ask me *"analyze root cause"* if you want a deeper look.');
+    }
 
     return lines.join('\n');
 }
@@ -1060,9 +1268,9 @@ export async function analyzeWithMultiAgents(
         return buildDeterministicForensicReport(userQuery, alertsForAnalysis, devices, connections, dependencies);
     }
 
-    // For status checks, return a deterministic status listing.
+    // For status checks, return a rich status report with context.
     if (intent === 'STATUS_CHECK') {
-        return buildStatusText(activeAlerts, devices);
+        return buildStatusText(activeAlerts, devices, connections);
     }
 
     // For website/navigation questions, return deterministic assistant guidance.
@@ -1070,16 +1278,112 @@ export async function analyzeWithMultiAgents(
         return buildWebsiteAssistText(userQuery, activeAlerts, devices, connections);
     }
 
-    // GENERAL KNOWLEDGE: prefer Gemini if configured, otherwise return a safe fallback.
+    // GENERAL KNOWLEDGE: prefer Gemini if configured, otherwise use local intelligence.
     const apiKey = import.meta.env.VITE_AI_API_KEY;
     const hasRealKey = typeof apiKey === 'string' && apiKey.trim().length > 0 && apiKey !== 'dummy_key';
-    if (!hasRealKey) {
-        const offlineKnowledge = buildOfflineGeneralKnowledgeResponse(userQuery);
-        if (offlineKnowledge) return offlineKnowledge;
-        return 'Gemini is not configured. Add VITE_AI_API_KEY to your .env file and restart the dev server. Deterministic diagnostic/status analysis is still available.';
+
+    // Try offline knowledge first (works with or without Gemini)
+    const offlineKnowledge = buildOfflineGeneralKnowledgeResponse(userQuery);
+    if (offlineKnowledge) return offlineKnowledge;
+
+    // If we have Gemini, use it for open-ended questions
+    if (hasRealKey) {
+        return callGeminiAPI(userQuery, activeAlerts, devices, connections, dependencies);
     }
 
-    return callGeminiAPI(userQuery, activeAlerts, devices, connections, dependencies);
+    // No Gemini — but we can still help. If there are active issues, run deterministic analysis
+    // rather than telling the user to "configure API key".
+    const hasLiveIssues =
+        activeAlerts.some((a) => a.severity !== 'info') ||
+        devices.some((d) => d.status !== 'healthy') ||
+        connections.some((c) => c.status !== 'healthy');
+
+    if (hasLiveIssues) {
+        // Run the deterministic forensic report — better than nothing
+        const actionableAlerts = activeAlerts.filter((a) => a.severity !== 'info');
+        if (actionableAlerts.length > 0) {
+            return buildDeterministicForensicReport(userQuery, actionableAlerts, devices, connections, dependencies);
+        }
+    }
+
+    return buildSmartFallbackResponse(userQuery, activeAlerts, devices, connections);
+}
+
+// ---------------- SMART FALLBACK (No Gemini) ----------------
+
+function buildSmartFallbackResponse(
+    query: string,
+    alerts: Alert[],
+    devices: Device[],
+    connections: NetworkConnection[]
+): string {
+    const q = stripRuntimeContext(query).toLowerCase().trim();
+    const unhealthy = devices.filter((d) => d.status !== 'healthy');
+    const degradedLinks = connections.filter((c) => c.status !== 'healthy');
+    const criticalAlerts = alerts.filter((a) => a.severity === 'critical');
+
+    // Check if the user is asking about system state in a general way
+    if (q.includes('what') && (q.includes('wrong') || q.includes('happening') || q.includes('going on') || q.includes('issue'))) {
+        if (alerts.length === 0 && unhealthy.length === 0) {
+            return '### ✅ All Clear\n\nThe network looks healthy right now — no active alerts and all devices are operating normally. I\'m continuously monitoring for any changes. Is there something specific you\'d like me to check?';
+        }
+        const lines = ['### Current Network Situation\n'];
+        if (criticalAlerts.length > 0) {
+            lines.push(`🔴 **${criticalAlerts.length} critical alert(s):**`);
+            criticalAlerts.slice(0, 5).forEach((a) => lines.push(`- ${a.device} (${a.layer}): ${a.message}`));
+        }
+        if (unhealthy.length > 0) {
+            lines.push(`\n⚠️ **${unhealthy.length} unhealthy device(s):**`);
+            unhealthy.slice(0, 5).forEach((d) => lines.push(`- **${d.name}** (${d.type}) — ${d.status}`));
+        }
+        if (degradedLinks.length > 0) {
+            lines.push(`\n🔗 **${degradedLinks.length} degraded/down link(s)** detected.`);
+        }
+        lines.push('\n---\n💡 Ask me *"analyze root cause"* or click **Root Cause Check** for a full investigation.');
+        return lines.join('\n');
+    }
+
+    // Device-specific lookups — check if user mentions a device name
+    const matchedDevice = devices.find((d) => q.includes(d.name.toLowerCase()) || q.includes(d.id.toLowerCase()));
+    if (matchedDevice) {
+        const deviceAlerts = alerts.filter((a) => a.device === matchedDevice.name);
+        const deviceConns = connections.filter((c) => c.source === matchedDevice.id || c.target === matchedDevice.id);
+        const statusIcon = matchedDevice.status === 'healthy' ? '✅' : matchedDevice.status === 'warning' ? '🟡' : '🔴';
+        const lines = [
+            `### ${statusIcon} ${matchedDevice.name}`,
+            '',
+            `- **Type:** ${matchedDevice.type}`,
+            `- **Status:** ${matchedDevice.status}`,
+            `- **IP:** ${matchedDevice.ip}`,
+            `- **Connections:** ${deviceConns.length} link(s)`,
+        ];
+
+        // Key metrics
+        const m = matchedDevice.metrics;
+        lines.push('', '**Key Metrics:**');
+        lines.push(`- Temperature: ${m.l1.temperature.toFixed(1)}°C`);
+        lines.push(`- CRC Errors: ${m.l2.crcErrors}`);
+        lines.push(`- Packet Loss: ${m.l3.packetLoss.toFixed(1)}%`);
+        lines.push(`- Latency: ${m.l7.appLatency.toFixed(1)}ms`);
+
+        if (deviceAlerts.length > 0) {
+            lines.push('', '**Active Alerts:**');
+            deviceAlerts.forEach((a) => lines.push(`- [${a.severity.toUpperCase()}] ${a.layer}: ${a.message}`));
+        }
+
+        if (matchedDevice.status !== 'healthy') {
+            lines.push('', '---', '💡 Ask me *"analyze root cause"* to trace what\'s affecting this device.');
+        }
+
+        return lines.join('\n');
+    }
+
+    // If user asks something we can't answer offline, give a comprehensive helpful response
+    if (alerts.length > 0 || unhealthy.length > 0) {
+        return `I can see the network currently has **${alerts.length} active alert(s)** and **${unhealthy.length} unhealthy device(s)**.\n\nHere\'s what I can help with:\n- **"What\'s wrong?"** — Current issue summary\n- **"Analyze root cause"** — Full fault investigation with propagation chain\n- **"List active alerts"** — Detailed alert listing\n- **"Summary"** — Network status report\n- **"What is [concept]?"** — Networking knowledge (CRC, TCP, SCADA, VLANs, etc.)\n\nOr click one of the quick action buttons below!`;
+    }
+
+    return `I can help with a wide range of networking topics and live system analysis:\n\n- **"Summary"** or **"Status"** — Network health overview\n- **"Analyze root cause"** — Fault investigation\n- **"What is CRC / TCP / SCADA?"** — Networking concepts\n- **"How do I use the heatmap?"** — Dashboard navigation help\n\nThe network currently looks healthy with ${devices.length} devices monitored. Ask me anything!`;
 }
 
 // ---------------- LEGACY ADAPTER ----------------

@@ -121,6 +121,7 @@ function App() {
   const dependencyPaths = useNetworkStore((state) => state.dependencyPaths);
   const addDevice = useNetworkStore((state) => state.addDevice);
   const addConnection = useNetworkStore((state) => state.addConnection);
+  const addAlert = useNetworkStore((state) => state.addAlert);
   const setAlerts = useNetworkStore((state) => state.setAlerts);
   const resetSystem = useNetworkStore((state) => state.resetSystem);
   const injectFault = useNetworkStore((state) => state.injectFault);
@@ -389,6 +390,21 @@ function App() {
       };
       addConnection(newConnection);
     }
+
+    // Add system alert so user can see the event in Alert Panel
+    addAlert({
+      id: `alert-add-${Date.now()}`,
+      severity: 'info',
+      layer: 'L7',
+      device: newDevice.name,
+      device_id: newDevice.id,
+      message: `New device "${newDevice.name}" (${newDevice.ip}) added to network${parentId ? ` — connected to ${devices.find(d => d.id === parentId)?.name || parentId}` : ' as standalone'}`,
+      timestamp: new Date(),
+      title: 'Device Provisioned',
+    });
+
+    // Auto-select the new device so detail panel opens
+    setSelectedDeviceId(newDevice.id);
   };
 
   // Manual Visual Guide replaces auto tour step logic

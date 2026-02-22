@@ -44,6 +44,8 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAddDeviceOpen, setIsAddDeviceOpen] = useState(false); // New State for Modal
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [newDeviceId, setNewDeviceId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -539,7 +541,7 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
     const positionMap: Record<string, [number, number, number]> = {};
     const tiers = {
       floor: devices.filter(d => ['sensor', 'switch'].includes(d.type)),
-      edge: devices.filter(d => ['plc', 'gateway', 'router'].includes(d.type)),
+      edge: devices.filter(d => ['plc', 'gateway', 'router', 'firewall'].includes(d.type)),
       cloud: devices.filter(d => ['server', 'scada'].includes(d.type))
     };
     const placeTier = (tierDevices: Device[], yVals: number, radius: number) => {
@@ -565,6 +567,24 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
           const ring = new THREE.Mesh(new THREE.TorusGeometry(8, 0.5, 16, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }));
           ring.rotateX(Math.PI / 2);
           mesh.add(ring);
+        }
+
+        // NEW DEVICE highlight - pulsing green ring
+        if (newDeviceId && device.id === newDeviceId) {
+          const glowRing = new THREE.Mesh(
+            new THREE.TorusGeometry(10, 0.8, 16, 48),
+            new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.9 })
+          );
+          glowRing.rotateX(Math.PI / 2);
+          glowRing.userData.isNewGlow = true;
+          mesh.add(glowRing);
+          // Second outer ring for extra visibility
+          const outerRing = new THREE.Mesh(
+            new THREE.TorusGeometry(13, 0.4, 16, 48),
+            new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.4 })
+          );
+          outerRing.rotateX(Math.PI / 2);
+          mesh.add(outerRing);
         }
 
         // Props
@@ -636,7 +656,7 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
       }
     });
 
-  }, [devices, connections, selectedDeviceId]); // Updates when data changes
+  }, [devices, connections, selectedDeviceId, newDeviceId]); // Updates when data changes
 
   // Click Handler for Device Selection (Attached via ref to avoid stale closure if needed, but here simple click handler logic suffices if attached to DOM correctly)
   // Actually, we need to attach the click listener to the container, but it needs access to 'devices' and 'scene' which are now in refs or closure.
@@ -864,7 +884,25 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
         </div>
       )}
 
-      {isAddDeviceOpen && onAddDevice && <AddDeviceModal onClose={() => setIsAddDeviceOpen(false)} onAdd={onAddDevice} devices={devices} />}
+      {isAddDeviceOpen && onAddDevice && <AddDeviceModal onClose={() => setIsAddDeviceOpen(false)} onAdd={(device, parentId) => {
+        onAddDevice(device, parentId);
+        setNewDeviceId(device.id);
+        setToastMessage(`✓ "${device.name}" added to network`);
+        setTimeout(() => setToastMessage(null), 4000);
+        setTimeout(() => setNewDeviceId(null), 6000);
+        // Auto-select the new device to show detail panel
+        onDeviceSelect?.(device.id);
+      }} devices={devices} connections={connections} />}
+
+      {/* Success Toast */}
+      {toastMessage && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[110] animate-in slide-in-from-top fade-in duration-300">
+          <div className="bg-emerald-600/90 backdrop-blur-md text-white px-6 py-3 rounded-xl shadow-2xl border border-emerald-400/50 flex items-center gap-3 font-medium">
+            <span className="text-lg">🟢</span>
+            <span>{toastMessage}</span>
+          </div>
+        </div>
+      )}
 
       <div className={`absolute bottom-8 right-8 z-[70] transition-all duration-200 ${isGuideOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
         <button onClick={() => onShowControlsChange?.(!showControls)} className="bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-full shadow-lg border border-slate-600 transition-all">

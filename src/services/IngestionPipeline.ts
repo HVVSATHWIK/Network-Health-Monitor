@@ -24,7 +24,7 @@ function detectFaultLayer(metrics: Device['metrics']): { layer: Alert['layer']; 
  * or the DataImporter (user-uploaded data).
  */
 export const processTelemetryBatch = (batch: RawTelemetry[]) => {
-    const { updateDevice, addAlert, alerts, devices } = useNetworkStore.getState();
+    const { updateDevice, addAlert, alerts, devices, faultedDeviceIds } = useNetworkStore.getState();
 
     // Track previous device statuses for transition detection
     const prevStatusMap = new Map(devices.map(d => [d.id, d.status]));
@@ -34,6 +34,9 @@ export const processTelemetryBatch = (batch: RawTelemetry[]) => {
         const device = IdentifierResolver.resolveDevice({ deviceId: telemetry.deviceId });
 
         if (device) {
+            // Skip devices under an active injected fault — don't overwrite their metrics
+            if (faultedDeviceIds.has(device.id)) return;
+
             // 2. Map Telemetry
             const updatedDevice = TelemetryMapper.mapTelemetryToDeviceMetrics(device, telemetry);
 

@@ -2,7 +2,7 @@ import { Device, LayerKPI, Alert, NetworkConnection, DependencyPath } from '../t
 
 export const devices: Device[] = [
   {
-    id: 'd1', name: 'Hirschmann DRAGON MACH4x00', type: 'switch', status: 'healthy', category: 'OT', ip: '192.168.1.1', location: 'Server Room', manufacturer: 'Hirschmann', position: [0, 0, 0],
+    id: 'd1', name: 'Hirschmann DRAGON MACH4x00', type: 'switch', status: 'healthy', category: 'OT', ip: '192.168.1.1', location: 'Server Room', manufacturer: 'Hirschmann', vlan: 1, subnetMask: '/24', position: [0, 0, 0],
     metrics: {
       l1: { temperature: 42, fanSpeed: 4500 },
       l2: { crcErrors: 0, linkUtilization: 45 },
@@ -14,7 +14,7 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd2', name: 'Hirschmann EAGLE40 Firewall', type: 'firewall', status: 'healthy', category: 'IT', ip: '192.168.1.2', location: 'Network Center', manufacturer: 'Belden', position: [-20, 0, 10],
+    id: 'd2', name: 'Hirschmann EAGLE40 Firewall', type: 'firewall', status: 'healthy', category: 'IT', ip: '192.168.1.2', location: 'Network Center', manufacturer: 'Belden', vlan: 1, subnetMask: '/24', position: [-20, 0, 10],
     metrics: {
       l1: { temperature: 45, fanSpeed: 4200 },
       l2: { crcErrors: 2, linkUtilization: 60 },
@@ -26,7 +26,7 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd3', name: 'Lion-M PLC Node A', type: 'plc', status: 'warning', category: 'OT', ip: '192.168.10.5', location: 'Production Floor A', position: [20, 0, -10],
+    id: 'd3', name: 'Lion-M PLC Node A', type: 'plc', status: 'warning', category: 'OT', ip: '192.168.10.5', location: 'Production Floor A', vlan: 10, subnetMask: '/24', position: [20, 0, -10],
     metrics: {
       l1: { temperature: 65, fanSpeed: 0 },
       l2: { crcErrors: 150, linkUtilization: 10 },
@@ -38,7 +38,7 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd4', name: 'Lion-M PLC Node B', type: 'plc', status: 'healthy', category: 'OT', ip: '192.168.10.6', location: 'Production Floor B', position: [10, 0, 20],
+    id: 'd4', name: 'Lion-M PLC Node B', type: 'plc', status: 'healthy', category: 'OT', ip: '192.168.10.6', location: 'Production Floor B', vlan: 10, subnetMask: '/24', position: [10, 0, 20],
     metrics: {
       l1: { temperature: 38 },
       l2: { crcErrors: 0, linkUtilization: 12 },
@@ -50,7 +50,7 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd5', name: 'SCADA Control Loop', type: 'scada', status: 'healthy', category: 'OT', ip: '192.168.5.10', location: 'Control Room', position: [0, 20, 0],
+    id: 'd5', name: 'SCADA Control Loop', type: 'scada', status: 'healthy', category: 'OT', ip: '192.168.5.10', location: 'Control Room', vlan: 5, subnetMask: '/24', position: [0, 20, 0],
     metrics: {
       l1: { temperature: 35 },
       l2: { crcErrors: 0, linkUtilization: 30 },
@@ -62,7 +62,7 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd6', name: 'Temp Sensor 01', type: 'sensor', status: 'healthy', category: 'OT', ip: '192.168.20.15', location: 'Zone A', position: [30, -10, 5],
+    id: 'd6', name: 'Temp Sensor 01', type: 'sensor', status: 'healthy', category: 'OT', ip: '192.168.20.15', location: 'Zone A', vlan: 20, subnetMask: '/24', position: [30, -10, 5],
     metrics: {
       l1: { temperature: 25 },
       l2: { crcErrors: 0, linkUtilization: 1 },
@@ -74,7 +74,7 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd7', name: 'Pressure Sensor 02', type: 'sensor', status: 'warning', category: 'OT', ip: '192.168.20.16', location: 'Zone B', position: [-30, -10, -5],
+    id: 'd7', name: 'Pressure Sensor 02', type: 'sensor', status: 'warning', category: 'OT', ip: '192.168.20.16', location: 'Zone B', vlan: 20, subnetMask: '/24', position: [-30, -10, -5],
     metrics: {
       l1: { temperature: 55 },
       l2: { crcErrors: 6, linkUtilization: 2 },
@@ -86,7 +86,7 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd8', name: 'OpEdge-8D Gateway', type: 'gateway', status: 'healthy', category: 'OT', ip: '192.168.1.50', location: 'Edge Network', manufacturer: 'Belden', position: [-10, 10, -15],
+    id: 'd8', name: 'OpEdge-8D Gateway', type: 'gateway', status: 'healthy', category: 'OT', ip: '192.168.1.50', location: 'Edge Network', manufacturer: 'Belden', vlan: 1, subnetMask: '/24', position: [-10, 10, -15],
     metrics: {
       l1: { temperature: 40 },
       l2: { crcErrors: 5, linkUtilization: 55 },
@@ -98,7 +98,7 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd9', name: 'Global ERP Core', type: 'server', status: 'healthy', category: 'IT', ip: '192.168.1.100', location: 'Server Room', position: [15, 15, 15],
+    id: 'd9', name: 'Global ERP Core', type: 'server', status: 'healthy', category: 'IT', ip: '192.168.1.100', location: 'Server Room', vlan: 1, subnetMask: '/24', position: [15, 15, 15],
     metrics: {
       l1: { temperature: 22, fanSpeed: 6000 },
       l2: { crcErrors: 0, linkUtilization: 80 },
@@ -110,7 +110,7 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd10', name: 'Hirschmann BOBCAT Switch', type: 'switch', status: 'warning', category: 'OT', ip: '192.168.1.3', location: 'Floor A', manufacturer: 'Hirschmann', position: [25, 5, 25],
+    id: 'd10', name: 'Hirschmann BOBCAT Switch', type: 'switch', status: 'warning', category: 'OT', ip: '192.168.1.3', location: 'Floor A', manufacturer: 'Hirschmann', vlan: 1, subnetMask: '/24', position: [25, 5, 25],
     metrics: {
       l1: { temperature: 48, opticalRxPower: -24 },
       l2: { crcErrors: 45, linkUtilization: 35 },

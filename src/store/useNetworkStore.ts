@@ -8,6 +8,8 @@ interface NetworkState {
     connections: NetworkConnection[];
     layerKPIs: LayerKPI[];
     dependencyPaths: DependencyPath[];
+    /** Device IDs currently under an injected fault — simulation must not overwrite these. */
+    faultedDeviceIds: Set<string>;
 
     // Actions
     setDevices: (devices: Device[]) => void;
@@ -49,6 +51,7 @@ export const useNetworkStore = create<NetworkState>((set) => ({
     connections: cloneConnections(initialConnections),
     layerKPIs: [...initialKPIs],
     dependencyPaths: [...initialDependencyPaths],
+    faultedDeviceIds: new Set(),
 
     setDevices: (devices) => set({ devices }),
     updateDevice: (id, updates) => set((state) => ({
@@ -66,6 +69,7 @@ export const useNetworkStore = create<NetworkState>((set) => ({
             alerts: cloneAlerts(initialAlerts),
             connections: cloneConnections(initialConnections),
             layerKPIs: [...initialKPIs],
+            faultedDeviceIds: new Set(),
         });
     },
 
@@ -208,7 +212,8 @@ export const useNetworkStore = create<NetworkState>((set) => ({
             set({
                 devices: nextDevices,
                 connections: nextConnections,
-                alerts: [...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))]
+                alerts: [...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))],
+                faultedDeviceIds: new Set(['d10', 'd5', 'd3', 'd6', 'd7', 'd1']),
             });
 
         } else if (type === 'l7') {
@@ -281,7 +286,8 @@ export const useNetworkStore = create<NetworkState>((set) => ({
             set({
                 devices: nextDevices,
                 connections: nextConnections,
-                alerts: [...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))]
+                alerts: [...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))],
+                faultedDeviceIds: new Set(['d5', 'd3', 'd4']),
             });
         }
     }
