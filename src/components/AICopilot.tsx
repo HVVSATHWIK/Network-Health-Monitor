@@ -69,7 +69,7 @@ interface AICopilotProps {
     dependencyPaths: import('../types/network').DependencyPath[];
     layerKPIs?: LayerKPI[];
     systemContext?: {
-        activeView: '3d' | 'analytics' | 'layer' | 'logs' | 'kpi';
+        activeView: '3d' | 'analytics' | 'layer' | 'logs' | 'kpi' | 'rca';
         selectedLayer: string | null;
         selectedDeviceId: string | null;
         healthPercentage: number;

@@ -14,6 +14,7 @@ const AICopilot = lazy(() => import('./components/AICopilot'));
 const SmartLogPanel = lazy(() => import('./components/SmartLogPanel'));
 const RealTimeKPIPage = lazy(() => import('./components/kpi/RealTimeKPIPage'));
 const BusinessROI = lazy(() => import('./components/BusinessROI'));
+const RcaCockpit = lazy(() => import('./components/RcaCockpit'));
 
 import { Device, NetworkConnection } from './types/network';
 import type { AIMonitoringEvent } from './components/SmartLogPanel';
@@ -55,8 +56,9 @@ const getFirebaseErrorCode = (error: unknown): string | undefined => {
 };
 
 function App() {
-  const [activeView, setActiveView] = useState<'3d' | 'analytics' | 'layer' | 'logs' | 'kpi'>('3d');
+  const [activeView, setActiveView] = useState<'3d' | 'analytics' | 'layer' | 'logs' | 'kpi' | 'rca'>('3d');
   const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
+  const [activeRcaData, setActiveRcaData] = useState<{ rootNodeId: string, affectedNodeIds: string[] } | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBooting, setIsBooting] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -173,9 +175,12 @@ function App() {
   const healthPercentage = useMemo(() => Math.round((healthyDevices / totalDevices) * 100), [healthyDevices, totalDevices]);
   const aiMonitoringSnapshot = useMemo(() => buildAIMonitoringSnapshot(alerts, devices, connections, layerKPIs, dependencyPaths), [alerts, devices, connections, layerKPIs, dependencyPaths]);
 
-  const switchView = (view: '3d' | 'analytics' | 'layer' | 'logs' | 'kpi') => {
+  const switchView = (view: '3d' | 'analytics' | 'layer' | 'logs' | 'kpi' | 'rca') => {
     const startedAt = PerfMonitorService.startTimer();
     setActiveView(view);
+    if (view !== '3d') {
+      setActiveRcaData(null); // Clear 3D RCA viz if they leave the 3D map context
+    }
     PerfMonitorService.endAction(`switch_view_${view}`, startedAt);
   };
 
@@ -388,41 +393,8 @@ function App() {
 
   const runRootCauseAnalysis = () => {
     const startedAt = PerfMonitorService.startTimer();
-    switchView('3d');
-
-    const recencyWindowMs = 10 * 60 * 1000;
-    const now = Date.now();
-    const severityRank: Record<'critical' | 'high' | 'medium' | 'low' | 'info', number> = {
-      critical: 5,
-      high: 4,
-      medium: 3,
-      low: 2,
-      info: 1,
-    };
-
-    const recentActionableAlerts = filteredAlerts
-      .filter((a) => {
-        const ts = new Date(a.timestamp).getTime();
-        return Number.isFinite(ts) && now - ts <= recencyWindowMs && a.severity !== 'info';
-      })
-      .sort((a, b) => {
-        const severityDelta = severityRank[b.severity] - severityRank[a.severity];
-        if (severityDelta !== 0) return severityDelta;
-        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-      });
-
-    const hasLiveDegradation =
-      devices.some((d) => d.status !== 'healthy') ||
-      connections.some((c) => c.status !== 'healthy');
-
-    const contextPrompt = recentActionableAlerts.length > 0
-      ? `Perform root cause analysis on current live alerts. Prioritize highest severity and explain cause, impact, and remediation. Top alert: ${recentActionableAlerts[0].device} (${recentActionableAlerts[0].layer}) - ${recentActionableAlerts[0].message}`
-      : hasLiveDegradation
-        ? 'Perform proactive root cause analysis using current live telemetry (devices, links, KPIs, workflows). There are degraded elements but no fresh high-signal alert in the last 10 minutes. Identify likely root causes and remediation.'
-        : 'Validate that the system is currently healthy and incident is resolved. If no active fault exists, provide a short health confirmation and top preventive recommendations.';
-
-    openAICopilot('root-cause', `${contextPrompt}\n\nRequest timestamp: ${new Date().toISOString()}`);
-    PerfMonitorService.endAction('run_root_cause_analysis', startedAt);
+    switchView('rca');
+    PerfMonitorService.endAction('navigate_to_rca', startedAt);
   };
 
   // GAMIFICATION: Auto-Advance Tour based on User Actions
@@ -447,6 +419,11 @@ function App() {
 
     // AI Reaction - Legacy
     // setAiMessage(`Alert Detected: ${type.toUpperCase()} Anomaly. Analyzing root cause...`); // Removed
+  };
+
+  const handleVisualizeRca = (rootNodeId: string, affectedNodeIds: string[]) => {
+    setActiveRcaData({ rootNodeId, affectedNodeIds });
+    switchView('3d');
   };
 
   const handleReset = () => {
@@ -690,6 +667,25 @@ function App() {
             3D Topology
           </button>
           <button
+            id="view-rca-trigger"
+            role="tab"
+            aria-selected={activeView === 'rca'}
+            onClick={() => switchView('rca')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 relative ${activeView === 'rca'
+              ? 'bg-purple-100 text-purple-950 shadow-[0_0_15px_rgba(216,180,254,0.3)]'
+              : 'text-purple-400 hover:text-purple-300 hover:bg-slate-800/80'
+              }`}
+          >
+            <Bot className="w-4 h-4" />
+            Incidents (RCA)
+            {filteredAlerts.length > 0 && activeView !== 'rca' && (
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+            )}
+          </button>
+          <button
             id="view-analytics-trigger"
             role="tab"
             aria-selected={activeView === 'analytics'}
@@ -762,58 +758,76 @@ function App() {
         }
 
         {
+          activeView === 'rca' && (
+            <Suspense fallback={<LoadingSkeleton label="Loading RCA Engine..." />}>
+              <RcaCockpit
+                alerts={filteredAlerts}
+                devices={devices}
+                connections={connections}
+                onVisualizeRca={handleVisualizeRca}
+              />
+            </Suspense>
+          )
+        }
+
+        {
           activeView === '3d' && (
             <Suspense fallback={<LoadingSkeleton label="Loading 3D Topology…" />}>
-            <div className="grid grid-cols-12 gap-6">
-              <div className="col-span-12">
-                <Advanced3DTopology
-                  devices={devices}
-                  connections={connections}
-                  alerts={filteredAlerts}
-                  dependencyPaths={dependencyPaths}
-                  onInjectFault={handleInjectFault}
-                  onReset={handleReset}
-                  // tourStep={showTour ? tourStep : -1} // Removed
-                  showControls={isChaosOpen}
-                  onShowControlsChange={setIsChaosOpen}
-                  selectedDeviceId={selectedDeviceId}
-                  onDeviceSelect={selectDevice}
-                  onAddDevice={handleAddDevice}
-                />
-              </div>
+              <div className="grid grid-cols-12 gap-6">
+                <div className="col-span-12">
+                  <Advanced3DTopology
+                    devices={devices}
+                    connections={connections}
+                    alerts={filteredAlerts}
+                    dependencyPaths={dependencyPaths}
+                    onInjectFault={handleInjectFault}
+                    onReset={handleReset}
+                    showControls={isChaosOpen}
+                    onShowControlsChange={setIsChaosOpen}
+                    selectedDeviceId={selectedDeviceId}
+                    onDeviceSelect={selectDevice}
+                    onAddDevice={handleAddDevice}
+                    activeRcaData={activeRcaData}
+                  />
+                </div>
 
-              {/* New Analysis Cards */}
-              <div className="col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-                <OTHealthCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} device={devices.find(d => d.id === 'd3')} />
-                <NetworkLoadCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} device={devices.find(d => d.id === 'd10')} connections={connections} devices={devices} />
-                <CorrelationTimelineCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} alerts={filteredAlerts} devices={devices} connections={connections} />
-              </div>
+                {/* New Analysis Cards */}
+                <div className="col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <OTHealthCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} device={devices.find(d => d.id === 'd3')} />
+                  <NetworkLoadCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} device={devices.find(d => d.id === 'd10')} connections={connections} devices={devices} />
+                  <CorrelationTimelineCard timeRangeLabel={timeRange.label} timeRangeValue={timeRange.value} alerts={filteredAlerts} devices={devices} connections={connections} />
+                </div>
 
-              {/* Critical Panels: Status & Alerts */}
-              <div className="col-span-12 lg:col-span-4" id="asset-status-panel">
-                <DeviceStatus
-                  devices={devices}
-                  connections={connections}
-                  selectedDeviceId={selectedDeviceId}
-                  onSelectDevice={selectDevice}
-                  onInjectFault={(id: string) => handleInjectFault(devices.find(d => d.id === id)?.category === 'OT' ? 'l1' : 'l7')}
-                />
-              </div>
-              <div className="col-span-12 lg:col-span-8" id="alerts-panel">
-                <AlertPanel alerts={filteredAlerts} devices={devices} />
-              </div>
+                {/* Critical Panels: Status & Alerts */}
+                <div className="col-span-12 lg:col-span-4" id="asset-status-panel">
+                  <DeviceStatus
+                    devices={devices}
+                    connections={connections}
+                    selectedDeviceId={selectedDeviceId}
+                    onSelectDevice={selectDevice}
+                    onInjectFault={(id: string) => handleInjectFault(devices.find(d => d.id === id)?.category === 'OT' ? 'l1' : 'l7')}
+                  />
+                </div>
+                <div className="col-span-12 lg:col-span-8" id="alerts-panel">
+                  <AlertPanel
+                    alerts={filteredAlerts}
+                    devices={devices}
+                    connections={connections}
+                    onVisualizeRca={handleVisualizeRca}
+                  />
+                </div>
 
-              <div className="col-span-12 lg:col-span-6" id="data-flow-viz">
-                <DataFlowVisualization
-                  mode={visualMode}
-                  // showControlsExternal={showTour && tourStep === 3} // Removed forced external control to enforce 'Active Learning' (User must click)
-                  selectedDevice={devices.find(d => d.id === selectedDeviceId) ?? null}
-                />
+                <div className="col-span-12 lg:col-span-6" id="data-flow-viz">
+                  <DataFlowVisualization
+                    mode={visualMode}
+                    // showControlsExternal={showTour && tourStep === 3} // Removed forced external control to enforce 'Active Learning' (User must click)
+                    selectedDevice={devices.find(d => d.id === selectedDeviceId) ?? null}
+                  />
+                </div>
+                <div className="col-span-12 lg:col-span-6" id="heatmap-panel">
+                  <NetworkHeatmap alerts={filteredAlerts} devices={devices} />
+                </div>
               </div>
-              <div className="col-span-12 lg:col-span-6" id="heatmap-panel">
-                <NetworkHeatmap alerts={filteredAlerts} devices={devices} />
-              </div>
-            </div>
             </Suspense>
           )
         }
@@ -821,60 +835,26 @@ function App() {
         {
           activeView === 'analytics' && (
             <Suspense fallback={<LoadingSkeleton label="Loading Analytics…" />}>
-            <div id="analytics-view" className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
-                <TimeRangeSelector value={timeRange} onChange={handleTimeRangeChange} />
-                <button
-                  id="kpi-matrix-trigger"
-                  onClick={() => {
-                    const startedAt = PerfMonitorService.startTimer();
-                    setShowMatrix(true);
-                    PerfMonitorService.endAction('open_kpi_matrix', startedAt);
-                  }}
-                  className="h-9 whitespace-nowrap inline-flex items-center gap-2 px-3 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 rounded-lg transition-all text-sm font-medium"
-                >
-                  <Activity className="w-4 h-4" />
-                  <span>KPI Matrix</span>
-                </button>
-              </div>
+              <div id="analytics-view" className="space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
+                  <TimeRangeSelector value={timeRange} onChange={handleTimeRangeChange} />
+                  <button
+                    id="kpi-matrix-trigger"
+                    onClick={() => {
+                      const startedAt = PerfMonitorService.startTimer();
+                      setShowMatrix(true);
+                      PerfMonitorService.endAction('open_kpi_matrix', startedAt);
+                    }}
+                    className="h-9 whitespace-nowrap inline-flex items-center gap-2 px-3 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 rounded-lg transition-all text-sm font-medium"
+                  >
+                    <Activity className="w-4 h-4" />
+                    <span>KPI Matrix</span>
+                  </button>
+                </div>
 
-              {/* Business Value Dashboard (Score Booster) */}
-              <BusinessROI healthPercentage={healthPercentage} />
-              <AdvancedAnalytics
-                devices={devices}
-                alerts={filteredAlerts}
-                connections={connections}
-                timeRangeLabel={timeRange.label}
-                timeRangeValue={timeRange.value}
-                timeRangeStart={timeRange.start}
-                timeRangeEnd={timeRange.end}
-              />
-            </div>
-            </Suspense>
-          )
-        }
-
-        {
-          activeView === 'kpi' && (
-            <Suspense fallback={<LoadingSkeleton label="Loading KPI Intelligence…" />}>
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
-                <TimeRangeSelector value={timeRange} onChange={handleTimeRangeChange} />
-                <button
-                  onClick={() => {
-                    const startedAt = PerfMonitorService.startTimer();
-                    setShowMatrix(true);
-                    PerfMonitorService.endAction('open_kpi_matrix', startedAt);
-                  }}
-                  className="h-9 whitespace-nowrap inline-flex items-center gap-2 px-3 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 rounded-lg transition-all text-sm font-medium"
-                >
-                  <Activity className="w-4 h-4" />
-                  <span>KPI Matrix</span>
-                </button>
-              </div>
-
-              <div className="h-[calc(100vh-210px)]">
-                <RealTimeKPIPage
+                {/* Business Value Dashboard (Score Booster) */}
+                <BusinessROI healthPercentage={healthPercentage} />
+                <AdvancedAnalytics
                   devices={devices}
                   alerts={filteredAlerts}
                   connections={connections}
@@ -884,7 +864,41 @@ function App() {
                   timeRangeEnd={timeRange.end}
                 />
               </div>
-            </div>
+            </Suspense>
+          )
+        }
+
+        {
+          activeView === 'kpi' && (
+            <Suspense fallback={<LoadingSkeleton label="Loading KPI Intelligence…" />}>
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
+                  <TimeRangeSelector value={timeRange} onChange={handleTimeRangeChange} />
+                  <button
+                    onClick={() => {
+                      const startedAt = PerfMonitorService.startTimer();
+                      setShowMatrix(true);
+                      PerfMonitorService.endAction('open_kpi_matrix', startedAt);
+                    }}
+                    className="h-9 whitespace-nowrap inline-flex items-center gap-2 px-3 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 rounded-lg transition-all text-sm font-medium"
+                  >
+                    <Activity className="w-4 h-4" />
+                    <span>KPI Matrix</span>
+                  </button>
+                </div>
+
+                <div className="h-[calc(100vh-210px)]">
+                  <RealTimeKPIPage
+                    devices={devices}
+                    alerts={filteredAlerts}
+                    connections={connections}
+                    timeRangeLabel={timeRange.label}
+                    timeRangeValue={timeRange.value}
+                    timeRangeStart={timeRange.start}
+                    timeRangeEnd={timeRange.end}
+                  />
+                </div>
+              </div>
             </Suspense>
           )
         }
@@ -892,14 +906,14 @@ function App() {
         {
           activeView === 'logs' && (
             <Suspense fallback={<LoadingSkeleton label="Loading System Logs…" />}>
-            <div className="h-[calc(100vh-140px)] grid grid-cols-1 xl:grid-cols-12 gap-4">
-              <div className="xl:col-span-8 h-full min-h-0">
-                <SmartLogPanel logs={smartLogs} aiTimeline={aiMonitoringTimeline} />
+              <div className="h-[calc(100vh-140px)] grid grid-cols-1 xl:grid-cols-12 gap-4">
+                <div className="xl:col-span-8 h-full min-h-0">
+                  <SmartLogPanel logs={smartLogs} aiTimeline={aiMonitoringTimeline} />
+                </div>
+                <div className="xl:col-span-4 h-full min-h-0">
+                  <PerformanceStatsPanel />
+                </div>
               </div>
-              <div className="xl:col-span-4 h-full min-h-0">
-                <PerformanceStatsPanel />
-              </div>
-            </div>
             </Suspense>
           )
         }
@@ -923,44 +937,44 @@ function App() {
 
       {/* NetMonitAI Assistant (floating button + chat panel) */}
       <Suspense fallback={null}>
-      <AICopilot
-        userName={userName}
-        launchMode={aiLaunchMode}
-        sessionKey={aiSessionKey}
-        onModeChange={(mode) => openAICopilot(mode)}
-        systemMessage={aiSystemMessage}
-        alerts={filteredAlerts}
-        devices={devices}
-        connections={connections}
-        dependencyPaths={dependencyPaths}
-        layerKPIs={layerKPIs}
-        systemContext={{
-          activeView,
-          selectedLayer,
-          selectedDeviceId,
-          healthPercentage,
-          timeRangeLabel: timeRange.label,
-          aiCoverageSummary: aiMonitoringSnapshot.summary,
-        }}
-        isOpen={isNetMonitAIOpen}
-        onOpenChange={setIsNetMonitAIOpen}
-      />
+        <AICopilot
+          userName={userName}
+          launchMode={aiLaunchMode}
+          sessionKey={aiSessionKey}
+          onModeChange={(mode) => openAICopilot(mode)}
+          systemMessage={aiSystemMessage}
+          alerts={filteredAlerts}
+          devices={devices}
+          connections={connections}
+          dependencyPaths={dependencyPaths}
+          layerKPIs={layerKPIs}
+          systemContext={{
+            activeView,
+            selectedLayer,
+            selectedDeviceId,
+            healthPercentage,
+            timeRangeLabel: timeRange.label,
+            aiCoverageSummary: aiMonitoringSnapshot.summary,
+          }}
+          isOpen={isNetMonitAIOpen}
+          onOpenChange={setIsNetMonitAIOpen}
+        />
       </Suspense>
 
       {/* Diagnostic Scan Forensic Console (only mounted when open to avoid extra launcher UI) */}
       <Suspense fallback={null}>
-      {
-        isForensicOpen && (
-          <ForensicCockpit
-            userName={userName}
-            alerts={filteredAlerts}
-            devices={devices}
-            isOpen={isForensicOpen}
-            onOpenChange={setIsForensicOpen}
-            systemMessage={forensicSystemMessage}
-          />
-        )
-      }
+        {
+          isForensicOpen && (
+            <ForensicCockpit
+              userName={userName}
+              alerts={filteredAlerts}
+              devices={devices}
+              isOpen={isForensicOpen}
+              onOpenChange={setIsForensicOpen}
+              systemMessage={forensicSystemMessage}
+            />
+          )
+        }
       </Suspense>
     </div >
   );

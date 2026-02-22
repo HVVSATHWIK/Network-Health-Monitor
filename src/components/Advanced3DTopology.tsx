@@ -26,6 +26,7 @@ interface Advanced3DTopologyProps {
   selectedDeviceId?: string | null;
   onDeviceSelect?: (id: string | null) => void;
   onAddDevice?: (device: Device, parentId?: string) => void; // Added Prop
+  activeRcaData?: { rootNodeId: string, affectedNodeIds: string[] } | null;
 }
 
 export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
@@ -40,6 +41,7 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
     selectedDeviceId,
     onDeviceSelect,
     onAddDevice,
+    activeRcaData,
   } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAddDeviceOpen, setIsAddDeviceOpen] = useState(false); // New State for Modal
@@ -61,7 +63,7 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
   const targetCamPos = useRef(new THREE.Vector3(120, 80, 160));
   const targetLookAt = useRef(new THREE.Vector3(0, 40, 0));
   const isTransitioning = useRef(false);
-  const transitionTimeout = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const transitionTimeout = useRef<number | ReturnType<typeof setTimeout> | null>(null);
 
   // --- 1. INITIALIZATION EFFEECT (Run Once) ---
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -360,9 +362,13 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
         }
 
         group.children.forEach((child) => {
-          const cd = child.userData as { blinkSpeed?: number };
+          const cd = child.userData as { blinkSpeed?: number, isRcaGlow?: boolean };
           if (typeof cd.blinkSpeed === 'number' && Math.random() < cd.blinkSpeed) {
             child.visible = !child.visible;
+          }
+          if (cd.isRcaGlow) {
+            const scale = 1 + Math.sin(Date.now() * 0.005) * 0.15;
+            child.scale.set(scale, scale, scale);
           }
         });
       });
@@ -587,6 +593,53 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
           mesh.add(outerRing);
         }
 
+        // RCA Blast Radius Highlight
+        if (activeRcaData) {
+          const isRoot = device.id === activeRcaData.rootNodeId;
+          const isAffected = activeRcaData.affectedNodeIds.includes(device.id);
+
+          if (!isRoot && !isAffected) {
+            // Dim everything else out
+            mesh.traverse((m) => {
+              if (m instanceof THREE.Mesh && m.material) {
+                const mat = m.material as THREE.Material;
+                mat.transparent = true;
+                mat.opacity = 0.15;
+
+                // if emissive exists, turn it off
+                if ('emissive' in mat) {
+                  (mat as any).emissive.setHex(0x000000);
+                }
+              }
+            });
+          } else if (isRoot) {
+            // Pulsing Red Glow for the Root
+            const rootGlow = new THREE.Mesh(
+              new THREE.TorusGeometry(14, 1, 16, 48),
+              new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.8 })
+            );
+            rootGlow.rotateX(Math.PI / 2);
+            // Simple pulse animation handled in render loop by checking userdata
+            rootGlow.userData.isRcaGlow = true;
+            mesh.add(rootGlow);
+
+            // Target camera at root
+            targetCamPos.current.set(x + 20, y + 40, z + 50);
+            targetLookAt.current.set(x, y, z);
+            isTransitioning.current = true;
+            if (transitionTimeout.current != null) window.clearTimeout(transitionTimeout.current);
+            transitionTimeout.current = window.setTimeout(() => { isTransitioning.current = false; }, 2000);
+          } else if (isAffected) {
+            // Yellow/Orange glow for affected nodes
+            const affectedGlow = new THREE.Mesh(
+              new THREE.TorusGeometry(10, 0.5, 16, 48),
+              new THREE.MeshBasicMaterial({ color: 0xffa500, transparent: true, opacity: 0.6 })
+            );
+            affectedGlow.rotateX(Math.PI / 2);
+            mesh.add(affectedGlow);
+          }
+        }
+
         // Props
         mesh.userData = { ...mesh.userData, id: device.id, type: 'device', originalY: y, floatOffset: Math.random() * 100 };
         deviceGroupRef.current?.add(mesh); // Add to ref group
@@ -595,11 +648,13 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
         const isCritical = device.status === 'critical';
         const hexColor = isCritical ? '#ef4444' : (device.status === 'warning' ? '#f59e0b' : '#34d399');
         const glitchClass = isCritical ? 'animate-pulse' : '';
+        const opacityStyle = activeRcaData && device.id !== activeRcaData.rootNodeId && !activeRcaData.affectedNodeIds.includes(device.id) ? 'opacity: 0.15;' : 'opacity: 1;';
+
         const div = document.createElement('div');
         div.className = 'flex flex-col items-center pointer-events-none';
         div.innerHTML = `
-           <div style="height: 40px; width: 1px; background: linear-gradient(to top, ${hexColor}, transparent);"></div>
-           <div class="px-3 py-2 bg-slate-900/60 border-l-2 mt-1 ${glitchClass}" style="border-left-color: ${hexColor}; box-shadow: 0 0 15px ${hexColor}40;">
+           <div style="height: 40px; width: 1px; background: linear-gradient(to top, ${hexColor}, transparent); ${opacityStyle}"></div>
+           <div class="px-3 py-2 bg-slate-900/60 border-l-2 mt-1 ${glitchClass}" style="border-left-color: ${hexColor}; box-shadow: 0 0 15px ${hexColor}40; ${opacityStyle}">
              <div class="text-[10px] uppercase tracking-widest font-mono mb-0.5" style="color: ${hexColor};">ID: ${device.id.toUpperCase()}</div>
              <div class="text-xs font-bold text-white whitespace-nowrap flex items-center gap-2">
                <span style="width: 6px; height: 6px; background-color: ${hexColor}; box-shadow: 0 0 8px ${hexColor};"></span>
@@ -634,19 +689,44 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
       tubeGeo.computeBoundsTree();
 
       const isCritical = devices.find(d => d.id === conn.source)?.status === 'critical' || devices.find(d => d.id === conn.target)?.status === 'critical';
+
+      let color = isCritical ? 0xef4444 : 0x475569;
+      let emissive = isCritical ? 0x7f1d1d : 0x000000;
+      let opacity = 1;
+      let transparent = false;
+
+      if (activeRcaData) {
+        const sourceActive = conn.source === activeRcaData.rootNodeId || activeRcaData.affectedNodeIds.includes(conn.source);
+        const targetActive = conn.target === activeRcaData.rootNodeId || activeRcaData.affectedNodeIds.includes(conn.target);
+
+        if (sourceActive && targetActive) {
+          // Highlight the failure path
+          color = 0xff0000;
+          emissive = 0xcc0000;
+        } else {
+          // Dim unrelated paths
+          opacity = 0.1;
+          transparent = true;
+          emissive = 0x000000;
+        }
+      }
+
       const tubeMat = new THREE.MeshPhongMaterial({
-        color: isCritical ? 0xef4444 : 0x475569,
-        emissive: isCritical ? 0x7f1d1d : 0x000000,
-        shininess: 20
+        color: color,
+        emissive: emissive,
+        shininess: 20,
+        opacity: opacity,
+        transparent: transparent
       });
       const cable = new THREE.Mesh(tubeGeo, tubeMat);
       cable.userData = { id: conn.id, source: conn.source, target: conn.target, status: isCritical ? 'CRITICAL' : 'HEALTHY' };
       lineGroupRef.current?.add(cable);
 
       // Packets
-      if (conn.status === 'healthy' && !isCritical) {
+      if (conn.status === 'healthy' && !isCritical && (!activeRcaData || (activeRcaData && (conn.source === activeRcaData.rootNodeId || conn.target === activeRcaData.rootNodeId)))) {
         for (let i = 0; i < 2; i++) {
-          const packet = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+          const packetColor = activeRcaData ? 0xff0000 : 0x38bdf8; // Red packets if tracing RCA
+          const packet = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: packetColor }));
           packet.userData.curve = curve;
           packet.userData.progress = Math.random();
           packet.userData.speed = 0.003 + (Math.random() * 0.002);
@@ -656,7 +736,7 @@ export default function Advanced3DTopology(props: Advanced3DTopologyProps) {
       }
     });
 
-  }, [devices, connections, selectedDeviceId, newDeviceId]); // Updates when data changes
+  }, [devices, connections, selectedDeviceId, newDeviceId, activeRcaData]); // Updates when data changes
 
   // Click Handler for Device Selection (Attached via ref to avoid stale closure if needed, but here simple click handler logic suffices if attached to DOM correctly)
   // Actually, we need to attach the click listener to the container, but it needs access to 'devices' and 'scene' which are now in refs or closure.
