@@ -162,7 +162,9 @@ function App() {
   useEffect(() => {
     if (aiEnrichmentInFlight.current) return;
 
-    const nextAlert = alerts.find((alert) => !alert.aiCorrelation || alert.aiCorrelation.trim().length === 0);
+    // Use fresh state from the store, not the closure value
+    const currentAlerts = useNetworkStore.getState().alerts;
+    const nextAlert = currentAlerts.find((alert) => !alert.aiCorrelation || alert.aiCorrelation.trim().length === 0);
     if (!nextAlert) return;
 
     aiEnrichmentInFlight.current = true;
@@ -172,7 +174,7 @@ function App() {
         const result = await analyzeWithMultiAgents(
           `Analyze root cause and impact for ${nextAlert.device}: ${nextAlert.message}`,
           null,
-          alerts,
+          currentAlerts,
           devices,
           connections,
           dependencyPaths,
@@ -203,8 +205,9 @@ function App() {
           return next.slice(-50);
         });
 
+        // Use functional updater to avoid stale closure — only update THIS alert
         setAlerts(
-          alerts.map((alert) =>
+          useNetworkStore.getState().alerts.map((alert) =>
             alert.id === nextAlert.id
               ? { ...alert, aiCorrelation: normalizedSummary }
               : alert

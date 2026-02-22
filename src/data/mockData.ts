@@ -26,15 +26,15 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd3', name: 'Lion-M PLC Node A', type: 'plc', status: 'warning', category: 'OT', ip: '192.168.10.5', location: 'Production Floor A', vlan: 10, subnetMask: '/24', position: [20, 0, -10],
+    id: 'd3', name: 'Lion-M PLC Node A', type: 'plc', status: 'healthy', category: 'OT', ip: '192.168.10.5', location: 'Production Floor A', vlan: 10, subnetMask: '/24', position: [20, 0, -10],
     metrics: {
-      l1: { temperature: 65, fanSpeed: 0 },
-      l2: { crcErrors: 150, linkUtilization: 10 },
-      l3: { packetLoss: 2.1, routingTableSize: 48, firewallDrops: 0 },
-      l4: { tcpRetransmissions: 2.4, jitter: 45 },
-      l5: { sessionResets: 6, sessionStability: 93.2 },
+      l1: { temperature: 42, fanSpeed: 0 },
+      l2: { crcErrors: 3, linkUtilization: 10 },
+      l3: { packetLoss: 0.3, routingTableSize: 48, firewallDrops: 0 },
+      l4: { tcpRetransmissions: 0.02, jitter: 4 },
+      l5: { sessionResets: 0, sessionStability: 99.4 },
       l6: { tlsHandshakeFailures: 0, encryptionOverheadMs: 0 },
-      l7: { appLatency: 350 }
+      l7: { appLatency: 18 }
     }
   },
   {
@@ -74,15 +74,15 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd7', name: 'Pressure Sensor 02', type: 'sensor', status: 'warning', category: 'OT', ip: '192.168.20.16', location: 'Zone B', vlan: 20, subnetMask: '/24', position: [-30, -10, -5],
+    id: 'd7', name: 'Pressure Sensor 02', type: 'sensor', status: 'healthy', category: 'OT', ip: '192.168.20.16', location: 'Zone B', vlan: 20, subnetMask: '/24', position: [-30, -10, -5],
     metrics: {
-      l1: { temperature: 55 },
-      l2: { crcErrors: 6, linkUtilization: 2 },
-      l3: { packetLoss: 2.8, routingTableSize: 10, firewallDrops: 0 },
-      l4: { tcpRetransmissions: 0.1, jitter: 4 },
-      l5: { sessionResets: 4, sessionStability: 95.2 },
+      l1: { temperature: 32 },
+      l2: { crcErrors: 1, linkUtilization: 2 },
+      l3: { packetLoss: 0.1, routingTableSize: 10, firewallDrops: 0 },
+      l4: { tcpRetransmissions: 0, jitter: 2 },
+      l5: { sessionResets: 0, sessionStability: 99.6 },
       l6: { tlsHandshakeFailures: 0, encryptionOverheadMs: 0 },
-      l7: { appLatency: 22 }
+      l7: { appLatency: 8 }
     }
   },
   {
@@ -110,15 +110,15 @@ export const devices: Device[] = [
     }
   },
   {
-    id: 'd10', name: 'Hirschmann BOBCAT Switch', type: 'switch', status: 'warning', category: 'OT', ip: '192.168.1.3', location: 'Floor A', manufacturer: 'Hirschmann', vlan: 1, subnetMask: '/24', position: [25, 5, 25],
+    id: 'd10', name: 'Hirschmann BOBCAT Switch', type: 'switch', status: 'healthy', category: 'OT', ip: '192.168.1.3', location: 'Floor A', manufacturer: 'Hirschmann', vlan: 1, subnetMask: '/24', position: [25, 5, 25],
     metrics: {
-      l1: { temperature: 48, opticalRxPower: -24 },
-      l2: { crcErrors: 45, linkUtilization: 35 },
-      l3: { packetLoss: 1.8, routingTableSize: 160, firewallDrops: 0 },
-      l4: { tcpRetransmissions: 1.2, jitter: 20 },
-      l5: { sessionResets: 3, sessionStability: 97.2 },
+      l1: { temperature: 40, opticalRxPower: -18 },
+      l2: { crcErrors: 2, linkUtilization: 35 },
+      l3: { packetLoss: 0.2, routingTableSize: 160, firewallDrops: 0 },
+      l4: { tcpRetransmissions: 0.03, jitter: 3 },
+      l5: { sessionResets: 0, sessionStability: 99.5 },
       l6: { tlsHandshakeFailures: 0, encryptionOverheadMs: 0 },
-      l7: { appLatency: 120 }
+      l7: { appLatency: 20 }
     }
   }
 ];
@@ -161,11 +161,11 @@ export const connections: NetworkConnection[] = [
   { id: 'c2', source: 'd1', target: 'd10', bandwidth: 640, latency: 3, status: 'healthy' },
   { id: 'c3', source: 'd1', target: 'd8', bandwidth: 780, latency: 2, status: 'healthy' },
   { id: 'c4', source: 'd1', target: 'd9', bandwidth: 890, latency: 1, status: 'healthy' },
-  { id: 'c5', source: 'd8', target: 'd3', bandwidth: 450, latency: 5, status: 'degraded' },
+  { id: 'c5', source: 'd8', target: 'd3', bandwidth: 450, latency: 5, status: 'healthy' },
   { id: 'c6', source: 'd8', target: 'd4', bandwidth: 520, latency: 4, status: 'healthy' },
   { id: 'c7', source: 'd10', target: 'd5', bandwidth: 380, latency: 3, status: 'healthy' },
   { id: 'c8', source: 'd10', target: 'd6', bandwidth: 120, latency: 6, status: 'healthy' },
-  { id: 'c9', source: 'd10', target: 'd7', bandwidth: 85, latency: 18, status: 'degraded' },
+  { id: 'c9', source: 'd10', target: 'd7', bandwidth: 85, latency: 6, status: 'healthy' },
 ];
 
 export const dependencyPaths: DependencyPath[] = [
