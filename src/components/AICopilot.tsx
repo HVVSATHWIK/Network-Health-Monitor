@@ -53,9 +53,13 @@ interface Message {
     text: string;
 }
 
+export type AILaunchMode = 'assistant' | 'root-cause' | 'diagnostic';
+
 interface AICopilotProps {
     userName?: string;
     systemMessage?: string;
+    launchMode?: AILaunchMode;
+    sessionKey?: number;
     onOpenChange?: (isOpen: boolean) => void;
     isOpen?: boolean;
     alerts: Alert[];
@@ -73,7 +77,32 @@ interface AICopilotProps {
     };
 }
 
-const buildCoordinatorIntro = (name: string) => `Hey ${name}! 👋 I'm **NetMonit AI** — your intelligent network analysis assistant.
+const buildCoordinatorIntro = (name: string, mode: AILaunchMode) => {
+    if (mode === 'root-cause') {
+        return `Hey ${name}! 👋 I'm in **Root Cause Analysis** mode.
+
+I will focus on:
+- Most likely fault origin (L1-L7)
+- Impact radius and affected workflows
+- Evidence from live telemetry
+- Actionable remediation steps
+
+Share an incident detail or use a quick action below.`;
+    }
+
+    if (mode === 'diagnostic') {
+        return `Hey ${name}! 👋 I'm in **Diagnostic Scan** mode.
+
+I will run a broad health sweep across:
+- Device and link status
+- KPI anomalies by layer
+- Alert correlations
+- Preventive risk signals
+
+Use a quick action to begin a deep scan.`;
+    }
+
+    return `Hey ${name}! 👋 I'm **NetMonit AI** — your intelligent network analysis assistant.
 
 I can help you with:
 - 🔍 **Root cause analysis** across all 7 OSI layers
@@ -83,6 +112,7 @@ I can help you with:
 - 📚 **Networking concepts** (protocols, troubleshooting, best practices)
 
 Just ask me anything — or tap one of the quick actions below to get started!`;
+};
 
 const isGreetingOnly = (query: string): boolean => {
     const q = query.trim().toLowerCase();
@@ -102,7 +132,34 @@ const isCapabilityRequest = (query: string): boolean => {
     );
 };
 
-const buildCompactCapabilitiesReply = () => `I can help with:
+const buildCompactCapabilitiesReply = (mode: AILaunchMode) => {
+    if (mode === 'root-cause') {
+        return `In Root Cause Analysis mode, I focus on:
+- Most likely fault origin and confidence
+- Layer-by-layer evidence chain
+- Blast radius and workflow impact
+- Remediation priority plan
+
+Try:
+- "Find the primary root cause for current active alerts"
+- "Show evidence for why this is L3 and not L2"
+- "Give me immediate containment steps"`;
+    }
+
+    if (mode === 'diagnostic') {
+        return `In Diagnostic Scan mode, I focus on:
+- Full health sweep (L1-L7)
+- Early-warning anomalies
+- Link/device degradation trends
+- Preventive actions before incidents escalate
+
+Try:
+- "Run a full diagnostic summary now"
+- "Which metrics are closest to threshold?"
+- "What should I monitor in the next 30 minutes?"`;
+    }
+
+    return `I can help with:
 - Root-cause analysis (L1-L7)
 - Active alerts and unhealthy device status
 - Blast-radius / impact analysis
@@ -114,6 +171,7 @@ Try:
 - "Analyze the root cause for current alerts"
 - "What devices are down right now?"
 - "What is the blast radius if Core Switch 01 fails?"`;
+};
 
 const buildObservabilitySnapshot = (
     alerts: Alert[],
@@ -172,13 +230,13 @@ const buildObservabilitySnapshot = (
     ].join('\n');
 };
 
-export default function AICopilot({ userName = "User", systemMessage, onOpenChange, isOpen = false, alerts, devices, connections, dependencyPaths, layerKPIs = [], systemContext }: AICopilotProps) {
+export default function AICopilot({ userName = "User", systemMessage, launchMode = 'assistant', sessionKey = 0, onOpenChange, isOpen = false, alerts, devices, connections, dependencyPaths, layerKPIs = [], systemContext }: AICopilotProps) {
     // Chat State
     const [messages, setMessages] = useState<Message[]>([
         {
             id: '1',
             role: 'ai',
-            text: buildCoordinatorIntro(userName)
+            text: buildCoordinatorIntro(userName, launchMode)
         }
     ]);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -187,19 +245,32 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const lastSystemMessageRef = useRef<string | undefined>(undefined);
 
-    // Update greeting
+    // Start a fresh chat session when launch entry changes (Root Cause vs NetMonit AI vs Diagnostic)
+    useEffect(() => {
+        setMessages([
+            {
+                id: '1',
+                role: 'ai',
+                text: buildCoordinatorIntro(userName, launchMode)
+            }
+        ]);
+        setInputValue('');
+        lastSystemMessageRef.current = undefined;
+    }, [sessionKey, launchMode, userName]);
+
+    // Update greeting text when user name/mode changes in-place
     useEffect(() => {
         setMessages(prev => {
             const newMessages = [...prev];
             if (newMessages.length > 0 && newMessages[0].role === 'ai') {
                 newMessages[0] = {
                     ...newMessages[0],
-                    text: buildCoordinatorIntro(userName)
+                    text: buildCoordinatorIntro(userName, launchMode)
                 };
             }
             return newMessages;
         });
-    }, [userName]);
+    }, [userName, launchMode]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -255,7 +326,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
             setMessages(prev => [...prev, {
                 id: nextMsgId(),
                 role: 'ai',
-                text: buildCompactCapabilitiesReply()
+                text: buildCompactCapabilitiesReply(launchMode)
             }]);
             setIsProcessing(false);
             return;
@@ -292,7 +363,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
         }
 
         setIsProcessing(false);
-    }, [alerts, connections, dependencyPaths, devices, isProcessing, layerKPIs, systemContext, userName]);
+    }, [alerts, connections, dependencyPaths, devices, isProcessing, layerKPIs, launchMode, systemContext, userName]);
 
     const handleSubmit = useCallback(() => {
         if (!inputValue.trim() || isProcessing) return;
@@ -312,27 +383,67 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
 
     const leadAlert = alerts[0];
     const leadDevice = devices.find((d) => d.status !== 'healthy') ?? devices[0];
-    const prompts = [
-        {
-            label: "Root Cause Check",
-            icon: <Zap className="w-3 h-3 text-yellow-400" />,
-            query: leadAlert
-                ? `Analyze root cause for current alert on ${leadAlert.device} (${leadAlert.layer}): ${leadAlert.message}`
-                : 'Analyze current live telemetry and KPIs for root-cause indicators. If no active incident exists, report top emerging risks.',
-        },
-        {
-            label: "Impact Analysis",
-            icon: <AlertTriangle className="w-3 h-3 text-red-400" />,
-            query: leadDevice
-                ? `Run blast-radius and operational impact analysis for ${leadDevice.name} using current topology/workflow context.`
-                : 'Run blast-radius analysis based on current topology, dependencies, and active telemetry.',
-        },
-        {
-            label: "Security Scan",
-            icon: <Lock className="w-3 h-3 text-blue-400" />,
-            query: 'Perform a live security posture scan using current alerts, device states, links, and telemetry. Highlight any immediate risks and actions.',
-        }
-    ];
+    const prompts = launchMode === 'root-cause'
+        ? [
+            {
+                label: "Primary Cause",
+                icon: <Zap className="w-3 h-3 text-yellow-400" />,
+                query: leadAlert
+                    ? `Identify the primary root cause for this alert and justify why: ${leadAlert.device} (${leadAlert.layer}) ${leadAlert.message}`
+                    : 'Identify the most likely root cause based on live telemetry, even if no alert is currently critical.',
+            },
+            {
+                label: "Impact Radius",
+                icon: <AlertTriangle className="w-3 h-3 text-red-400" />,
+                query: leadDevice
+                    ? `Map the blast radius for ${leadDevice.name}. Include affected workflows, dependencies, and business impact.`
+                    : 'Map likely impact radius based on current topology and workflow dependencies.',
+            },
+            {
+                label: "Fix Plan",
+                icon: <Lock className="w-3 h-3 text-blue-400" />,
+                query: 'Provide an immediate remediation plan with priority steps, validation checks, and rollback safeguards.',
+            }
+        ]
+        : launchMode === 'diagnostic'
+            ? [
+                {
+                    label: "Full Scan",
+                    icon: <Zap className="w-3 h-3 text-yellow-400" />,
+                    query: 'Run a full L1-L7 diagnostic scan and summarize any anomalies with severity.',
+                },
+                {
+                    label: "Threshold Risk",
+                    icon: <AlertTriangle className="w-3 h-3 text-red-400" />,
+                    query: 'Which metrics are closest to breaching thresholds and what preventive actions should be taken?',
+                },
+                {
+                    label: "Stability Check",
+                    icon: <Lock className="w-3 h-3 text-blue-400" />,
+                    query: 'Assess network stability for the next 30 minutes and list top operational risks.',
+                }
+            ]
+            : [
+                {
+                    label: "Root Cause Check",
+                    icon: <Zap className="w-3 h-3 text-yellow-400" />,
+                    query: leadAlert
+                        ? `Analyze root cause for current alert on ${leadAlert.device} (${leadAlert.layer}): ${leadAlert.message}`
+                        : 'Analyze current live telemetry and KPIs for root-cause indicators. If no active incident exists, report top emerging risks.',
+                },
+                {
+                    label: "Impact Analysis",
+                    icon: <AlertTriangle className="w-3 h-3 text-red-400" />,
+                    query: leadDevice
+                        ? `Run blast-radius and operational impact analysis for ${leadDevice.name} using current topology/workflow context.`
+                        : 'Run blast-radius analysis based on current topology, dependencies, and active telemetry.',
+                },
+                {
+                    label: "Security Scan",
+                    icon: <Lock className="w-3 h-3 text-blue-400" />,
+                    query: 'Perform a live security posture scan using current alerts, device states, links, and telemetry. Highlight any immediate risks and actions.',
+                }
+            ];
 
     const [mounted, setMounted] = useState(false);
     useEffect(() => { setMounted(true); return () => setMounted(false); }, []);
@@ -364,7 +475,9 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                     </div>
                     <div>
                         <h3 className="font-bold text-white text-sm tracking-tight">NetMonit Coordinator</h3>
-                        <p className="text-[10px] text-indigo-300 font-medium">AI Analysis Assistant</p>
+                        <p className="text-[10px] text-indigo-300 font-medium">
+                            {launchMode === 'root-cause' ? 'Root Cause Workflow' : launchMode === 'diagnostic' ? 'Diagnostic Scan Workflow' : 'AI Analysis Assistant'}
+                        </p>
                     </div>
                 </div>
                 <button onClick={() => onOpenChange?.(false)} aria-label="Close AI assistant" className="text-slate-400 hover:text-white transition-colors bg-white/5 p-1.5 rounded-lg hover:bg-white/10">

@@ -38,6 +38,7 @@ import {
   analyzeWithMultiAgents,
   buildAIMonitoringSnapshot,
 } from './utils/aiLogic';
+import type { AILaunchMode } from './components/AICopilot';
 
 import { auth, db } from './firebase'; // Import db
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -67,6 +68,8 @@ function App() {
   const [forensicSystemMessage, setForensicSystemMessage] = useState<string | undefined>(undefined);
   const [isNetMonitAIOpen, setIsNetMonitAIOpen] = useState(false);
   const [aiSystemMessage, setAiSystemMessage] = useState<string | undefined>(undefined);
+  const [aiLaunchMode, setAiLaunchMode] = useState<AILaunchMode>('assistant');
+  const [aiSessionKey, setAiSessionKey] = useState(0);
 
   // Time Range State
   const [timeRange, setTimeRange] = useState<TimeRange>({ ...TIME_RANGE_PRESETS[2] }); // Default to '1h' so initial alerts don't age out
@@ -158,6 +161,13 @@ function App() {
   const totalDevices = devices.length;
   const healthPercentage = useMemo(() => Math.round((healthyDevices / totalDevices) * 100), [healthyDevices, totalDevices]);
   const aiMonitoringSnapshot = useMemo(() => buildAIMonitoringSnapshot(alerts, devices, connections, layerKPIs, dependencyPaths), [alerts, devices, connections, layerKPIs, dependencyPaths]);
+
+  const openAICopilot = (mode: AILaunchMode, systemPrompt?: string) => {
+    setAiLaunchMode(mode);
+    setAiSystemMessage(systemPrompt);
+    setAiSessionKey((prev) => prev + 1);
+    startTransition(() => setIsNetMonitAIOpen(true));
+  };
 
   useEffect(() => {
     if (aiEnrichmentInFlight.current) return;
@@ -304,13 +314,13 @@ function App() {
     const unhealthyCount = devices.filter((d) => d.status !== 'healthy').length;
     const degradedLinks = connections.filter((c) => c.status !== 'healthy').length;
     const recentAlerts = filteredAlerts.slice(0, 3).map((a) => `${a.device} (${a.layer}) ${a.message}`).join(' | ');
-    setAiSystemMessage(
+    openAICopilot(
+      'diagnostic',
       `Initiate full stack diagnostic scan (L1–L7) for ${userName}. ` +
       `Live state: alerts=${filteredAlerts.length}, unhealthyDevices=${unhealthyCount}, degradedLinks=${degradedLinks}. ` +
       `${recentAlerts ? `Recent alerts: ${recentAlerts}. ` : ''}` +
       `Scan request id: ${Date.now()}.`
     );
-    startTransition(() => setIsNetMonitAIOpen(true));
 
     // Clear previous scan timers so repeated clicks behave predictably.
     scanTimeoutsRef.current.forEach((id) => window.clearTimeout(id));
@@ -364,8 +374,7 @@ function App() {
         ? 'Perform proactive root cause analysis using current live telemetry (devices, links, KPIs, workflows). There are degraded elements but no fresh high-signal alert in the last 10 minutes. Identify likely root causes and remediation.'
         : 'Validate that the system is currently healthy and incident is resolved. If no active fault exists, provide a short health confirmation and top preventive recommendations.';
 
-    setAiSystemMessage(`${contextPrompt}\n\nRequest timestamp: ${new Date().toISOString()}`);
-    startTransition(() => setIsNetMonitAIOpen(true));
+    openAICopilot('root-cause', `${contextPrompt}\n\nRequest timestamp: ${new Date().toISOString()}`);
   };
 
   // GAMIFICATION: Auto-Advance Tour based on User Actions
@@ -508,7 +517,7 @@ function App() {
 
               <button
                 id="netmonit-ai-trigger"
-                onClick={() => startTransition(() => setIsNetMonitAIOpen(true))}
+                onClick={() => openAICopilot('assistant')}
                 className="h-10 whitespace-nowrap inline-flex items-center gap-2 px-3.5 bg-slate-900/70 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-lg transition-all text-sm font-medium"
               >
                 <Bot className="w-4 h-4" />
@@ -841,6 +850,8 @@ function App() {
       <Suspense fallback={null}>
       <AICopilot
         userName={userName}
+        launchMode={aiLaunchMode}
+        sessionKey={aiSessionKey}
         systemMessage={aiSystemMessage}
         alerts={filteredAlerts}
         devices={devices}
