@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Device, Alert, NetworkConnection, LayerKPI, DependencyPath } from '../types/network';
 import { devices as initialDevices, connections as initialConnections, layerKPIs as initialKPIs, dependencyPaths as initialDependencyPaths } from '../data/mockData';
+import { archiveAlerts } from '../services/AlertHistoryDB';
 
 interface NetworkState {
     devices: Device[];
@@ -123,9 +124,11 @@ export const useNetworkStore = create<NetworkState>((set) => ({
     })),
     setAlerts: (alerts) => set({ alerts }),
     addAlert: (alert) => set((state) => ({ alerts: [...state.alerts, alert] })),
-    removeAlertsForDevice: (deviceName) => set((state) => ({
-        alerts: state.alerts.filter(a => a.device !== deviceName)
-    })),
+    removeAlertsForDevice: (deviceName) => set((state) => {
+        const removed = state.alerts.filter(a => a.device === deviceName);
+        if (removed.length > 0) void archiveAlerts(removed);
+        return { alerts: state.alerts.filter(a => a.device !== deviceName) };
+    }),
     setConnections: (connections) => set({ connections }),
     addDevice: (device) => set((state) => ({ devices: [...state.devices, device] })),
     addConnection: (connection) => set((state) => ({ connections: [...state.connections, connection] })),
@@ -133,6 +136,9 @@ export const useNetworkStore = create<NetworkState>((set) => ({
     resetSystem: () => {
         const freshDevices = cloneDevices(initialDevices);
         const freshConnections = cloneConnections(initialConnections);
+        // Archive any active alerts before clearing
+        const currentAlerts = useNetworkStore.getState().alerts;
+        if (currentAlerts.length > 0) void archiveAlerts(currentAlerts);
         set({
             devices: freshDevices,
             alerts: deriveAlertsFromState(freshDevices, freshConnections),

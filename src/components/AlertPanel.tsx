@@ -1,7 +1,8 @@
 import { Alert, Device } from '../types/network';
-import { AlertCircle, AlertTriangle, Info, Sparkles, BrainCircuit } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Info, Sparkles, BrainCircuit, History, Trash2 } from 'lucide-react';
 import { analyzeRootCause } from '../utils/aiLogic';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { getAlertHistory, clearAlertHistory, type ArchivedAlert } from '../services/AlertHistoryDB';
 
 interface AlertPanelProps {
   alerts: Alert[];
@@ -11,6 +12,31 @@ interface AlertPanelProps {
 export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
   const [insights, setInsights] = useState<Record<string, string>>({});
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
+  const [tab, setTab] = useState<'active' | 'history'>('active');
+  const [history, setHistory] = useState<ArchivedAlert[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const data = await getAlertHistory(200);
+      setHistory(data);
+    } catch {
+      // IndexedDB unavailable — silently fail
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  // Refresh history when tab switches to it, or when active alerts change (some may have resolved)
+  useEffect(() => {
+    if (tab === 'history') void loadHistory();
+  }, [tab, alerts.length, loadHistory]);
+
+  const handleClearHistory = async () => {
+    await clearAlertHistory();
+    setHistory([]);
+  };
 
   const handleAnalyze = async (alertId: string, deviceName: string) => {
     setAnalyzingIds(prev => new Set(prev).add(alertId));
@@ -40,25 +66,70 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
     info: { icon: Info, color: 'text-blue-400', bg: 'bg-blue-950/30', border: 'border-blue-500/30' },
   };
 
-  const formatTime = (date: Date) => {
-    const now = new Date();
-    const diff = Math.floor((now.getTime() - date.getTime()) / 60000);
+  const formatTimeAgo = (ms: number) => {
+    const now = Date.now();
+    const diff = Math.floor((now - ms) / 60000);
     if (diff < 1) return 'Just now';
     if (diff < 60) return `${diff}m ago`;
-    return `${Math.floor(diff / 60)}h ago`;
+    if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+    return `${Math.floor(diff / 1440)}d ago`;
   };
 
   return (
     <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-2xl h-full overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white tracking-wide">Active Alerts</h2>
-        <span className="bg-red-500/20 text-red-400 text-sm font-semibold px-3 py-1 rounded-full">
-          {alerts.length}
-        </span>
+      {/* Tab header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex gap-1 bg-slate-800/60 rounded-lg p-0.5" role="tablist">
+          <button
+            role="tab"
+            aria-selected={tab === 'active'}
+            onClick={() => setTab('active')}
+            className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${tab === 'active' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            Active
+            {alerts.length > 0 && (
+              <span className="ml-1.5 bg-red-500/20 text-red-400 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                {alerts.length}
+              </span>
+            )}
+          </button>
+          <button
+            role="tab"
+            aria-selected={tab === 'history'}
+            onClick={() => setTab('history')}
+            className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all flex items-center gap-1.5 ${tab === 'history' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            <History className="w-3.5 h-3.5" />
+            History
+            {history.length > 0 && tab !== 'history' && (
+              <span className="ml-0.5 text-xs text-slate-500">{history.length}</span>
+            )}
+          </button>
+        </div>
+
+        {tab === 'history' && history.length > 0 && (
+          <button
+            onClick={() => void handleClearHistory()}
+            className="text-xs text-slate-500 hover:text-red-400 transition-colors flex items-center gap-1"
+            title="Clear all history"
+          >
+            <Trash2 className="w-3 h-3" />
+            Clear
+          </button>
+        )}
       </div>
 
-      <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1" role="log" aria-label="Active alerts" aria-live="polite">
-        {alerts.map((alert) => {
+      {/* Active tab */}
+      {tab === 'active' && (
+        <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1" role="log" aria-label="Active alerts" aria-live="polite">
+          {alerts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+              <AlertTriangle className="w-8 h-8 mb-3 opacity-30" />
+              <p className="text-sm font-medium">No active alerts</p>
+              <p className="text-xs mt-1">All systems operating normally</p>
+            </div>
+          ) : (
+            alerts.map((alert) => {
           const config = severityConfig[alert.severity];
           const Icon = config.icon;
           const rootCauseInsight = insights[alert.id];
@@ -73,7 +144,7 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
                       {alert.severity}
                     </span>
                     <span className="text-xs text-slate-400">
-                      {formatTime(alert.timestamp)}
+                      {formatTimeAgo(new Date(alert.timestamp).getTime())}
                     </span>
                   </div>
                   <div className="text-sm font-semibold text-slate-200 mb-1">
@@ -152,8 +223,65 @@ export default function AlertPanel({ alerts, devices }: AlertPanelProps) {
               </div>
             </div>
           );
-        })}
-      </div>
+        })
+          )}
+        </div>
+      )}
+
+      {/* History tab */}
+      {tab === 'history' && (
+        <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1" role="log" aria-label="Alert history">
+          {historyLoading ? (
+            <div className="flex items-center justify-center py-12 text-slate-500">
+              <div className="w-5 h-5 border-2 border-slate-600 border-t-slate-300 rounded-full animate-spin mr-3" />
+              <span className="text-sm">Loading history…</span>
+            </div>
+          ) : history.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+              <History className="w-8 h-8 mb-3 opacity-30" />
+              <p className="text-sm font-medium">No alert history yet</p>
+              <p className="text-xs mt-1">Resolved alerts will appear here</p>
+            </div>
+          ) : (
+            history.map((item) => {
+              const config = severityConfig[item.severity];
+              const Icon = config.icon;
+              return (
+                <div key={item.historyId} className="border border-slate-700/50 bg-slate-800/30 rounded-lg p-3 opacity-80 hover:opacity-100 transition-opacity">
+                  <div className="flex items-start gap-3">
+                    <Icon className={`w-4 h-4 ${config.color} flex-shrink-0 mt-0.5 opacity-60`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className={`text-xs font-semibold ${config.color} uppercase opacity-70`}>
+                          {item.severity}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          Resolved {formatTimeAgo(item.resolvedAt)}
+                        </span>
+                      </div>
+                      <div className="text-sm font-medium text-slate-300 truncate">
+                        {item.device} ({item.layer})
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5 truncate">
+                        {item.message}
+                      </div>
+                      {item.aiCorrelation && (
+                        <div className="text-[10px] text-purple-400/70 mt-1 truncate flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 flex-shrink-0" />
+                          {item.aiCorrelation}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-slate-600 mt-1">
+                        Created {formatTimeAgo(item.timestamp)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 }
