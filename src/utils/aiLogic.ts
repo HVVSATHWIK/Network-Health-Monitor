@@ -1185,6 +1185,33 @@ function buildRecommendations(rootLayer: string): string[] {
     }
 }
 
+function buildIndustrialFlowNarrative(devices: Device[]): string {
+    const plc = devices.find((d) => d.type === 'plc');
+    const scada = devices.find((d) => d.type === 'scada' || /scada/i.test(d.name));
+    const switchNode = devices.find((d) => d.type === 'switch' || /hirschmann|switch/i.test(d.name));
+    const firewall = devices.find((d) => d.type === 'firewall' || /eagle/i.test(d.name));
+
+    const plcLabel = plc?.name ?? 'PLC endpoint';
+    const switchLabel = switchNode?.name ?? 'managed switch';
+    const firewallLabel = firewall?.name ?? 'industrial firewall/router';
+    const scadaLabel = scada?.name ?? 'SCADA server';
+
+    return `Industrial path: ${plcLabel} (L1/L2 ingress) -> ${switchLabel} (L2 switching, link checks) -> ${firewallLabel} (L3 zoning + policy) -> ${scadaLabel} (L4 reliability + L7 processing).`;
+}
+
+function buildPropagationNarrative(rootLayer: Alert['layer'], primaryDevice: string): string {
+    if (rootLayer === 'L1' || rootLayer === 'L2') {
+        return `Propagation model: lower-layer instability at ${primaryDevice} can cascade upward to L3 routing loss, L4 retries/timeouts, and L7 application delay.`;
+    }
+    if (rootLayer === 'L3') {
+        return `Propagation model: L3 impairment at ${primaryDevice} is expected to surface as L4 retransmissions/timeouts and L7 latency symptoms.`;
+    }
+    if (rootLayer === 'L4') {
+        return `Propagation model: L4 transport disruption at ${primaryDevice} typically manifests as session/application instability at L5-L7.`;
+    }
+    return `Propagation model: issue appears primarily at ${rootLayer}; validate whether any lower-layer precursors exist before final remediation.`;
+}
+
 function buildDeterministicForensicReport(
     query: string,
     alerts: Alert[],
@@ -1194,6 +1221,8 @@ function buildDeterministicForensicReport(
 ): ForensicReport {
     const chain = analyzeRelationships(alerts, devices, connections, dependencies);
     const criticality = deriveCriticality(chain, alerts);
+    const industrialFlow = buildIndustrialFlowNarrative(devices);
+    const propagationNarrative = buildPropagationNarrative(chain.primaryFault.layer, chain.primaryFault.device);
 
     const now = Date.now();
     const steps: ForensicStep[] = [
@@ -1239,11 +1268,11 @@ function buildDeterministicForensicReport(
     ];
 
     const affectedWorkflows = chain.impact?.affectedWorkflows?.length ? chain.impact.affectedWorkflows.join(', ') : 'None detected';
-    const summary = `${chain.summary} Workflows: ${affectedWorkflows}. Confidence ${(chain.confidenceScore * 100).toFixed(0)}%.`;
+    const summary = `${chain.summary} ${industrialFlow} ${propagationNarrative} Workflows: ${affectedWorkflows}. Confidence ${(chain.confidenceScore * 100).toFixed(0)}%.`;
 
     return {
         criticality,
-        rootCause: `${chain.primaryFault.layer} fault on ${chain.primaryFault.device}: ${chain.primaryFault.reason}`,
+        rootCause: `${chain.primaryFault.layer} fault on ${chain.primaryFault.device}: ${chain.primaryFault.reason}. ${propagationNarrative}`,
         chainOfThought: steps,
         artifacts: [
             {

@@ -502,6 +502,7 @@ describe('buildDeterministicForensicReport', () => {
     expect(report.artifacts.length).toBeGreaterThan(0);
     expect(report.recommendations.length).toBeGreaterThan(0);
     expect(report.summary).toBeDefined();
+    expect(report.summary).toContain('Industrial path:');
   });
 
   it('all chain-of-thought steps are "success"', () => {
