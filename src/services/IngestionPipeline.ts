@@ -50,7 +50,7 @@ export const processTelemetryBatch = (batch: RawTelemetry[]) => {
             const prevStatus = prevStatusMap.get(device.id) || 'healthy';
             const newStatus = updatedDevice.status;
 
-            const severityOrder = { healthy: 0, warning: 1, critical: 2 };
+            const severityOrder: Record<string, number> = { healthy: 0, warning: 1, critical: 2, offline: 3 };
             if (severityOrder[newStatus] > severityOrder[prevStatus]) {
                 // Check if there's already a recent alert for this device (within 30 seconds) to avoid spam
                 const recentCutoff = Date.now() - 30_000;

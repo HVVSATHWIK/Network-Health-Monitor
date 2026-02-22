@@ -1380,7 +1380,7 @@ function buildSmartFallbackResponse(
 
     // If user asks something we can't answer offline, give a comprehensive helpful response
     if (alerts.length > 0 || unhealthy.length > 0) {
-        return `I can see the network currently has **${alerts.length} active alert(s)** and **${unhealthy.length} unhealthy device(s)**.\n\nHere\'s what I can help with:\n- **"What\'s wrong?"** — Current issue summary\n- **"Analyze root cause"** — Full fault investigation with propagation chain\n- **"List active alerts"** — Detailed alert listing\n- **"Summary"** — Network status report\n- **"What is [concept]?"** — Networking knowledge (CRC, TCP, SCADA, VLANs, etc.)\n\nOr click one of the quick action buttons below!`;
+        return `I can see the network currently has **${alerts.length} active alert(s)** and **${unhealthy.length} unhealthy device(s)**.\n\nHere's what I can help with:\n- **"What's wrong?"** — Current issue summary\n- **"Analyze root cause"** — Full fault investigation with propagation chain\n- **"List active alerts"** — Detailed alert listing\n- **"Summary"** — Network status report\n- **"What is [concept]?"** — Networking knowledge (CRC, TCP, SCADA, VLANs, etc.)\n\nOr click one of the quick action buttons below!`;
     }
 
     return `I can help with a wide range of networking topics and live system analysis:\n\n- **"Summary"** or **"Status"** — Network health overview\n- **"Analyze root cause"** — Fault investigation\n- **"What is CRC / TCP / SCADA?"** — Networking concepts\n- **"How do I use the heatmap?"** — Dashboard navigation help\n\nThe network currently looks healthy with ${devices.length} devices monitored. Ask me anything!`;

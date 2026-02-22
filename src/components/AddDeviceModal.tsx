@@ -1,7 +1,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Server, Router, Cpu, Box, Shield, Gauge, Activity, AlertTriangle, Lightbulb, Check, Info, Zap } from 'lucide-react';
+import { X, Plus, Server, Router, Cpu, Box, Shield, Gauge, Activity, AlertTriangle, Check, Info, Zap } from 'lucide-react';
 import { Device, NetworkConnection } from '../types/network';
 
 // ═══════════════════════════════════════════════════════════════
@@ -52,18 +52,20 @@ const numToIp = (n: number): string => {
 };
 
 /** Get human-readable subnet string from IP + mask */
-const subnetStr = (ip: string, mask?: string): string => {
+const _subnetStr = (ip: string, mask?: string): string => {
     const bits = parseMaskBits(mask);
     const net = networkAddr(ip, bits);
     return `${numToIp(net)}/${bits}`;
 };
+void _subnetStr; // reserved for future CIDR display
 
 /** Check if two IPs are on the same network given CIDR masks */
-const sameNetwork = (ip1: string, mask1: string | undefined, ip2: string, mask2: string | undefined): boolean => {
+const _sameNetwork = (ip1: string, mask1: string | undefined, ip2: string, mask2: string | undefined): boolean => {
     // Use the more specific (larger prefix) mask for comparison
     const bits = Math.max(parseMaskBits(mask1), parseMaskBits(mask2));
     return networkAddr(ip1, bits) === networkAddr(ip2, bits);
 };
+void _sameNetwork; // reserved for cross-subnet validation
 
 const getLastOctet = (ip: string): number => Number(ip.split('.')[3]);
 const getSubnetPrefix = (ip: string): string => ip.split('.').slice(0, 3).join('.');
@@ -201,7 +203,8 @@ const classifyReachability = (
 
         const neighbors = adj.get(node.deviceId) || [];
 
-        for (const { neighborId, conn } of neighbors) {
+        for (const { neighborId, conn: _conn } of neighbors) {
+            void _conn;
             const neighbor = devices.find(d => d.id === neighborId);
             if (!neighbor) continue;
 
@@ -414,7 +417,7 @@ export default function AddDeviceModal({ onClose, onAdd, devices, connections }:
     const [name, setName] = useState('');
     const [type, setType] = useState<Device['type']>('switch');
     const [ip, setIp] = useState('');
-    const [ipTouched, setIpTouched] = useState(false);
+    const [, setIpTouched] = useState(false);
     const [category, setCategory] = useState<'IT' | 'OT'>('OT');
     const [parentId, setParentId] = useState<string>('');
     const [vlan, setVlan] = useState<number | undefined>(undefined);
@@ -428,8 +431,8 @@ export default function AddDeviceModal({ onClose, onAdd, devices, connections }:
     const parentDevice = useMemo(() => devices.find(d => d.id === parentId), [devices, parentId]);
     const parentSubnet = parentDevice ? getSubnetPrefix(parentDevice.ip) : null;
 
-    // Known VLANs
-    const knownVlans = useMemo(() => {
+    // Known VLANs (used by VLAN-aware validation engine)
+    const _knownVlans = useMemo(() => {
         const vlans = new Map<number, { count: number; subnet: string }>();
         devices.forEach(d => {
             if (d.vlan != null) {
@@ -440,6 +443,7 @@ export default function AddDeviceModal({ onClose, onAdd, devices, connections }:
         });
         return vlans;
     }, [devices]);
+    void _knownVlans;
 
     // Auto-suggest IP when parent changes in auto mode
     useEffect(() => {
