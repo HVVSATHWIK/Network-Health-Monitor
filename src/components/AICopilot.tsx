@@ -60,6 +60,7 @@ interface AICopilotProps {
     systemMessage?: string;
     launchMode?: AILaunchMode;
     sessionKey?: number;
+    onModeChange?: (mode: 'assistant' | 'root-cause') => void;
     onOpenChange?: (isOpen: boolean) => void;
     isOpen?: boolean;
     alerts: Alert[];
@@ -230,7 +231,7 @@ const buildObservabilitySnapshot = (
     ].join('\n');
 };
 
-export default function AICopilot({ userName = "User", systemMessage, launchMode = 'assistant', sessionKey = 0, onOpenChange, isOpen = false, alerts, devices, connections, dependencyPaths, layerKPIs = [], systemContext }: AICopilotProps) {
+export default function AICopilot({ userName = "User", systemMessage, launchMode = 'assistant', sessionKey = 0, onModeChange, onOpenChange, isOpen = false, alerts, devices, connections, dependencyPaths, layerKPIs = [], systemContext }: AICopilotProps) {
     // Chat State
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -383,6 +384,7 @@ export default function AICopilot({ userName = "User", systemMessage, launchMode
 
     const leadAlert = alerts[0];
     const leadDevice = devices.find((d) => d.status !== 'healthy') ?? devices[0];
+    const modeSection: 'assistant' | 'root-cause' = launchMode === 'assistant' ? 'assistant' : 'root-cause';
     const prompts = launchMode === 'root-cause'
         ? [
             {
@@ -478,6 +480,22 @@ export default function AICopilot({ userName = "User", systemMessage, launchMode
                         <p className="text-[10px] text-indigo-300 font-medium">
                             {launchMode === 'root-cause' ? 'Root Cause Workflow' : launchMode === 'diagnostic' ? 'Diagnostic Scan Workflow' : 'AI Analysis Assistant'}
                         </p>
+                        {onModeChange && (
+                            <div className="mt-2 inline-flex items-center bg-slate-900/70 border border-slate-700 rounded-md p-0.5">
+                                <button
+                                    onClick={() => onModeChange('assistant')}
+                                    className={`px-2 py-1 text-[10px] font-semibold rounded transition-colors ${modeSection === 'assistant' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'}`}
+                                >
+                                    NetMonit AI
+                                </button>
+                                <button
+                                    onClick={() => onModeChange('root-cause')}
+                                    className={`px-2 py-1 text-[10px] font-semibold rounded transition-colors ${modeSection === 'root-cause' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:text-white'}`}
+                                >
+                                    Root Cause
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
                 <button onClick={() => onOpenChange?.(false)} aria-label="Close AI assistant" className="text-slate-400 hover:text-white transition-colors bg-white/5 p-1.5 rounded-lg hover:bg-white/10">

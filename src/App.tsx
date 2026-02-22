@@ -852,6 +852,7 @@ function App() {
         userName={userName}
         launchMode={aiLaunchMode}
         sessionKey={aiSessionKey}
+        onModeChange={(mode) => openAICopilot(mode)}
         systemMessage={aiSystemMessage}
         alerts={filteredAlerts}
         devices={devices}
