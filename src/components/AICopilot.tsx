@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, X, AlertTriangle, Send, Search, Lock, Zap } from 'lucide-react';
+
+let _msgIdCounter = 0;
+const nextMsgId = () => `msg-${Date.now()}-${++_msgIdCounter}`;
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { analyzeWithMultiAgents, ForensicReport } from '../utils/aiLogic';
@@ -211,7 +214,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
         setIsProcessing(true);
 
         // 1. User Message
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: query }]);
+        setMessages(prev => [...prev, { id: nextMsgId(), role: 'user', text: query }]);
 
         if (isGreetingOnly(query)) {
             const q = query.trim().toLowerCase();
@@ -240,7 +243,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                 }
             }
             setMessages(prev => [...prev, {
-                id: Date.now().toString(),
+                id: nextMsgId(),
                 role: 'ai',
                 text: greetingReply
             }]);
@@ -250,7 +253,7 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
 
         if (isCapabilityRequest(query)) {
             setMessages(prev => [...prev, {
-                id: Date.now().toString(),
+                id: nextMsgId(),
                 role: 'ai',
                 text: buildCompactCapabilitiesReply()
             }]);
@@ -275,14 +278,14 @@ export default function AICopilot({ userName = "User", systemMessage, onOpenChan
                 : formatForensicReportAsMarkdown(finalResponse);
 
             setMessages(prev => [...prev, {
-                id: Date.now().toString(),
+                id: nextMsgId(),
                 role: 'ai',
                 text: responseText
             }]);
         } catch (error: unknown) {
             if (import.meta.env.DEV) console.error(error);
             setMessages(prev => [...prev, {
-                id: Date.now().toString(),
+                id: nextMsgId(),
                 role: 'ai',
                 text: "I apologize, but I encountered an error while coordinating the agents."
             }]);
