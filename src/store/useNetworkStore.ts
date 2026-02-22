@@ -16,6 +16,7 @@ interface NetworkState {
     updateDevice: (id: string, updates: Partial<Device>) => void;
     setAlerts: (alerts: Alert[]) => void;
     addAlert: (alert: Alert) => void;
+    removeAlertsForDevice: (deviceName: string) => void;
     setConnections: (connections: NetworkConnection[]) => void;
     addDevice: (device: Device) => void;
     addConnection: (connection: NetworkConnection) => void;
@@ -122,6 +123,9 @@ export const useNetworkStore = create<NetworkState>((set) => ({
     })),
     setAlerts: (alerts) => set({ alerts }),
     addAlert: (alert) => set((state) => ({ alerts: [...state.alerts, alert] })),
+    removeAlertsForDevice: (deviceName) => set((state) => ({
+        alerts: state.alerts.filter(a => a.device !== deviceName)
+    })),
     setConnections: (connections) => set({ connections }),
     addDevice: (device) => set((state) => ({ devices: [...state.devices, device] })),
     addConnection: (connection) => set((state) => ({ connections: [...state.connections, connection] })),

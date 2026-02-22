@@ -24,7 +24,7 @@ function detectFaultLayer(metrics: Device['metrics']): { layer: Alert['layer']; 
  * or the DataImporter (user-uploaded data).
  */
 export const processTelemetryBatch = (batch: RawTelemetry[]) => {
-    const { updateDevice, addAlert, alerts, devices, faultedDeviceIds } = useNetworkStore.getState();
+    const { updateDevice, addAlert, removeAlertsForDevice, alerts, devices, faultedDeviceIds } = useNetworkStore.getState();
 
     // Track previous device statuses for transition detection
     const prevStatusMap = new Map(devices.map(d => [d.id, d.status]));
@@ -51,6 +51,12 @@ export const processTelemetryBatch = (batch: RawTelemetry[]) => {
             const newStatus = updatedDevice.status;
 
             const severityOrder: Record<string, number> = { healthy: 0, warning: 1, critical: 2, offline: 3 };
+
+            // Auto-clear alerts when a device recovers to healthy
+            if (newStatus === 'healthy' && prevStatus !== 'healthy') {
+                removeAlertsForDevice(device.name);
+            }
+
             if (severityOrder[newStatus] > severityOrder[prevStatus]) {
                 // Check if there's already a recent alert for this device (within 30 seconds) to avoid spam
                 const recentCutoff = Date.now() - 30_000;
