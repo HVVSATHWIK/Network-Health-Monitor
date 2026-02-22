@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Device, Alert, NetworkConnection, LayerKPI, DependencyPath } from '../types/network';
-import { devices as initialDevices, alerts as initialAlerts, connections as initialConnections, layerKPIs as initialKPIs, dependencyPaths as initialDependencyPaths } from '../data/mockData';
+import { devices as initialDevices, connections as initialConnections, layerKPIs as initialKPIs, dependencyPaths as initialDependencyPaths } from '../data/mockData';
 
 interface NetworkState {
     devices: Device[];
@@ -45,9 +45,72 @@ const cloneAlerts = (source: Alert[]) => source.map(a => ({
 
 const cloneConnections = (source: NetworkConnection[]) => source.map(c => ({ ...c }));
 
+/**
+ * Derive alerts from actual device metrics and connection states.
+ * Replaces hardcoded mock alerts — every alert now reflects real topology data.
+ */
+function deriveAlertsFromState(devices: Device[], connections: NetworkConnection[]): Alert[] {
+    const out: Alert[] = [];
+    const now = new Date();
+
+    for (const d of devices) {
+        if (d.status === 'healthy') continue;
+        const m = d.metrics;
+        const sev: Alert['severity'] = d.status === 'critical' ? 'critical' : 'medium';
+
+        // Pick primary fault layer (lowest OSI layer first)
+        if ((m.l1.temperature || 0) > 60) {
+            out.push({ id: `derived-${d.id}-l1`, severity: sev, layer: 'L1', device: d.name, message: `Temperature elevated (${Math.round(m.l1.temperature || 0)}°C)`, timestamp: now });
+        } else if ((m.l1.opticalRxPower ?? 0) < -28 && m.l1.opticalRxPower !== undefined) {
+            out.push({ id: `derived-${d.id}-l1`, severity: sev, layer: 'L1', device: d.name, message: `Optical RX power degraded (${(m.l1.opticalRxPower || 0).toFixed(1)} dBm)`, timestamp: now });
+        }
+
+        if ((m.l2.crcErrors || 0) > 50) {
+            out.push({ id: `derived-${d.id}-l2`, severity: sev, layer: 'L2', device: d.name, message: `CRC error storm (${Math.round(m.l2.crcErrors || 0)} errors)`, timestamp: now });
+        } else if ((m.l2.crcErrors || 0) > 10) {
+            out.push({ id: `derived-${d.id}-l2`, severity: sev, layer: 'L2', device: d.name, message: `Elevated CRC errors (${Math.round(m.l2.crcErrors || 0)})`, timestamp: now });
+        }
+
+        if ((m.l3.packetLoss || 0) > 5) {
+            out.push({ id: `derived-${d.id}-l3`, severity: sev, layer: 'L3', device: d.name, message: `High packet loss (${(m.l3.packetLoss || 0).toFixed(1)}%)`, timestamp: now });
+        } else if ((m.l3.packetLoss || 0) > 1.5) {
+            out.push({ id: `derived-${d.id}-l3`, severity: sev, layer: 'L3', device: d.name, message: `Packet loss detected (${(m.l3.packetLoss || 0).toFixed(1)}%)`, timestamp: now });
+        }
+
+        if ((m.l4.jitter || 0) > 30) {
+            out.push({ id: `derived-${d.id}-l4`, severity: 'medium', layer: 'L4', device: d.name, message: `Elevated jitter (${Math.round(m.l4.jitter || 0)}ms)`, timestamp: now });
+        } else if ((m.l4.tcpRetransmissions || 0) > 1) {
+            out.push({ id: `derived-${d.id}-l4`, severity: 'medium', layer: 'L4', device: d.name, message: `TCP retransmissions elevated (${(m.l4.tcpRetransmissions || 0).toFixed(1)}%)`, timestamp: now });
+        }
+
+        if ((m.l7.appLatency || 0) > 500) {
+            out.push({ id: `derived-${d.id}-l7`, severity: sev, layer: 'L7', device: d.name, message: `Application latency critical (${Math.round(m.l7.appLatency || 0)}ms)`, timestamp: now });
+        } else if ((m.l7.appLatency || 0) > 200) {
+            out.push({ id: `derived-${d.id}-l7`, severity: 'medium', layer: 'L7', device: d.name, message: `Application response slow (${Math.round(m.l7.appLatency || 0)}ms)`, timestamp: now });
+        }
+    }
+
+    // Connection-level alerts
+    for (const c of connections) {
+        if (c.status === 'healthy') continue;
+        const src = devices.find(dd => dd.id === c.source);
+        const tgt = devices.find(dd => dd.id === c.target);
+        const srcName = src?.name || c.source;
+        const tgtName = tgt?.name || c.target;
+
+        if (c.status === 'down') {
+            out.push({ id: `derived-${c.id}-link`, severity: 'critical', layer: 'L1', device: srcName, message: `Link down: ${srcName} → ${tgtName}`, timestamp: now });
+        } else if (c.status === 'degraded') {
+            out.push({ id: `derived-${c.id}-link`, severity: 'medium', layer: 'L2', device: srcName, message: `Link degraded: ${srcName} → ${tgtName} (latency ${c.latency}ms)`, timestamp: now });
+        }
+    }
+
+    return out;
+}
+
 export const useNetworkStore = create<NetworkState>((set) => ({
     devices: cloneDevices(initialDevices),
-    alerts: cloneAlerts(initialAlerts),
+    alerts: deriveAlertsFromState(initialDevices, initialConnections),
     connections: cloneConnections(initialConnections),
     layerKPIs: [...initialKPIs],
     dependencyPaths: [...initialDependencyPaths],
@@ -64,10 +127,12 @@ export const useNetworkStore = create<NetworkState>((set) => ({
     addConnection: (connection) => set((state) => ({ connections: [...state.connections, connection] })),
 
     resetSystem: () => {
+        const freshDevices = cloneDevices(initialDevices);
+        const freshConnections = cloneConnections(initialConnections);
         set({
-            devices: cloneDevices(initialDevices),
-            alerts: cloneAlerts(initialAlerts),
-            connections: cloneConnections(initialConnections),
+            devices: freshDevices,
+            alerts: deriveAlertsFromState(freshDevices, freshConnections),
+            connections: freshConnections,
             layerKPIs: [...initialKPIs],
             faultedDeviceIds: new Set(),
         });
@@ -76,7 +141,6 @@ export const useNetworkStore = create<NetworkState>((set) => ({
     injectFault: (type: 'l1' | 'l7') => {
         // Replicate App.tsx logic: Reset to initial then apply fault.
         const baseDevices = cloneDevices(initialDevices);
-        const baseAlerts = cloneAlerts(initialAlerts);
         const baseConnections = cloneConnections(initialConnections);
         const now = Date.now();
 
@@ -209,10 +273,13 @@ export const useNetworkStore = create<NetworkState>((set) => ({
                 }
             ];
 
+            // Combine handcrafted sim alerts with derived alerts for non-sim devices
+            const derivedL1 = deriveAlertsFromState(nextDevices, nextConnections)
+                .filter(a => !simAlerts.some(sa => sa.device === a.device));
             set({
                 devices: nextDevices,
                 connections: nextConnections,
-                alerts: [...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))],
+                alerts: [...simAlerts, ...derivedL1],
                 faultedDeviceIds: new Set(['d10', 'd5', 'd3', 'd6', 'd7', 'd1']),
             });
 
@@ -283,10 +350,13 @@ export const useNetworkStore = create<NetworkState>((set) => ({
                 }
             ];
 
+            // Combine handcrafted sim alerts with derived alerts for non-sim devices
+            const derivedL7 = deriveAlertsFromState(nextDevices, nextConnections)
+                .filter(a => !simAlerts.some(sa => sa.device === a.device));
             set({
                 devices: nextDevices,
                 connections: nextConnections,
-                alerts: [...simAlerts, ...baseAlerts.filter(a => !a.id.startsWith('sim-'))],
+                alerts: [...simAlerts, ...derivedL7],
                 faultedDeviceIds: new Set(['d5', 'd3', 'd4']),
             });
         }

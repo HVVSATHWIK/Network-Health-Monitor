@@ -151,43 +151,10 @@ export const layerKPIs: LayerKPI[] = [
   { layer: 'L7', name: 'EtherNet/IP Health', value: 98.5, unit: '%', status: 'healthy', trend: 'stable', threshold: 97 },
 ];
 
-export const alerts: Alert[] = [
-  {
-    id: 'a1',
-    severity: 'medium',
-    layer: 'L1',
-    device: 'Pressure Sensor 02',
-    message: 'Signal degradation detected - monitor link quality',
-    timestamp: new Date(Date.now() - 5 * 60000),
-    aiCorrelation: 'Correlated with L3 routing issues in Zone B - likely physical layer root cause'
-  },
-  {
-    id: 'a2',
-    severity: 'medium',
-    layer: 'L2',
-    device: 'Hirschmann BOBCAT Switch',
-    message: 'Switch utilization approaching threshold',
-    timestamp: new Date(Date.now() - 15 * 60000),
-    aiCorrelation: 'Traffic pattern suggests normal production ramp-up'
-  },
-  {
-    id: 'a3',
-    severity: 'medium',
-    layer: 'L4',
-    device: 'Lion-M PLC Node A',
-    message: 'Increased connection timeouts detected',
-    timestamp: new Date(Date.now() - 25 * 60000),
-    aiCorrelation: 'No L1-L3 issues detected - possible application layer protocol conflict'
-  },
-  {
-    id: 'a4',
-    severity: 'low',
-    layer: 'L3',
-    device: 'Hirschmann DRAGON MACH4x00',
-    message: 'Routing table growing - review subnet allocation',
-    timestamp: new Date(Date.now() - 120 * 60000)
-  },
-];
+// Alerts are now derived dynamically from device metrics and connection
+// states at runtime (see useNetworkStore.deriveAlertsFromState).
+// This export is kept for type compatibility but is intentionally empty.
+export const alerts: Alert[] = [];
 
 export const connections: NetworkConnection[] = [
   { id: 'c1', source: 'd2', target: 'd1', bandwidth: 950, latency: 2, status: 'healthy' },
