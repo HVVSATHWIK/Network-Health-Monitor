@@ -5,6 +5,8 @@ import PropagationFlow from './PropagationFlow';
 import EscalationCard from './EscalationCard';
 import TrendAnalysisGraph from './TrendAnalysisGraph';
 import type { Alert, Device, NetworkConnection } from '../../types/network';
+import { TimeRangeSelector } from '../dashboard/TimeRangeSelector';
+import type { TimeRange } from '../dashboard/timeRangePresets';
 import {
     kpiSummary,
     layerSeverityData,
@@ -26,6 +28,8 @@ interface RealTimeKPIPageProps {
     timeRangeValue?: string;
     timeRangeStart?: Date;
     timeRangeEnd?: Date;
+    timeRange?: TimeRange;
+    onTimeRangeChange?: (range: TimeRange) => void;
 }
 
 const severityWeight: Record<Alert['severity'], number> = {
@@ -78,6 +82,8 @@ const RealTimeKPIPage = ({
     timeRangeValue = '3h',
     timeRangeStart,
     timeRangeEnd,
+    timeRange,
+    onTimeRangeChange,
 }: RealTimeKPIPageProps) => {
     const hasLiveData = devices.length > 0 || alerts.length > 0 || connections.length > 0;
 
@@ -340,9 +346,14 @@ const RealTimeKPIPage = ({
     return (
         <div className="h-full w-full p-6 lg:pr-28 pb-28 bg-gunmetal-950 text-gunmetal-100 overflow-y-auto custom-scrollbar">
             {/* Page Header */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-sans font-bold text-gunmetal-100 mb-2 tracking-tight">NetMonit AI: KPI Intelligence</h1>
-                <p className="text-gunmetal-400">Live telemetry, propagation mapping, and predictive escalation risk.</p>
+            <div className="mb-8 flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-sans font-bold text-gunmetal-100 mb-2 tracking-tight">NetMonit AI: KPI Intelligence</h1>
+                    <p className="text-gunmetal-400">Live telemetry, propagation mapping, and predictive escalation risk.</p>
+                </div>
+                {timeRange && onTimeRangeChange && (
+                    <TimeRangeSelector value={timeRange} onChange={onTimeRangeChange} />
+                )}
             </div>
 
             {/* Top Section: Global Metrics */}

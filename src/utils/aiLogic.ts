@@ -235,7 +235,7 @@ export interface ForensicReport {
     summary: string;
 }
 
-export type AnalysisResult = string | ForensicReport;
+export type AnalysisResult = string | ForensicReport | AIActionResponse;
 
 export interface AIQuotaStatus {
     perMinuteLimit: number;
@@ -614,7 +614,14 @@ async function callGeminiAPI(
 
 // ---------------- LOCAL (DETERMINISTIC) ANALYSIS ----------------
 
-type Intent = 'GENERAL_KNOWLEDGE' | 'STATUS_CHECK' | 'DIAGNOSTIC_ANALYSIS' | 'WEBSITE_ASSIST';
+type Intent = 'GENERAL_KNOWLEDGE' | 'STATUS_CHECK' | 'DIAGNOSTIC_ANALYSIS' | 'WEBSITE_ASSIST' | 'FAULT_INJECTION';
+
+/** Structured action returned when the user asks to inject a fault via chat */
+export interface AIActionResponse {
+    action: 'inject_fault';
+    faultType: 'l1' | 'l7';
+    message: string;
+}
 
 function stripRuntimeContext(query: string): string {
     const marker = 'RUNTIME SYSTEM CONTEXT:';
@@ -625,6 +632,40 @@ function stripRuntimeContext(query: string): string {
 
 function classifyIntent(query: string): Intent {
     const q = stripRuntimeContext(query).toLowerCase();
+
+    // Fault injection must be checked FIRST — before DIAGNOSTIC_ANALYSIS which also matches "fault"
+    // Patterns are intentionally typo-tolerant (cna→can, u→you, y→you, etc.)
+    const faultInjectionPatterns = [
+        'inject.*fault',
+        'inject.*l[17]',
+        'inject an? (l1|l7|layer)',
+        'simulate.*fault',
+        'simulate.*l[17]',
+        'trigger.*fault',
+        'trigger.*l[17]',
+        'run.*fault',
+        'create.*fault',
+        'start.*fault',
+        'do.*fault inject',
+        'fault inject',
+        'l1 fault',
+        'l7 fault',
+        'physical fault',
+        'application fault',
+        'cable.*(cut|fault|fail)',
+        'c[an]{2,3}\\s+(you|u|y|ya)\\s+inject',      // can/cna you/u/y inject
+        'c[an]{2,3}\\s+(you|u|y|ya)\\s+.{0,20}fault',  // can/cna you/u do a fault
+        'inject a fault',
+        'simulate a fault',
+        'simulate failure',
+        'inject failure',
+        'able\\s+to\\s+inject',                         // "be able to inject"
+        'able\\s+to\\s+.{0,15}fault',                   // "be able to do a fault"
+        'do\\s+a\\s+fault',
+        'introduce.*fault',
+        'induce.*fault',
+    ];
+    if (faultInjectionPatterns.some((p) => new RegExp(p, 'i').test(q))) return 'FAULT_INJECTION';
 
     const websiteAssistHints = [
         'where is',
@@ -1398,6 +1439,45 @@ export async function analyzeWithMultiAgents(
         return `Hey there! 👋 Network looks healthy right now with ${devices.length} devices monitored. I can help with root cause analysis, status checks, impact assessments, or any networking questions. What do you need?`;
     }
 
+    // Fault injection — return a structured action so the caller (AICopilot) can execute it
+    if (intent === 'FAULT_INJECTION') {
+        markDeterministic();
+        const q = strippedQuery.toLowerCase();
+        const wantsL7 = q.includes('l7') || q.includes('application') || q.includes('app') || q.includes('scada') || q.includes('latency');
+        const wantsL1 = q.includes('l1') || q.includes('physical') || q.includes('cable') || q.includes('fiber') || q.includes('optic');
+
+        if (wantsL7 && !wantsL1) {
+            return {
+                action: 'inject_fault',
+                faultType: 'l7',
+                message: '⚡ **L7 Application Fault injected!**\n\nSimulating SCADA application latency spike (>5000 ms), session instability, and transport retries.\n\n**Affected devices:** SCADA Control Loop, Lion-M PLC Node A, plus downstream nodes.\n\nAlerts are now active — ask me *"analyze root cause"* to see how I trace this L7-origin fault.',
+            } satisfies AIActionResponse;
+        }
+
+        if (wantsL1 && !wantsL7) {
+            return {
+                action: 'inject_fault',
+                faultType: 'l1',
+                message: '⚡ **L1 Physical Fault injected!**\n\nSimulating fiber link failure on Hirschmann BOBCAT Switch — optical RX power drop, CRC error storm, and link down.\n\n**Affected devices:** BOBCAT Switch (critical), DRAGON MACH (critical), PLC nodes, SCADA loop.\n\nThis will cascade from L1 → L2 → L3 → L7. Ask me *"analyze root cause"* to see the full propagation chain.',
+            } satisfies AIActionResponse;
+        }
+
+        // User said "inject a fault" without specifying — ask which type
+        if (!wantsL1 && !wantsL7) {
+            return 'Sure, I can inject a simulated fault! Which type would you like?\n\n' +
+                '**🔴 L1 Physical Fault** — Fiber link failure, CRC storm, optical power drop on the edge switch. Cascades up through all layers.\n\n' +
+                '**🟡 L7 Application Fault** — SCADA latency spike, session instability, transport retries. Upper-layer origin with no L1-L3 symptoms.\n\n' +
+                'Just say *"inject L1 fault"* or *"inject L7 fault"* and I\'ll trigger it.';
+        }
+
+        // Both mentioned — default to L1 (more dramatic demo)
+        return {
+            action: 'inject_fault',
+            faultType: 'l1',
+            message: '⚡ **L1 Physical Fault injected!**\n\nSimulating fiber link failure on Hirschmann BOBCAT Switch — optical RX power drop, CRC error storm, and link down.\n\n**Affected devices:** BOBCAT Switch (critical), DRAGON MACH (critical), PLC nodes, SCADA loop.\n\nThis will cascade from L1 → L2 → L3 → L7. Ask me *"analyze root cause"* to see the full propagation chain.',
+        } satisfies AIActionResponse;
+    }
+
     // For diagnostics, always return a structured report so forensic UIs can render artifacts/steps.
     if (intent === 'DIAGNOSTIC_ANALYSIS') {
         const now = Date.now();
@@ -1580,7 +1660,7 @@ export async function analyzeRootCause(
         () => { }
     );
 
-    return typeof res === 'string' ? res : res.summary;
+    return typeof res === 'string' ? res : 'summary' in res ? res.summary : res.message;
 }
 
 // ---------------- TEST EXPORTS ----------------

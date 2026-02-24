@@ -3,6 +3,15 @@ import { Device, Alert, NetworkConnection, LayerKPI, DependencyPath } from '../t
 import { devices as initialDevices, connections as initialConnections, layerKPIs as initialKPIs, dependencyPaths as initialDependencyPaths } from '../data/mockData';
 import { archiveAlerts } from '../services/AlertHistoryDB';
 
+interface ImportEvent {
+    filename: string;
+    format: 'json' | 'csv';
+    recordsIngested: number;
+    alertsGenerated: number;
+    devicesAffected: string[];
+    timestamp: number;
+}
+
 interface NetworkState {
     devices: Device[];
     alerts: Alert[];
@@ -11,6 +20,8 @@ interface NetworkState {
     dependencyPaths: DependencyPath[];
     /** Device IDs currently under an injected fault — simulation must not overwrite these. */
     faultedDeviceIds: Set<string>;
+    /** Last telemetry import event — used by AI / Smart Logs to surface import results */
+    lastImportEvent: ImportEvent | null;
 
     // Actions
     setDevices: (devices: Device[]) => void;
@@ -23,6 +34,9 @@ interface NetworkState {
     addConnection: (connection: NetworkConnection) => void;
     resetSystem: () => void;
     injectFault: (type: 'l1' | 'l7') => void;
+    recordImportEvent: (event: ImportEvent) => void;
+    /** Merge device IDs into faultedDeviceIds so simulation won't overwrite them */
+    markDevicesAsFaulted: (ids: string[]) => void;
 }
 
 // Helper to clone avoiding mutation in simulated scenarios
@@ -112,6 +126,7 @@ export const useNetworkStore = create<NetworkState>((set) => ({
     layerKPIs: [...initialKPIs],
     dependencyPaths: [...initialDependencyPaths],
     faultedDeviceIds: new Set(),
+    lastImportEvent: null,
 
     setDevices: (devices) => set({ devices }),
     updateDevice: (id, updates) => set((state) => ({
@@ -127,6 +142,13 @@ export const useNetworkStore = create<NetworkState>((set) => ({
     setConnections: (connections) => set({ connections }),
     addDevice: (device) => set((state) => ({ devices: [...state.devices, device] })),
     addConnection: (connection) => set((state) => ({ connections: [...state.connections, connection] })),
+    recordImportEvent: (event) => set({ lastImportEvent: event }),
+
+    markDevicesAsFaulted: (ids) => set((state) => {
+        const next = new Set(state.faultedDeviceIds);
+        ids.forEach(id => next.add(id));
+        return { faultedDeviceIds: next };
+    }),
 
     resetSystem: () => {
         const freshDevices = cloneDevices(initialDevices);

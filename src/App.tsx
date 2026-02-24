@@ -13,7 +13,7 @@ const ForensicCockpit = lazy(() => import('./components/forensics/ForensicCockpi
 const AICopilot = lazy(() => import('./components/AICopilot'));
 const SmartLogPanel = lazy(() => import('./components/SmartLogPanel'));
 const RealTimeKPIPage = lazy(() => import('./components/kpi/RealTimeKPIPage'));
-const BusinessROI = lazy(() => import('./components/BusinessROI'));
+
 const RcaCockpit = lazy(() => import('./components/RcaCockpit'));
 
 import { Device, NetworkConnection } from './types/network';
@@ -33,7 +33,6 @@ import { OTHealthCard } from './components/dashboard/OTHealthCard';
 import { NetworkLoadCard } from './components/dashboard/NetworkLoadCard';
 import { CorrelationTimelineCard } from './components/dashboard/CorrelationTimelineCard';
 import PerformanceStatsPanel from './components/dashboard/PerformanceStatsPanel';
-import { TimeRangeSelector } from './components/dashboard/TimeRangeSelector';
 import { TIME_RANGE_PRESETS, type TimeRange } from './components/dashboard/timeRangePresets';
 import { DataImporter } from './components/DataImporter';
 import {
@@ -168,6 +167,8 @@ function App() {
   const loadPerfBaseline = usePerfStore((state) => state.loadBaseline);
   const [aiMonitoringTimeline, setAiMonitoringTimeline] = useState<AIMonitoringEvent[]>([]);
   const aiEnrichmentInFlight = useRef(false);
+  const lastImportEvent = useNetworkStore((state) => state.lastImportEvent);
+  const lastImportProcessedRef = useRef<number>(0);
 
 
   const healthyDevices = useMemo(() => devices.filter(d => d.status === 'healthy').length, [devices]);
@@ -213,6 +214,25 @@ function App() {
     return () => PerfMonitorService.stopMemorySampler();
   }, [loadPerfBaseline]);
 
+  // Push import events into the AI monitoring timeline (Smart Logs)
+  useEffect(() => {
+    if (!lastImportEvent) return;
+    if (lastImportEvent.timestamp <= lastImportProcessedRef.current) return;
+    lastImportProcessedRef.current = lastImportEvent.timestamp;
+
+    setAiMonitoringTimeline((prev) => {
+      const entry: AIMonitoringEvent = {
+        id: `import-${lastImportEvent.timestamp}`,
+        timestamp: lastImportEvent.timestamp,
+        status: 'success',
+        layer: 'L1',
+        device: lastImportEvent.devicesAffected[0] ?? 'System',
+        detail: `Data import: ${lastImportEvent.recordsIngested} record(s) from "${lastImportEvent.filename}" (${lastImportEvent.format.toUpperCase()}). ${lastImportEvent.alertsGenerated} alert(s) generated across ${lastImportEvent.devicesAffected.length} device(s): ${lastImportEvent.devicesAffected.join(', ')}`,
+      };
+      return [...prev, entry].slice(-50);
+    });
+  }, [lastImportEvent]);
+
   useEffect(() => {
     if (aiEnrichmentInFlight.current) return;
 
@@ -235,7 +255,13 @@ function App() {
           () => { }
         );
 
-        const summary = typeof result === 'string' ? result : result.summary;
+        const summary = typeof result === 'string'
+          ? result
+          : 'summary' in result
+            ? result.summary
+            : 'message' in result
+              ? (result as { message: string }).message
+              : '';
         const normalizedSummary = summary.replace(/\s+/g, ' ').trim();
 
         if (!normalizedSummary) return;
@@ -744,6 +770,22 @@ function App() {
               <div className="text-xs font-semibold text-blue-300">{healthyDevices}/{totalDevices}</div>
             </div>
           </div>
+
+          <button
+            id="kpi-matrix-header-trigger"
+            onClick={() => {
+              const startedAt = PerfMonitorService.startTimer();
+              setShowMatrix(true);
+              PerfMonitorService.endAction('open_kpi_matrix', startedAt);
+            }}
+            className="flex items-center gap-2 bg-slate-900/70 hover:bg-slate-800 px-3 py-1.5 rounded-lg whitespace-nowrap border border-blue-500/30 transition-all cursor-pointer"
+          >
+            <Activity className="w-4 h-4 text-blue-400" />
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider">KPI Matrix</div>
+              <div className="text-xs font-semibold text-blue-300">View All</div>
+            </div>
+          </button>
         </div>
 
         {
@@ -836,24 +878,6 @@ function App() {
           activeView === 'analytics' && (
             <Suspense fallback={<LoadingSkeleton label="Loading Analytics…" />}>
               <div id="analytics-view" className="space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
-                  <TimeRangeSelector value={timeRange} onChange={handleTimeRangeChange} />
-                  <button
-                    id="kpi-matrix-trigger"
-                    onClick={() => {
-                      const startedAt = PerfMonitorService.startTimer();
-                      setShowMatrix(true);
-                      PerfMonitorService.endAction('open_kpi_matrix', startedAt);
-                    }}
-                    className="h-9 whitespace-nowrap inline-flex items-center gap-2 px-3 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 rounded-lg transition-all text-sm font-medium"
-                  >
-                    <Activity className="w-4 h-4" />
-                    <span>KPI Matrix</span>
-                  </button>
-                </div>
-
-                {/* Business Value Dashboard (Score Booster) */}
-                <BusinessROI healthPercentage={healthPercentage} />
                 <AdvancedAnalytics
                   devices={devices}
                   alerts={filteredAlerts}
@@ -862,6 +886,8 @@ function App() {
                   timeRangeValue={timeRange.value}
                   timeRangeStart={timeRange.start}
                   timeRangeEnd={timeRange.end}
+                  timeRange={timeRange}
+                  onTimeRangeChange={handleTimeRangeChange}
                 />
               </div>
             </Suspense>
@@ -872,22 +898,7 @@ function App() {
           activeView === 'kpi' && (
             <Suspense fallback={<LoadingSkeleton label="Loading KPI Intelligence…" />}>
               <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 border border-slate-800 rounded-xl p-3">
-                  <TimeRangeSelector value={timeRange} onChange={handleTimeRangeChange} />
-                  <button
-                    onClick={() => {
-                      const startedAt = PerfMonitorService.startTimer();
-                      setShowMatrix(true);
-                      PerfMonitorService.endAction('open_kpi_matrix', startedAt);
-                    }}
-                    className="h-9 whitespace-nowrap inline-flex items-center gap-2 px-3 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 rounded-lg transition-all text-sm font-medium"
-                  >
-                    <Activity className="w-4 h-4" />
-                    <span>KPI Matrix</span>
-                  </button>
-                </div>
-
-                <div className="h-[calc(100vh-210px)]">
+                <div className="h-[calc(100vh-160px)]">
                   <RealTimeKPIPage
                     devices={devices}
                     alerts={filteredAlerts}
@@ -896,6 +907,8 @@ function App() {
                     timeRangeValue={timeRange.value}
                     timeRangeStart={timeRange.start}
                     timeRangeEnd={timeRange.end}
+                    timeRange={timeRange}
+                    onTimeRangeChange={handleTimeRangeChange}
                   />
                 </div>
               </div>

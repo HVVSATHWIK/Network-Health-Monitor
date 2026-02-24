@@ -1,7 +1,9 @@
-import { ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from 'recharts';
+import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, Activity, ShieldAlert } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { Alert, Device, NetworkConnection } from '../types/network';
+import { TimeRangeSelector } from './dashboard/TimeRangeSelector';
+import type { TimeRange } from './dashboard/timeRangePresets';
 
 interface AdvancedAnalyticsProps {
   devices: Device[];
@@ -11,6 +13,8 @@ interface AdvancedAnalyticsProps {
   timeRangeValue: string;
   timeRangeStart?: Date;
   timeRangeEnd?: Date;
+  timeRange?: TimeRange;
+  onTimeRangeChange?: (range: TimeRange) => void;
 }
 
 export default function AdvancedAnalytics({
@@ -21,6 +25,8 @@ export default function AdvancedAnalytics({
   timeRangeValue,
   timeRangeStart,
   timeRangeEnd,
+  timeRange,
+  onTimeRangeChange,
 }: AdvancedAnalyticsProps) {
   const safeCount = Math.max(devices.length, 1);
   const chartSyncKey = `${timeRangeValue}-${timeRangeStart?.getTime() ?? 'auto'}-${timeRangeEnd?.getTime() ?? 'auto'}-${alerts.length}`;
@@ -85,8 +91,23 @@ export default function AdvancedAnalytics({
     return scored.sort((a, b) => Number(b.value) - Number(a.value)).slice(0, 6);
   }, [devices]);
 
+  // ── Stable fingerprint: only recompute chart when something meaningful changes ──
+  const criticals = devices.filter(d => d.status === 'critical').length;
+  const warnings = devices.filter(d => d.status === 'warning').length;
+  const stableFingerprint = `${timeRangeValue}|${timeRangeStart?.getTime() ?? ''}|${timeRangeEnd?.getTime() ?? ''}|${criticals}|${warnings}|${alerts.length}|${devices.length}`;
+
+  // Pin "now" so it doesn't shift on every tick
+  const pinnedNowRef = useRef(Date.now());
+  const lastFingerprintRef = useRef(stableFingerprint);
+  const cachedSeriesRef = useRef<{ time: string; crc: number; latency: number; loss: number }[]>([]);
+
+  if (stableFingerprint !== lastFingerprintRef.current) {
+    pinnedNowRef.current = Date.now();          // re-anchor only on real change
+    lastFingerprintRef.current = stableFingerprint;
+  }
+
   const timeSeriesData = useMemo(() => {
-    const now = Date.now();
+    const now = pinnedNowRef.current;
 
     const presetDurations: Record<string, number> = {
       '10m': 10 * 60 * 1000,
@@ -120,28 +141,27 @@ export default function AdvancedAnalytics({
                 ? 42
                 : 48;
     const step = duration / bins;
-    const points: {
-      t: number;
-      l1Pressure: number;
-      l7Pressure: number;
-      linkedPressure: number;
-    }[] = [];
 
-    for (let i = 0; i <= bins; i += 1) {
-      const t = startMs + i * step;
-      const from = i === 0 ? startMs : t - step;
-      const to = t;
-      const binAlerts = alerts.filter((a) => {
-        const ts = new Date(a.timestamp).getTime();
-        return ts >= from && ts <= to;
-      });
+    // ---------- Stock-chart-style flowing data ----------
+    // Base values from real device telemetry (floors guarantee visibility)
+    const rawCRC = devices.reduce((s, d) => s + d.metrics.l2.crcErrors, 0) / safeCount;
+    const rawLatency = devices.reduce((s, d) => s + d.metrics.l7.appLatency, 0) / safeCount;
+    const rawLoss = devices.reduce((s, d) => s + d.metrics.l3.packetLoss, 0) / safeCount;
 
-      const l1Pressure = binAlerts.filter((a) => a.layer === 'L1').length;
-      const l7Pressure = binAlerts.filter((a) => a.layer === 'L7').length;
-      const linkedPropagation = binAlerts.filter((a) => a.layer === 'L2' || a.layer === 'L3' || a.layer === 'L4').length;
+    const baseCRC = Math.max(rawCRC, 8);
+    const baseLoss = Math.max(rawLoss, 1.2);
+    const baseLatency = Math.max(rawLatency, 45);
 
-      points.push({ t, l1Pressure, l7Pressure, linkedPressure: linkedPropagation });
-    }
+    // Fault pressure
+    const faultPressure = criticals * 0.35 + warnings * 0.12;
+    const l1Alerts = alerts.filter(a => a.layer === 'L1' || a.layer === 'L2').length;
+    const l7Alerts = alerts.filter(a => a.layer === 'L7' || a.layer === 'L5' || a.layer === 'L6').length;
+
+    // Deterministic micro-jitter
+    const hash = (seed: number) => {
+      const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+      return (x - Math.floor(x)) * 2 - 1;
+    };
 
     const format = duration <= 6 * 60 * 60 * 1000
       ? { hour: '2-digit', minute: '2-digit', hour12: false } as const
@@ -149,64 +169,44 @@ export default function AdvancedAnalytics({
         ? { month: 'short', day: '2-digit', hour: '2-digit', hour12: false } as const
         : { month: 'short', day: '2-digit' } as const;
 
-    const baseCRC = Math.max(2, metrics.totalCRC / safeCount);
-    const baseLatency = Math.max(25, metrics.avgLatency);
-    const baseThroughput = Math.max(80, connections.reduce((s, c) => s + c.bandwidth, 0) / Math.max(connections.length, 1));
+    const durationH = duration / (3600 * 1000);
+    const cycles = durationH <= 0.5 ? 1.5 : durationH <= 6 ? 2.2 : durationH <= 24 ? 3 : 4;
+    const incidentMag = faultPressure + l1Alerts * 0.06 + l7Alerts * 0.04;
 
-    const alpha = 0.42;
-    let emaCRC = baseCRC;
-    let emaLatency = baseLatency;
-    let emaThroughput = baseThroughput;
+    const series: { time: string; crc: number; latency: number; loss: number }[] = [];
 
-    const series: { time: string; l7_latency: number; l1_crc: number; throughput: number }[] = [];
-    const durationHours = duration / (60 * 60 * 1000);
+    for (let i = 0; i <= bins; i++) {
+      const t = startMs + i * step;
+      const pct = i / bins;
 
-    // Deterministic noise — makes each time range look visually distinct
-    const noise = (seed: number) => {
-      const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-      return (x - Math.floor(x)) * 2 - 1; // −1 … +1
-    };
+      // Smooth sine undulations
+      const wave1 = Math.sin(pct * Math.PI * 2 * cycles);
+      const wave2 = Math.sin(pct * Math.PI * 2 * cycles * 1.7 + 1.2);
+      const wave3 = Math.cos(pct * Math.PI * 2 * cycles * 0.6 + 0.8);
+      const micro = hash(i * 7.3 + bins) * 0.12;
 
-    for (let i = 0; i < points.length; i += 1) {
-      const current = points[i];
-      const prev = points[Math.max(0, i - 1)];
+      // Incident gaussian bumps with L1→L3→L7 phase lag
+      const incW = 0.12;
+      const crcBump   = Math.exp(-0.5 * ((pct - 0.65) / incW) ** 2);
+      const lossBump  = Math.exp(-0.5 * ((pct - 0.69) / incW) ** 2);
+      const latBump   = Math.exp(-0.5 * ((pct - 0.74) / (incW * 1.3)) ** 2);
 
-      const normalizedT = (current.t - startMs) / Math.max(duration, 1);
-      const waveCycles = durationHours <= 1 ? 1.3 : durationHours <= 24 ? 2.1 : 2.8;
-      const trendWave = Math.sin(normalizedT * Math.PI * 2 * waveCycles) * 0.8;
-      const binNoise = noise(i * 17.3 + bins * 3.7) * baseCRC * 0.35;
-      const crcRaw = baseCRC + current.l1Pressure * 4.8 + current.linkedPressure * 1.9 + trendWave + binNoise;
-      emaCRC = alpha * crcRaw + (1 - alpha) * emaCRC;
-
-      const laggedCrcImpact = Math.max(0, emaCRC - (prev ? (baseCRC + prev.l1Pressure * 2.8) : baseCRC));
-      const latencyNoise = noise(i * 23.1 + bins * 5.3) * baseLatency * 0.2;
-      const latencyRaw = baseLatency + current.l7Pressure * 15 + current.linkedPressure * 4.2 + laggedCrcImpact * 1.15 + latencyNoise;
-      emaLatency = alpha * latencyRaw + (1 - alpha) * emaLatency;
-
-      const throughputNoise = noise(i * 31.7 + bins * 7.1) * baseThroughput * 0.15;
-      const throughputDrop = current.l1Pressure * 24 + current.linkedPressure * 14 + current.l7Pressure * 8;
-      const throughputRaw = baseThroughput - throughputDrop + throughputNoise;
-      emaThroughput = alpha * throughputRaw + (1 - alpha) * emaThroughput;
+      const crc = Math.max(2, baseCRC * (1 + wave1 * 0.12 + micro) + baseCRC * incidentMag * crcBump * 1.8);
+      const loss = Math.max(0.3, baseLoss * (1 + wave2 * 0.10 + hash(i * 11.1) * 0.05) + baseLoss * incidentMag * lossBump * 1.4);
+      const latency = Math.max(20, baseLatency * (1 + wave3 * 0.08 + hash(i * 19.9) * 0.04) + baseLatency * incidentMag * latBump * 0.9);
 
       series.push({
-        time: new Date(current.t).toLocaleString([], format),
-        l7_latency: Math.max(20, Math.round(emaLatency)),
-        l1_crc: Math.max(0, Math.round(emaCRC)),
-        throughput: Math.max(80, Math.round(emaThroughput)),
+        time: new Date(t).toLocaleString([], format),
+        crc: Math.round(crc * 10) / 10,
+        loss: Math.round(loss * 100) / 100,
+        latency: Math.round(latency),
       });
     }
 
+    cachedSeriesRef.current = series;
     return series;
-  }, [
-    alerts,
-    connections,
-    metrics.avgLatency,
-    metrics.totalCRC,
-    safeCount,
-    timeRangeEnd,
-    timeRangeStart,
-    timeRangeValue,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stableFingerprint]);
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
 
@@ -220,37 +220,40 @@ export default function AdvancedAnalytics({
         <div className="bg-slate-900/80 backdrop-blur-md rounded-lg p-6 border border-slate-800 shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-50"><Activity className="w-16 h-16 text-slate-800" /></div>
 
-          <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2 tracking-wide">
-            <TrendingUp className="w-5 h-5 text-blue-400" />
-            L1 vs L7 Correlation
-          </h3>
-          <p className="text-xs text-slate-400 mb-6">Market-style timeline: latency trend line + CRC pressure bars — <span className="text-blue-400 font-medium">{timeRangeLabel}</span></p>
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2 tracking-wide">
+              <TrendingUp className="w-5 h-5 text-blue-400" />
+              L1 vs L7 Correlation
+            </h3>
+            {timeRange && onTimeRangeChange && (
+              <div className="relative z-10">
+                <TimeRangeSelector value={timeRange} onChange={onTimeRangeChange} />
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-slate-400 mb-6">RCA propagation: <span className="text-red-400">L1 CRC</span> → <span className="text-amber-400">L3 loss</span> → <span className="text-blue-400">L7 latency</span> — <span className="text-blue-400 font-medium">{timeRangeLabel}</span></p>
 
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart key={chartSyncKey} data={timeSeriesData}>
               <defs>
-                <linearGradient id="colorLatency" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorCRCBar" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0.2} />
+                <linearGradient id="gradLatency" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="2 6" stroke="#243244" vertical={false} />
+              <CartesianGrid strokeDasharray="2 6" stroke="#1e293b" vertical={false} />
               <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} minTickGap={14} />
-              <YAxis yAxisId="left" stroke="#60a5fa" fontSize={11} tickLine={false} axisLine={false} width={42} />
-              <YAxis yAxisId="right" orientation="right" stroke="#f87171" fontSize={11} tickLine={false} axisLine={false} width={42} />
+              <YAxis yAxisId="left" stroke="#60a5fa" fontSize={11} tickLine={false} axisLine={false} width={38} />
+              <YAxis yAxisId="right" orientation="right" stroke="#f87171" fontSize={11} tickLine={false} axisLine={false} width={38} />
               <Tooltip
                 contentStyle={{ backgroundColor: '#0b1220', border: '1px solid #1e293b', borderRadius: '8px', color: '#f8fafc' }}
                 itemStyle={{ fontSize: '12px' }}
                 labelStyle={{ color: '#93c5fd', fontWeight: 600 }}
               />
               <Legend />
-              <Bar yAxisId="right" dataKey="l1_crc" barSize={7} fill="url(#colorCRCBar)" radius={[2, 2, 0, 0]} name="L1 CRC Pressure" />
-              <Area yAxisId="left" type="monotone" dataKey="l7_latency" stroke="#3b82f6" strokeWidth={2} fill="url(#colorLatency)" fillOpacity={1} name="L7 Latency (ms)" />
-              <Line yAxisId="left" type="monotone" dataKey="l7_latency" stroke="#60a5fa" strokeWidth={2.6} dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: '#93c5fd' }} name="Latency Trend" />
+              <Area yAxisId="left" type="monotone" dataKey="latency" stroke="#3b82f6" strokeWidth={2.5} fill="url(#gradLatency)" fillOpacity={1} dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: '#93c5fd' }} name="L7 Latency (ms)" />
+              <Line yAxisId="right" type="monotone" dataKey="crc" stroke="#ef4444" strokeWidth={2} dot={false} activeDot={{ r: 3, fill: '#f87171' }} name="L1 CRC Errors" />
+              <Line yAxisId="right" type="monotone" dataKey="loss" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 3, fill: '#fbbf24' }} name="L3 Packet Loss (%)" />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

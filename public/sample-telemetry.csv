@@ -1,0 +1,6 @@
+deviceId,timestamp,sourceType,cpu_temp,if_crc_errors,l3_packet_loss_pct,l7_response_time_ms,l4_jitter_ms,optical_rx_dbm,l6_tls_failures
+d10,1740300000000,snmp,82,980,18.5,1250,45,,
+d5,1740300001000,agent,55,120,8.2,1800,38,,
+d3,1740300002000,snmp,65,75,6.1,650,22,,
+d6,1740300003000,agent,58,35,4.3,420,18,,
+d1,1740300004000,snmp,48,15,2.8,580,12,-28,3

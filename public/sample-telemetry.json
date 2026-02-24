@@ -1,0 +1,52 @@
+[
+  {
+    "deviceId": "d10",
+    "timestamp": 1740300000000,
+    "sourceType": "snmp",
+    "cpu_temp": 82,
+    "if_crc_errors": 980,
+    "l3_packet_loss_pct": 18.5,
+    "l7_response_time_ms": 1250,
+    "l4_jitter_ms": 45
+  },
+  {
+    "deviceId": "d5",
+    "timestamp": 1740300001000,
+    "sourceType": "agent",
+    "cpu_temp": 55,
+    "if_crc_errors": 120,
+    "l3_packet_loss_pct": 8.2,
+    "l7_response_time_ms": 1800,
+    "l4_jitter_ms": 38
+  },
+  {
+    "deviceId": "d3",
+    "timestamp": 1740300002000,
+    "sourceType": "snmp",
+    "cpu_temp": 65,
+    "if_crc_errors": 75,
+    "l3_packet_loss_pct": 6.1,
+    "l7_response_time_ms": 650,
+    "l4_jitter_ms": 22
+  },
+  {
+    "deviceId": "d6",
+    "timestamp": 1740300003000,
+    "sourceType": "agent",
+    "cpu_temp": 58,
+    "if_crc_errors": 35,
+    "l3_packet_loss_pct": 4.3,
+    "l7_response_time_ms": 420,
+    "l4_jitter_ms": 18
+  },
+  {
+    "deviceId": "d1",
+    "timestamp": 1740300004000,
+    "sourceType": "snmp",
+    "cpu_temp": 48,
+    "if_crc_errors": 15,
+    "l3_packet_loss_pct": 2.8,
+    "l7_response_time_ms": 580,
+    "l4_jitter_ms": 12
+  }
+]

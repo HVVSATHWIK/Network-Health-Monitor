@@ -6,7 +6,7 @@ let _msgIdCounter = 0;
 const nextMsgId = () => `msg-${Date.now()}-${++_msgIdCounter}`;
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { analyzeWithMultiAgents, ForensicReport } from '../utils/aiLogic';
+import { analyzeWithMultiAgents, ForensicReport, AIActionResponse } from '../utils/aiLogic';
 import { Alert, Device, LayerKPI } from '../types/network';
 
 /** Convert a structured ForensicReport into rich readable markdown for the chat. */
@@ -145,24 +145,29 @@ const getInputExamples = (mode: AILaunchMode): string[] => {
 
 const normalizeChatText = (text: string): string => text
     .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '')
-    .replace(/\s{2,}/g, ' ')
+    .replace(/[^\S\n]{2,}/g, ' ')
     .trim();
 
 const isGreetingOnly = (query: string): boolean => {
     const q = query.trim().toLowerCase();
     if (!q) return false;
     if (q.length > 60) return false;
-    return /^(hi+|hello+|hey+|yo|hola|sup|what'?s\s*up|good\s+(morning|afternoon|evening|day)|how\s+are\s+you|howdy|greetings|thanks?|thank\s+you|ok|okay|cool|great|bye|goodbye|see\s+you|cheers|nice)\b/.test(q);
+    return /^(hi+|hii+|hello+|helo+|hey+|heyy+|yo|hola|sup|what'?s\s*up|wh?ats?\s*up|good\s+(morning|afternoon|evening|day)|how\s+are\s+(you|u|y|ya)|howdy|greetings|thanks?|thank\s+(you|u)|thnx|thx|ok|okay|cool|great|bye|goodbye|see\s+(you|u|ya)|cheers|nice)\b/.test(q);
 };
 
 const isCapabilityRequest = (query: string): boolean => {
     const q = query.trim().toLowerCase();
     return (
-        /what\s+can\s+(you|u)\s+do/.test(q) ||
+        /w(?:ha)?t\s+c(?:a|u)?n\s+(you|u|y|ya)\s+do/.test(q) ||
+        /w(?:ha)?t\s+(do|r|are)\s+(you|u|y|ya)\s+do/.test(q) ||
         q.includes('what can you do') ||
         q.includes('capabilities') ||
         q.includes('how can you help') ||
-        q.includes('help me')
+        /how\s+c(?:a|u)?n\s+(you|u|y)\s+help/.test(q) ||
+        q.includes('help me') ||
+        q.includes('what do you do') ||
+        q.includes('what r u able to') ||
+        /tell\s+me\s+(your|ur)\s+(features|capabilities)/.test(q)
     );
 };
 
@@ -368,8 +373,15 @@ export default function AICopilot({ userName = "User", systemMessage, launchMode
 
         try {
             const snapshot = buildObservabilitySnapshot(alerts, devices, connections, dependencyPaths, layerKPIs);
+
+            // Inject last import event context if available
+            const importStore = (await import('../store/useNetworkStore')).useNetworkStore.getState();
+            const importCtx = importStore.lastImportEvent
+                ? `\n- Last Data Import: ${importStore.lastImportEvent.filename} (${importStore.lastImportEvent.format.toUpperCase()}, ${importStore.lastImportEvent.recordsIngested} records, ${importStore.lastImportEvent.alertsGenerated} alerts generated, devices: ${importStore.lastImportEvent.devicesAffected.join(', ')}, ${Math.round((Date.now() - importStore.lastImportEvent.timestamp) / 1000)}s ago)`
+                : '';
+
             const runtimeContext = systemContext
-                ? `\n\nRUNTIME SYSTEM CONTEXT:\n- Active View: ${systemContext.activeView}\n- Selected Layer: ${systemContext.selectedLayer ?? 'none'}\n- Selected Device: ${systemContext.selectedDeviceId ?? 'none'}\n- Time Range: ${systemContext.timeRangeLabel}\n- Network Health: ${systemContext.healthPercentage}%\n- AI Coverage: ${systemContext.aiCoverageSummary}\n- Total Devices: ${devices.length}\n- Active Alerts: ${alerts.length}`
+                ? `\n\nRUNTIME SYSTEM CONTEXT:\n- Active View: ${systemContext.activeView}\n- Selected Layer: ${systemContext.selectedLayer ?? 'none'}\n- Selected Device: ${systemContext.selectedDeviceId ?? 'none'}\n- Time Range: ${systemContext.timeRangeLabel}\n- Network Health: ${systemContext.healthPercentage}%\n- AI Coverage: ${systemContext.aiCoverageSummary}\n- Total Devices: ${devices.length}\n- Active Alerts: ${alerts.length}${importCtx}`
                 : '';
 
             const contextualQuery = `${query}${runtimeContext}\n\n${snapshot}`;
@@ -377,10 +389,30 @@ export default function AICopilot({ userName = "User", systemMessage, launchMode
             // 3. Run Analysis
             const finalResponse = await analyzeWithMultiAgents(contextualQuery, null, alerts, devices, connections, dependencyPaths, () => { });
 
-            // 4. Final Coordinator Response
+            // 4. Check for action responses (e.g. fault injection)
+            if (typeof finalResponse === 'object' && 'action' in finalResponse) {
+                const actionResp = finalResponse as AIActionResponse;
+                if (actionResp.action === 'inject_fault') {
+                    // Execute the fault injection via the store
+                    const store = (await import('../store/useNetworkStore')).useNetworkStore.getState();
+                    store.injectFault(actionResp.faultType);
+
+                    setMessages(prev => [...prev, {
+                        id: nextMsgId(),
+                        role: 'ai',
+                        text: normalizeChatText(actionResp.message)
+                    }]);
+                    setIsProcessing(false);
+                    return;
+                }
+            }
+
+            // 5. Final Coordinator Response
             const responseText = typeof finalResponse === 'string'
                 ? finalResponse
-                : formatForensicReportAsMarkdown(finalResponse);
+                : 'summary' in finalResponse
+                    ? formatForensicReportAsMarkdown(finalResponse as ForensicReport)
+                    : String(finalResponse);
 
             setMessages(prev => [...prev, {
                 id: nextMsgId(),
